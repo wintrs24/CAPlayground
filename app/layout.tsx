@@ -21,7 +21,9 @@ const sourceSans = Source_Sans_3({
 export const metadata: Metadata = {
   title: "CAPlayground - Core Animation Editor",
   description: "Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer",
-  generator: "v0.app",
+  verification: {
+    google: "xNuTnO5iYYm2op2KXAClg0oYMmslpl35wOv-9RfySxU",
+  },
 }
 
 export default function RootLayout({
