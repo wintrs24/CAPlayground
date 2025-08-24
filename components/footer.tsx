@@ -12,7 +12,7 @@ export function Footer() {
               <div className="h-8 w-8 rounded-lg bg-accent flex items-center justify-center">
                 <div className="h-4 w-4 rounded bg-accent-foreground"></div>
               </div>
-              <span className="font-heading text-xl font-bold">CAPlayground</span>
+              <span className="font-helvetica-neue text-xl font-bold">CAPlayground</span>
             </div>
             <p className="text-muted-foreground text-sm">
               Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer.

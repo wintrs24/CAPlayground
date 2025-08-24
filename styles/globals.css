@@ -121,3 +121,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .font-sfpro {
+    font-family: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  }
+  .font-helvetica-neue {
+    font-family: "Helvetica Neue", Helvetica, Arial, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple Color Emoji", "Segoe UI Emoji";
+  }
+}

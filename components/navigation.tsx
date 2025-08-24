@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Sun, Moon } from "lucide-react"
+import { Menu, X, Sun, Moon, ArrowRight } from "lucide-react"
 import { useTheme } from "next-themes"
 
 export function Navigation() {
@@ -60,7 +60,7 @@ export function Navigation() {
             </div>
             <Link
               href="/"
-              className="font-heading text-xl font-bold text-foreground hover:text-accent transition-colors"
+              className="font-helvetica-neue text-xl font-bold text-foreground hover:text-accent transition-colors"
               onClick={() => setIsMenuOpen(false)}
             >
               CAPlayground
@@ -77,7 +77,7 @@ export function Navigation() {
             </Link>
             <Link href="/projects">
               <Button variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                Projects
+                Projects <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
             <Button
@@ -135,7 +135,7 @@ export function Navigation() {
                     variant="default"
                     className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold w-full"
                   >
-                    Projects
+                    Projects <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
                 </Link>
               </div>
