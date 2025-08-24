@@ -21,16 +21,16 @@ export default function RoadmapPage() {
         */}
 
         <div className="space-y-6">
-          <RoadmapItem index={1} title="Website Basics" status={<Badge>Done</Badge>}>
-            Landing page, navigation, footer, and basic styling.
+          <RoadmapItem index={1} title="The Start" status={<Badge>Done: 24th August, 2025</Badge>}>
+            Starting the project on 24th August, 2025 because Lemin said it's time for a second wallpaper competition. Creating the project.
           </RoadmapItem>
-          <RoadmapItem index={2} title="Projects and Base Editor" status={<Badge variant="secondary">In Progress</Badge>}>
+          <RoadmapItem index={2} title="Projects and Base Editor" status={<Badge>Done: 24th August, 2025</Badge>}>
             Projects page, base editor, and create .ca files.
           </RoadmapItem>
           <RoadmapItem index={3} title="Viewing and Editing Layers" status={<Badge variant="secondary">In Progress</Badge>}>
             Viewing and Editing layers in a Core Animation file.
           </RoadmapItem>
-          <RoadmapItem index={4} title="Core Animation Layer Properties" status={<Badge variant="outline">Not Started</Badge>}>
+          <RoadmapItem index={4} title="Core Animation Layer Properties" status={<Badge variant="secondary">In Progress</Badge>}>
             Adjusting position, bounds, opacity, rotation, and more of layers.
           </RoadmapItem>
           <RoadmapItem index={5} title="Creating Animations, Viewing and Editing States" status={<Badge variant="outline">Not Started</Badge>}>
