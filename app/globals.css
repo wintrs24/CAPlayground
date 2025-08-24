@@ -4,7 +4,6 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated color tokens to match CAPlayground design brief */
   --background: #ffffff;
   --foreground: #1f2937;
   --card: #f1f5f9;
@@ -112,7 +111,6 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  /* Added custom font variables for Playfair Display and Source Sans Pro */
   --font-heading: var(--font-playfair);
   --font-body: var(--font-source-sans);
 }
