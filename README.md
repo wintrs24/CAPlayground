@@ -44,7 +44,7 @@ npm run build && npm run start
 
 ## Contributing
 
-Read CONTRIBUTING.md
+Read [CONTRIBUTING.md](.github/CONTRIBUTING.md)
 
 ## License
 
