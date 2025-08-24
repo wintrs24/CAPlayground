@@ -3,10 +3,13 @@
 import Link from "next/link"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
+import { Menu, X, Sun, Moon } from "lucide-react"
+import { useTheme } from "next-themes"
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     const handleResize = () => {
@@ -20,6 +23,7 @@ export function Navigation() {
   }, [])
 
   useEffect(() => {
+    setMounted(true)
     const handleClickOutside = (event: MouseEvent) => {
       const nav = document.getElementById("mobile-nav")
       const button = document.getElementById("mobile-menu-button")
@@ -64,7 +68,7 @@ export function Navigation() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-4">
             <Link href="/docs" className="text-foreground hover:text-accent transition-colors">
               Docs
             </Link>
@@ -76,6 +80,19 @@ export function Navigation() {
                 Projects
               </Button>
             </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Toggle theme"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="rounded-full h-9 w-9 p-0"
+            >
+              {mounted && theme === "dark" ? (
+                <Sun className="h-5 w-5" />
+              ) : (
+                <Moon className="h-5 w-5" />
+              )}
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -121,6 +138,26 @@ export function Navigation() {
                     Projects
                   </Button>
                 </Link>
+              </div>
+              <div className="px-1 pb-3">
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => {
+                    setTheme(theme === "dark" ? "light" : "dark")
+                    setIsMenuOpen(false)
+                  }}
+                >
+                  {mounted && theme === "dark" ? (
+                    <>
+                      <Sun className="h-5 w-5 mr-2" /> Light Mode
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="h-5 w-5 mr-2" /> Dark Mode
+                    </>
+                  )}
+                </Button>
               </div>
             </div>
           </div>
