@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,8 +44,7 @@ export default function ProjectsPage() {
   const [rootHeight, setRootHeight] = useState<number>(844);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [isOpenInfo, setIsOpenInfo] = useState(false);
-  const [infoProjectName, setInfoProjectName] = useState<string | null>(null);
+  const router = useRouter();
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -260,8 +260,7 @@ export default function ProjectsPage() {
                       if (isSelectMode) {
                         toggleSelection(project.id);
                       } else {
-                        setInfoProjectName(project.name);
-                        setIsOpenInfo(true);
+                        router.push(`/editor/${project.id}`);
                       }
                     }}
                   >
@@ -288,7 +287,7 @@ export default function ProjectsPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (isSelectMode) toggleSelection(project.id);
-                            else { setInfoProjectName(project.name); setIsOpenInfo(true); }
+                            else router.push(`/editor/${project.id}`);
                           }}
                         >
                           <h3 className="font-medium block overflow-hidden text-ellipsis whitespace-nowrap" title={project.name}>
@@ -336,20 +335,6 @@ export default function ProjectsPage() {
           )}
         </div>
 
-        {/* Open Project Info Dialog */}
-        <Dialog open={isOpenInfo} onOpenChange={setIsOpenInfo}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{infoProjectName ?? "Project"}</DialogTitle>
-            </DialogHeader>
-            <p className="text-sm text-muted-foreground">
-              The editor is not ready yet. Opening projects will be available soon.
-            </p>
-            <DialogFooter>
-              <Button onClick={() => setIsOpenInfo(false)}>OK</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>

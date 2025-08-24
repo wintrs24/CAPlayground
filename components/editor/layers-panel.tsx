@@ -1,0 +1,62 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Plus, Trash2 } from "lucide-react";
+import { useEditor } from "./editor-context";
+
+export function LayersPanel() {
+  const { doc, selectLayer, addTextLayer, addImageLayer, addShapeLayer, deleteLayer } = useEditor();
+  const layers = doc?.layers ?? [];
+  const selectedId = doc?.selectedId ?? null;
+
+  return (
+    <Card className="p-3 h-full flex flex-col">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-medium">Layers</div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost" className="h-7 px-2">
+              <Plus className="h-4 w-4 mr-1" /> Add Layer
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={addTextLayer}>Text Layer</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => addShapeLayer("rect")}>Basic Layer</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => addImageLayer()}>Image Layer</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="text-sm rounded border bg-muted/30 divide-y overflow-auto">
+        <div className="px-2 py-2 font-medium select-none">Root Layer</div>
+        <div className="max-h-[260px] overflow-auto">
+          {layers.length === 0 && (
+            <div className="px-2 py-2 text-muted-foreground">No layers yet</div>
+          )}
+          {layers.map((l) => (
+            <div
+              key={l.id}
+              className={`px-2 py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+              onClick={() => selectLayer(l.id)}
+            >
+              <div className="truncate">
+                {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type})</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground"
+                onClick={(e) => { e.stopPropagation(); deleteLayer(l.id); }}
+                aria-label="Delete layer"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+}
