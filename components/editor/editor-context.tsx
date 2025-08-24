@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { AnyLayer, CAProject, ImageLayer, LayerBase, ShapeLayer, TextLayer } from "@/lib/ca/types";
+import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
 export type ProjectDocument = {
@@ -70,10 +70,9 @@ export function EditorProvider({
     setDoc((prev) => (prev ? { ...prev, selectedId: id } : prev));
   }, []);
 
-  const addBase = useCallback((name: string, type: LayerBase["type"]): LayerBase => ({
+  const addBase = useCallback((name: string): LayerBase => ({
     id: genId(),
     name,
-    type: type as any,
     position: { x: 50, y: 50 },
     size: { w: 120, h: 40 },
     rotation: 0,
@@ -84,7 +83,7 @@ export function EditorProvider({
     setDoc((prev) => {
       if (!prev) return prev;
       const layer: TextLayer = {
-        ...(addBase("Text Layer", "text") as LayerBase),
+        ...addBase("Text Layer"),
         type: "text",
         text: "Text Layer",
         color: "#111827",
@@ -99,7 +98,7 @@ export function EditorProvider({
     setDoc((prev) => {
       if (!prev) return prev;
       const layer: ImageLayer = {
-        ...(addBase("Image Layer", "image") as LayerBase),
+        ...addBase("Image Layer"),
         type: "image",
         size: { w: 200, h: 120 },
         src: src ?? "https://placehold.co/200x120/png",
@@ -113,35 +112,68 @@ export function EditorProvider({
     setDoc((prev) => {
       if (!prev) return prev;
       const layer: ShapeLayer = {
-        ...(addBase("Shape Layer", "shape") as LayerBase),
+        ...addBase("Shape Layer"),
         type: "shape",
         size: { w: 120, h: 120 },
         shape,
         fill: "#60a5fa",
-        radius: shape === "oval" ? 999 : 8,
+        radius: shape === "rounded-rect" ? 8 : undefined,
       };
       return { ...prev, layers: [...prev.layers, layer], selectedId: layer.id };
     });
   }, [addBase]);
+
+  const updateInTree = useCallback((layers: AnyLayer[], id: string, patch: Partial<AnyLayer>): AnyLayer[] => {
+    return layers.map((l) => {
+      if (l.id === id) return { ...l, ...patch } as AnyLayer;
+      if (l.type === "group") {
+        const g = l as GroupLayer;
+        return { ...g, children: updateInTree(g.children, id, patch) } as AnyLayer;
+      }
+      return l;
+    });
+  }, []);
+
+  const deleteInTree = useCallback((layers: AnyLayer[], id: string): AnyLayer[] => {
+    const next: AnyLayer[] = [];
+    for (const l of layers) {
+      if (l.id === id) continue;
+      if (l.type === "group") {
+        const g = l as GroupLayer;
+        next.push({ ...g, children: deleteInTree(g.children, id) } as AnyLayer);
+      } else {
+        next.push(l);
+      }
+    }
+    return next;
+  }, []);
+
+  const containsId = useCallback((layers: AnyLayer[], id: string): boolean => {
+    for (const l of layers) {
+      if (l.id === id) return true;
+      if (l.type === "group" && containsId((l as GroupLayer).children, id)) return true;
+    }
+    return false;
+  }, []);
 
   const updateLayer = useCallback((id: string, patch: Partial<AnyLayer>) => {
     setDoc((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
-        layers: prev.layers.map((l) => (l.id === id ? { ...l, ...patch } as AnyLayer : l)),
+        layers: updateInTree(prev.layers, id, patch),
       };
     });
-  }, []);
+  }, [updateInTree]);
 
   const deleteLayer = useCallback((id: string) => {
     setDoc((prev) => {
       if (!prev) return prev;
-      const nextLayers = prev.layers.filter((l) => l.id !== id);
-      const nextSelected = prev.selectedId === id ? null : prev.selectedId;
+      const nextLayers = deleteInTree(prev.layers, id);
+      const nextSelected = prev.selectedId === id || (prev.selectedId ? !containsId(nextLayers, prev.selectedId) : false) ? null : prev.selectedId;
       return { ...prev, layers: nextLayers, selectedId: nextSelected };
     });
-  }, []);
+  }, [deleteInTree, containsId]);
 
   const value = useMemo<EditorContextValue>(() => ({
     doc,

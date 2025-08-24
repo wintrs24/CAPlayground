@@ -5,11 +5,46 @@ import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, Trash2 } from "lucide-react";
 import { useEditor } from "./editor-context";
+import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 
 export function LayersPanel() {
   const { doc, selectLayer, addTextLayer, addImageLayer, addShapeLayer, deleteLayer } = useEditor();
   const layers = doc?.layers ?? [];
   const selectedId = doc?.selectedId ?? null;
+
+  const renderItem = (l: AnyLayer, depth: number) => {
+    const row = (
+      <div
+        key={l.id}
+        className={`px-2 py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+        onClick={() => selectLayer(l.id)}
+        style={{ paddingLeft: 8 + depth * 12 }}
+      >
+        <div className="truncate">
+          {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type})</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 text-muted-foreground"
+          onClick={(e) => { e.stopPropagation(); deleteLayer(l.id); }}
+          aria-label="Delete layer"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    );
+    if (l.type === "group") {
+      const g = l as GroupLayer;
+      return (
+        <div key={l.id}>
+          {row}
+          {g.children.map((c) => renderItem(c, depth + 1))}
+        </div>
+      );
+    }
+    return row;
+  };
 
   return (
     <Card className="p-3 h-full flex flex-col">
@@ -35,26 +70,7 @@ export function LayersPanel() {
           {layers.length === 0 && (
             <div className="px-2 py-2 text-muted-foreground">No layers yet</div>
           )}
-          {layers.map((l) => (
-            <div
-              key={l.id}
-              className={`px-2 py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
-              onClick={() => selectLayer(l.id)}
-            >
-              <div className="truncate">
-                {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type})</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground"
-                onClick={(e) => { e.stopPropagation(); deleteLayer(l.id); }}
-                aria-label="Delete layer"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+          {layers.map((l) => renderItem(l, 0))}
         </div>
       </div>
     </Card>

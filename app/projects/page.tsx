@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -24,7 +24,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check } from "lucide-react";
+import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload } from "lucide-react";
+import { unpackCA } from "@/lib/ca/ca-file";
 
 interface Project {
   id: string;
@@ -48,6 +49,7 @@ export default function ProjectsPage() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const projectsArray = Array.isArray(projects) ? projects : [];
 
@@ -126,6 +128,50 @@ export default function ProjectsPage() {
     );
   };
 
+  const handleImportClick = () => importInputRef.current?.click();
+
+  const handleImportChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const bundle = await unpackCA(file);
+      const id = Date.now().toString();
+      const name = bundle.project.name || "Imported Project";
+      const width = Math.round(bundle.project.width || (bundle.root?.size?.w ?? 0));
+      const height = Math.round(bundle.project.height || (bundle.root?.size?.h ?? 0));
+
+      const newProj: Project = {
+        id,
+        name,
+        createdAt: new Date().toISOString(),
+        width,
+        height,
+      };
+      setProjects([...(projectsArray || []), newProj]);
+
+      const root = bundle.root as any;
+      const layers = root?.type === 'group' && Array.isArray(root.children)
+        ? root.children
+        : root
+          ? [root]
+          : [];
+      const doc = {
+        meta: { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb' },
+        layers,
+        selectedId: null,
+      };
+      try {
+        localStorage.setItem(`caplayground-project:${id}`, JSON.stringify(doc));
+      } catch {}
+
+      router.push(`/editor/${id}`);
+    } catch (err) {
+      console.error('Import failed', err);
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
+
   const openBulkDelete = () => setIsBulkDeleteOpen(true);
   const performBulkDelete = () => {
     if (selectedIds.length === 0) return;
@@ -168,6 +214,16 @@ export default function ProjectsPage() {
           <div className="w-full md:w-auto flex gap-2">
             <Button variant={isSelectMode ? "secondary" : "outline"} onClick={toggleSelectMode}>
               {isSelectMode ? "Done" : "Select"}
+            </Button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".ca,application/zip"
+              onChange={handleImportChange}
+              className="hidden"
+            />
+            <Button variant="outline" onClick={handleImportClick}>
+              <Upload className="h-4 w-4 mr-2" /> Import .ca
             </Button>
             {isSelectMode && (
               <Button

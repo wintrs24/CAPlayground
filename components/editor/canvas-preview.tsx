@@ -3,6 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor } from "./editor-context";
+import type { AnyLayer, GroupLayer, ShapeLayer } from "@/lib/ca/types";
 
 export function CanvasPreview() {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -34,6 +35,50 @@ export function CanvasPreview() {
 
   const layers = doc?.layers ?? [];
 
+  const renderLayer = (l: AnyLayer): React.ReactNode => {
+    const common: React.CSSProperties = {
+      position: "absolute",
+      left: l.position.x,
+      top: l.position.y,
+      width: l.size.w,
+      height: l.size.h,
+      transform: `rotate(${l.rotation ?? 0}deg)`,
+      display: l.visible === false ? "none" : undefined,
+    };
+
+    if (l.type === "text") {
+      return (
+        <div key={l.id} style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: l.align ?? "left" }}>
+          {l.text}
+        </div>
+      );
+    }
+    if (l.type === "image") {
+      return (
+        <img
+          key={l.id}
+          src={l.src}
+          alt={l.name}
+          style={{ ...common, objectFit: (l as any).fit ?? ("cover" as any) }}
+        />
+      );
+    }
+    if (l.type === "shape") {
+      const s = l as ShapeLayer;
+      const borderRadius = s.shape === "circle" ? 9999 : (s.shape === "rounded-rect" ? (s.radius ?? 8) : 0);
+      return (
+        <div key={l.id} style={{ ...common, background: s.fill, borderRadius }} />
+      );
+    }
+    // group
+    const g = l as GroupLayer;
+    return (
+      <div key={g.id} style={{ ...common, background: g.backgroundColor }}>
+        {g.children.map((c) => renderLayer(c))}
+      </div>
+    );
+  };
+
   return (
     <Card ref={ref} className="relative w-full h-full overflow-hidden p-0">
       <div
@@ -57,39 +102,7 @@ export function CanvasPreview() {
           boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08)",
         }}
       >
-        {layers.map((l) => {
-          const common: React.CSSProperties = {
-            position: "absolute",
-            left: l.position.x,
-            top: l.position.y,
-            width: l.size.w,
-            height: l.size.h,
-            transform: `rotate(${l.rotation ?? 0}deg)`,
-            display: l.visible === false ? "none" : undefined,
-          };
-
-          if (l.type === "text") {
-            return (
-              <div key={l.id} style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: l.align ?? "left" }}>
-                {l.text}
-              </div>
-            );
-          }
-          if (l.type === "image") {
-            return (
-              <img
-                key={l.id}
-                src={l.src}
-                alt={l.name}
-                style={{ ...common, objectFit: l.fit ?? "cover" as any }}
-              />
-            );
-          }
-          const radius = l.shape === "oval" ? 9999 : (l.radius ?? 0);
-          return (
-            <div key={l.id} style={{ ...common, background: l.fill, borderRadius: radius }} />
-          );
-        })}
+        {layers.map((l) => renderLayer(l))}
       </div>
     </Card>
   );

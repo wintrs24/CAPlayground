@@ -4,10 +4,22 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEditor } from "./editor-context";
+import type { AnyLayer } from "@/lib/ca/types";
 
 export function Inspector() {
   const { doc, updateLayer } = useEditor();
-  const selected = doc?.layers.find((l) => l.id === doc?.selectedId);
+  const findById = (layers: AnyLayer[], id: string | null | undefined): AnyLayer | undefined => {
+    if (!id) return undefined;
+    for (const l of layers) {
+      if (l.id === id) return l;
+      if (l.type === "group") {
+        const found = findById(l.children, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+  const selected = doc ? findById(doc.layers, doc.selectedId) : undefined;
 
   if (!selected) {
     return (

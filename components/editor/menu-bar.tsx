@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Pencil, Trash2, Sun, Moon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
+import { packCA } from "@/lib/ca/ca-file";
+import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useEffect, useState } from "react";
 
@@ -104,7 +106,50 @@ export function MenuBar({ projectId }: { projectId: string }) {
             <Moon className="h-4 w-4" />
           )}
         </Button>
-        <Button variant="secondary" disabled>Export</Button>
+        <Button
+          variant="secondary"
+          onClick={async () => {
+            try {
+              if (!doc) return;
+              const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
+              const root: GroupLayer = {
+                id: doc.meta.id,
+                name: doc.meta.name || 'Project',
+                type: 'group',
+                position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
+                size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
+                backgroundColor: doc.meta.background,
+                children: (doc.layers as AnyLayer[]) || [],
+              };
+
+              const blob = await packCA({
+                project: {
+                  id: doc.meta.id,
+                  name: doc.meta.name,
+                  width: doc.meta.width,
+                  height: doc.meta.height,
+                  background: doc.meta.background,
+                },
+                root,
+                assets: {},
+              });
+
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${nameSafe}.ca`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            } catch (e) {
+              console.error('Export failed', e);
+            }
+          }}
+          disabled={!doc}
+        >
+          Export
+        </Button>
       </div>
 
       {/* Rename dialog */}
