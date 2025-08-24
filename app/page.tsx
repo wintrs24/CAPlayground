@@ -25,7 +25,7 @@ export default function HomePage() {
 
                 {/* Description */}
                 <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                  Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer
+                  Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer with CAPlayground.
                 </p>
 
                 {/* Button */}

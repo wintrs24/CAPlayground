@@ -26,6 +26,9 @@ export function Footer() {
               <Link href="/docs" className="block text-sm text-muted-foreground hover:text-accent transition-colors">
                 Documentation
               </Link>
+              <Link href="/roadmap" className="block text-sm text-muted-foreground hover:text-accent transition-colors">
+                Roadmap
+              </Link>
             </div>
           </div>
 
