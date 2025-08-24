@@ -48,6 +48,6 @@ Read [CONTRIBUTING.md](.github/CONTRIBUTING.md)
 
 ## License
 
-MIT License
+[MIT License](LICENSE.md)
 
 ![Star History Chart](https://api.star-history.com/svg?repos=caplayground/caplayground&type=Date)
