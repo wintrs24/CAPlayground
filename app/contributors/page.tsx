@@ -119,16 +119,16 @@ export default async function ContributorsPage() {
 
             {/* Contributors Grid */}
             {contributors.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-[repeat(1,max-content)] sm:grid-cols-[repeat(2,max-content)] lg:grid-cols-[repeat(3,max-content)] justify-center gap-6">
                 {contributors.map((contributor) => (
                   <Link
                     key={contributor.id}
                     href={contributor.html_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group"
+                    className="group w-80"
                   >
-                    <Card className="h-full transition-all duration-300 hover:shadow-lg hover:shadow-accent/10 hover:border-accent/30 group-hover:scale-105">
+                    <Card className="h-full w-full transition-all duration-300 hover:shadow-lg hover:shadow-accent/10 hover:border-accent/30 group-hover:scale-105">
                       <CardContent className="p-6 text-center space-y-4">
                         {/* Avatar */}
                         <div className="relative mx-auto w-20 h-20">
@@ -144,7 +144,7 @@ export default async function ContributorsPage() {
 
                         {/* Username */}
                         <div>
-                          <h3 className="font-heading font-semibold text-lg text-foreground group-hover:text-accent transition-colors">
+                          <h3 className="font-sfpro font-semibold text-lg text-foreground group-hover:text-accent transition-colors">
                             @{contributor.login}
                           </h3>
                         </div>
