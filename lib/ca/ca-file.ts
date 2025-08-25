@@ -35,13 +35,19 @@ export async function packCA(bundle: CAProjectBundle): Promise<Blob> {
   const JSZip = (await import('jszip')).default;
   const zip = new JSZip();
 
-  const caml = serializeCAML(bundle.root, bundle.project);
-  zip.file(DEFAULT_SCENE, caml);
+  const projectName = bundle.project.name.replace(/[^\w\-]/g, '_');
+  const projectFolder = zip.folder(projectName);
+  if (!projectFolder) {
+    throw new Error('Failed to create project folder');
+  }
 
-  zip.file(INDEX_XML_BASENAME, buildIndexXml(DEFAULT_SCENE));
+  const caml = serializeCAML(bundle.root, bundle.project);
+  projectFolder.file(DEFAULT_SCENE, caml);
+
+  projectFolder.file(INDEX_XML_BASENAME, buildIndexXml(DEFAULT_SCENE));
 
   const assets = bundle.assets || {};
-  const assetsFolder = zip.folder('assets');
+  const assetsFolder = projectFolder.folder('assets');
   if (assetsFolder) {
     for (const [name, asset] of Object.entries(assets)) {
       const data = (asset.data instanceof Blob)
@@ -51,7 +57,13 @@ export async function packCA(bundle: CAProjectBundle): Promise<Blob> {
     }
   }
 
-  return zip.generateAsync({ type: 'blob' });
+  const blob = await zip.generateAsync({
+    type: 'blob',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 }
+  });
+
+  return new Blob([blob], { type: 'application/zip' });
 }
 
 export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
