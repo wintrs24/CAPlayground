@@ -50,4 +50,6 @@ Read [CONTRIBUTING.md](.github/CONTRIBUTING.md)
 
 [MIT License](LICENSE)
 
-![Star History Chart](https://api.star-history.com/svg?repos=caplayground/caplayground&type=Date)
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=caplayground/caplayground&type=Date)](https://www.star-history.com/#caplayground/caplayground&Date)
