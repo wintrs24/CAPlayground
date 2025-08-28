@@ -166,47 +166,54 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         </DropdownMenu>
       </div>
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 p-0"
-          title={showLeft ? "Hide left panel" : "Show left panel"}
-          aria-label={showLeft ? "Hide left panel" : "Show left panel"}
-          onClick={() => toggleLeft?.()}
-        >
-          <PanelLeft className={`h-4 w-4 ${showLeft ? '' : 'opacity-50'}`} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 p-0"
-          title={showRight ? "Hide right panel" : "Show right panel"}
-          aria-label={showRight ? "Hide right panel" : "Show right panel"}
-          onClick={() => toggleRight?.()}
-        >
-          <PanelRight className={`h-4 w-4 ${showRight ? '' : 'opacity-50'}`} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Toggle theme"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="rounded-full h-8 w-8 p-0"
-        >
-          {mounted && theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </Button>
-        <Button
-          variant="ghost"
-          className="h-8 px-2"
-          onClick={() => setShortcutsOpen(true)}
-        >
-          <Keyboard className="h-4 w-4 mr-2" />
-          Shortcuts
-        </Button>
+        <div className="flex items-center gap-1 border rounded-md p-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 p-0"
+            title={showLeft ? "Hide left panel" : "Show left panel"}
+            aria-label={showLeft ? "Hide left panel" : "Show left panel"}
+            onClick={() => toggleLeft?.()}
+          >
+            <PanelLeft className={`h-4 w-4 ${showLeft ? '' : 'opacity-50'}`} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 p-0"
+            title={showRight ? "Hide right panel" : "Show right panel"}
+            aria-label={showRight ? "Hide right panel" : "Show right panel"}
+            onClick={() => toggleRight?.()}
+          >
+            <PanelRight className={`h-4 w-4 ${showRight ? '' : 'opacity-50'}`} />
+          </Button>
+        </div>
+
+        <div className="border rounded-md p-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle theme"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="h-8 w-8 p-0"
+          >
+            {mounted && theme === "dark" ? (
+              <Sun className="h-4 w-4" />
+            ) : (
+              <Moon className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        <div className="border rounded-md p-0.5">
+          <Button
+            variant="ghost"
+            className="h-8 px-2"
+            onClick={() => setShortcutsOpen(true)}
+          >
+            <Keyboard className="h-4 w-4 mr-2" />
+            Shortcuts
+          </Button>
+        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" disabled={!doc}>Export</Button>
