@@ -13,19 +13,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import { packCA } from "@/lib/ca/ca-file";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
 
 export function MenuBar({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const { doc } = useEditor();
+  const { doc, undo, redo } = useEditor();
   const [projects, setProjects] = useLocalStorage<ProjectMeta[]>("caplayground-projects", []);
 
   const [renameOpen, setRenameOpen] = useState(false);
@@ -33,6 +34,7 @@ export function MenuBar({ projectId }: { projectId: string }) {
   const [name, setName] = useState("");
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -41,6 +43,24 @@ export function MenuBar({ projectId }: { projectId: string }) {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undo, redo]);
 
   const exportCA = async () => {
     try {
@@ -145,6 +165,14 @@ export function MenuBar({ projectId }: { projectId: string }) {
             <Moon className="h-4 w-4" />
           )}
         </Button>
+        <Button
+          variant="ghost"
+          className="h-8 px-2"
+          onClick={() => setShortcutsOpen(true)}
+        >
+          <Keyboard className="h-4 w-4 mr-2" />
+          Shortcuts
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" disabled={!doc}>Export</Button>
@@ -162,6 +190,29 @@ export function MenuBar({ projectId }: { projectId: string }) {
         </DropdownMenu>
       </div>
 
+      {/* shortcuts modal */}
+      {shortcutsOpen && typeof window !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] grid place-items-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShortcutsOpen(false)}>
+          <div className="bg-background rounded-md shadow p-5 w-full max-w-sm" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="font-medium mb-3 text-lg">Keyboard Shortcuts</div>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span>Undo</span>
+                <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Z</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Redo</span>
+                <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Z</span>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button variant="outline" onClick={() => setShortcutsOpen(false)}>Close</Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      
       {/* Rename dialog */}
       {renameOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={() => setRenameOpen(false)}>

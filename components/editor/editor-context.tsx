@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
@@ -23,6 +23,8 @@ export type EditorContextValue = {
   selectLayer: (id: string | null) => void;
   deleteLayer: (id: string) => void;
   persist: () => void;
+  undo: () => void;
+  redo: () => void;
 };
 
 const EditorContext = createContext<EditorContextValue | undefined>(undefined);
@@ -39,6 +41,13 @@ export function EditorProvider({
   const storageKey = STORAGE_PREFIX + projectId;
   const [storedDoc, setStoredDoc] = useLocalStorage<ProjectDocument | null>(storageKey, null);
   const [doc, setDoc] = useState<ProjectDocument | null>(null);
+  const pastRef = useRef<ProjectDocument[]>([]);
+  const futureRef = useRef<ProjectDocument[]>([]);
+
+  const pushHistory = useCallback((prev: ProjectDocument) => {
+    pastRef.current.push(JSON.parse(JSON.stringify(prev)) as ProjectDocument);
+    futureRef.current = [];
+  }, []);
 
   useEffect(() => {
     if (storedDoc) {
@@ -67,7 +76,11 @@ export function EditorProvider({
   }, [doc, setStoredDoc]);
 
   const selectLayer = useCallback((id: string | null) => {
-    setDoc((prev) => (prev ? { ...prev, selectedId: id } : prev));
+    setDoc((prev) => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      return { ...prev, selectedId: id };
+    });
   }, []);
 
   const addBase = useCallback((name: string): LayerBase => ({
@@ -82,6 +95,7 @@ export function EditorProvider({
   const addTextLayer = useCallback(() => {
     setDoc((prev) => {
       if (!prev) return prev;
+      pushHistory(prev);
       const layer: TextLayer = {
         ...addBase("Text Layer"),
         type: "text",
@@ -97,6 +111,7 @@ export function EditorProvider({
   const addImageLayer = useCallback((src?: string) => {
     setDoc((prev) => {
       if (!prev) return prev;
+      pushHistory(prev);
       const layer: ImageLayer = {
         ...addBase("Image Layer"),
         type: "image",
@@ -111,6 +126,7 @@ export function EditorProvider({
   const addShapeLayer = useCallback((shape: ShapeLayer["shape"] = "rect") => {
     setDoc((prev) => {
       if (!prev) return prev;
+      pushHistory(prev);
       const layer: ShapeLayer = {
         ...addBase("Shape Layer"),
         type: "shape",
@@ -159,6 +175,7 @@ export function EditorProvider({
   const updateLayer = useCallback((id: string, patch: Partial<AnyLayer>) => {
     setDoc((prev) => {
       if (!prev) return prev;
+      pushHistory(prev);
       return {
         ...prev,
         layers: updateInTree(prev.layers, id, patch),
@@ -169,11 +186,34 @@ export function EditorProvider({
   const deleteLayer = useCallback((id: string) => {
     setDoc((prev) => {
       if (!prev) return prev;
+      pushHistory(prev);
       const nextLayers = deleteInTree(prev.layers, id);
       const nextSelected = prev.selectedId === id || (prev.selectedId ? !containsId(nextLayers, prev.selectedId) : false) ? null : prev.selectedId;
       return { ...prev, layers: nextLayers, selectedId: nextSelected };
     });
   }, [deleteInTree, containsId]);
+
+  const undo = useCallback(() => {
+    setDoc((current) => {
+      if (!current) return current;
+      const past = pastRef.current;
+      if (past.length === 0) return current;
+      const previous = past.pop() as ProjectDocument;
+      futureRef.current.push(current);
+      return previous;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setDoc((current) => {
+      if (!current) return current;
+      const future = futureRef.current;
+      if (future.length === 0) return current;
+      const next = future.pop() as ProjectDocument;
+      pastRef.current.push(current);
+      return next;
+    });
+  }, []);
 
   const value = useMemo<EditorContextValue>(() => ({
     doc,
@@ -185,7 +225,9 @@ export function EditorProvider({
     selectLayer,
     deleteLayer,
     persist,
-  }), [doc, addTextLayer, addImageLayer, addShapeLayer, updateLayer, selectLayer, deleteLayer, persist]);
+    undo,
+    redo,
+  }), [doc, addTextLayer, addImageLayer, addShapeLayer, updateLayer, selectLayer, deleteLayer, persist, undo, redo]);
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }
