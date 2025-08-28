@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import { packCA } from "@/lib/ca/ca-file";
@@ -24,7 +24,15 @@ import { createPortal } from "react-dom";
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
 
-export function MenuBar({ projectId }: { projectId: string }) {
+type MenuBarProps = {
+  projectId: string;
+  showLeft?: boolean;
+  showRight?: boolean;
+  toggleLeft?: () => void;
+  toggleRight?: () => void;
+};
+
+export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLeft, toggleRight }: MenuBarProps) {
   const router = useRouter();
   const { doc, undo, redo } = useEditor();
   const [projects, setProjects] = useLocalStorage<ProjectMeta[]>("caplayground-projects", []);
@@ -56,11 +64,17 @@ export function MenuBar({ projectId }: { projectId: string }) {
         } else {
           undo();
         }
+      } else if (e.shiftKey && key === 'l') {
+        e.preventDefault();
+        toggleLeft?.();
+      } else if (e.shiftKey && key === 'i') {
+        e.preventDefault();
+        toggleRight?.();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, toggleLeft, toggleRight]);
 
   const exportCA = async () => {
     try {
@@ -152,6 +166,26 @@ export function MenuBar({ projectId }: { projectId: string }) {
         </DropdownMenu>
       </div>
       <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 p-0"
+          title={showLeft ? "Hide left panel" : "Show left panel"}
+          aria-label={showLeft ? "Hide left panel" : "Show left panel"}
+          onClick={() => toggleLeft?.()}
+        >
+          <PanelLeft className={`h-4 w-4 ${showLeft ? '' : 'opacity-50'}`} />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 p-0"
+          title={showRight ? "Hide right panel" : "Show right panel"}
+          aria-label={showRight ? "Hide right panel" : "Show right panel"}
+          onClick={() => toggleRight?.()}
+        >
+          <PanelRight className={`h-4 w-4 ${showRight ? '' : 'opacity-50'}`} />
+        </Button>
         <Button
           variant="ghost"
           size="icon"
