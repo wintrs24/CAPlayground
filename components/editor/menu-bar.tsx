@@ -42,6 +42,45 @@ export function MenuBar({ projectId }: { projectId: string }) {
     setMounted(true);
   }, []);
 
+  const exportCA = async () => {
+    try {
+      if (!doc) return;
+      const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
+      const root: GroupLayer = {
+        id: doc.meta.id,
+        name: doc.meta.name || 'Project',
+        type: 'group',
+        position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
+        size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
+        backgroundColor: doc.meta.background,
+        children: (doc.layers as AnyLayer[]) || [],
+      };
+
+      const blob = await packCA({
+        project: {
+          id: doc.meta.id,
+          name: doc.meta.name,
+          width: doc.meta.width,
+          height: doc.meta.height,
+          background: doc.meta.background,
+        },
+        root,
+        assets: {},
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${nameSafe}.ca`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export failed', e);
+    }
+  };
+
   const performRename = () => {
     if (!name.trim()) return;
     const next = (projects ?? []).map((p) => (p.id === projectId ? { ...p, name: name.trim() } : p));
@@ -106,50 +145,21 @@ export function MenuBar({ projectId }: { projectId: string }) {
             <Moon className="h-4 w-4" />
           )}
         </Button>
-        <Button
-          variant="secondary"
-          onClick={async () => {
-            try {
-              if (!doc) return;
-              const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
-              const root: GroupLayer = {
-                id: doc.meta.id,
-                name: doc.meta.name || 'Project',
-                type: 'group',
-                position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
-                size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
-                backgroundColor: doc.meta.background,
-                children: (doc.layers as AnyLayer[]) || [],
-              };
-
-              const blob = await packCA({
-                project: {
-                  id: doc.meta.id,
-                  name: doc.meta.name,
-                  width: doc.meta.width,
-                  height: doc.meta.height,
-                  background: doc.meta.background,
-                },
-                root,
-                assets: {},
-              });
-
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `${nameSafe}.ca`;
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-              URL.revokeObjectURL(url);
-            } catch (e) {
-              console.error('Export failed', e);
-            }
-          }}
-          disabled={!doc}
-        >
-          Export
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="secondary" disabled={!doc}>Export</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Export</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); exportCA(); }} disabled={!doc}>
+              Export .ca file
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled className="opacity-50">
+              Export Tendies file (coming soon)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Rename dialog */}
