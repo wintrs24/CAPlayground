@@ -25,6 +25,15 @@ export const metadata: Metadata = {
   verification: {
     google: "xNuTnO5iYYm2op2KXAClg0oYMmslpl35wOv-9RfySxU",
   },
+  openGraph: {
+    title: "CAPlayground - Core Animation Editor",
+    description: "Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer",
+    type: "website",
+    images: [
+      { url: "/icon-light.png", alt: "CAPlayground icon (light)" },
+      { url: "/icon-dark.png", alt: "CAPlayground icon (dark)" },
+    ],
+  },
   icons: {
     icon: [
       { url: "/icon-light.png", media: "(prefers-color-scheme: light)" },
