@@ -19,15 +19,13 @@ export function Favicon() {
   const { resolvedTheme } = useTheme()
 
   useEffect(() => {
-    const isDark = resolvedTheme === "dark";
-    const injected = (globalThis as any).__NEXT_DATA__?.assetPrefix as string | undefined;
-    const base = (injected || process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
-    const icon = `${base}${isDark ? "/icon-dark.png" : "/icon-light.png"}`;
+    const isDark = resolvedTheme === "dark"
+    const icon = isDark ? "/icon-dark.png" : "/icon-light.png"
 
-    upsertLink("icon", icon);
-    upsertLink("shortcut icon", icon);
+    upsertLink("icon", icon)
+    upsertLink("shortcut icon", icon)
 
-    upsertLink("apple-touch-icon", icon);
+    upsertLink("apple-touch-icon", icon)
   }, [resolvedTheme])
 
   return null

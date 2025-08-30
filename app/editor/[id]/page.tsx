@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { EditorProvider } from "@/components/editor/editor-context";
 import { MenuBar } from "@/components/editor/menu-bar";
 import { LayersPanel } from "@/components/editor/layers-panel";
 import { Inspector } from "@/components/editor/inspector";
 import { CanvasPreview } from "@/components/editor/canvas-preview";
 
-export default function EditorPageClient() {
+export default function EditorPage() {
+  const params = useParams<{ id: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const projectId = searchParams.get('id');
+  const projectId = params?.id;
   const [meta, setMeta] = useState<{ id: string; name: string; width: number; height: number; background?: string } | null>(null);
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(340);
@@ -20,57 +23,20 @@ export default function EditorPageClient() {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId) return;
+    try {
+      const listRaw = localStorage.getItem("caplayground-projects");
+      const list = listRaw ? JSON.parse(listRaw) as Array<{ id: string; name: string; width?: number; height?: number }> : [];
+      const p = list.find((x) => x.id === projectId);
+      if (!p) {
+        router.replace("/projects");
+        return;
+      }
+      setMeta({ id: p.id, name: p.name, width: p.width ?? 390, height: p.height ?? 844 });
+    } catch {
       router.replace("/projects");
-      return;
     }
-
-    const loadProject = async () => {
-      try {
-        const listRaw = localStorage.getItem("caplayground-projects");
-        const list = listRaw ? (JSON.parse(listRaw) as Array<{ id: string; name: string; width?: number; height?: number }>) : [];
-        const p = list.find((x) => x.id === projectId);
-        if (p) {
-          setMeta({ id: p.id, name: p.name, width: p.width ?? 390, height: p.height ?? 844 });
-          return;
-        }
-      } catch {
-      }
-
-      try {
-        const injected = (globalThis as any).__NEXT_DATA__?.assetPrefix as string | undefined;
-        const base = (injected || process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
-        const res = await fetch(`${base}/templates/${projectId}.json`);
-        if (res.ok) {
-          const projectData = await res.json();
-          const { project, root } = projectData;
-          const meta = {
-            id: project.id || projectId,
-            name: project.name || 'Template',
-            width: project.width || root?.size?.w || 390,
-            height: project.height || root?.size?.h || 844,
-            background: root?.backgroundColor,
-          };
-          setMeta(meta);
-
-          const doc = {
-            meta,
-            layers: root?.type === 'group' && Array.isArray(root.children) ? root.children : root ? [root] : [],
-            selectedId: null,
-          };
-          localStorage.setItem(`caplayground-project:${projectId}`, JSON.stringify(doc));
-
-          return;
-        }
-      } catch (err) {
-        console.error('Failed to fetch template', err);
-      }
-
-      router.replace("/projects");
-    };
-
-    loadProject();
-  }, [projectId, router]);
+  }, [projectId]);
 
   if (!projectId || !meta) return null;
 

@@ -19,8 +19,6 @@ const sourceSans = Source_Sans_3({
   weight: ["400", "600"],
 })
 
-const BASE = (process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "")
-
 export const metadata: Metadata = {
   title: "CAPlayground - Core Animation Editor",
   description: "Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer",
@@ -32,22 +30,22 @@ export const metadata: Metadata = {
     description: "Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer",
     type: "website",
     images: [
-      { url: `${BASE}/icon-light.png`, alt: "CAPlayground icon (light)" },
-      { url: `${BASE}/icon-dark.png`, alt: "CAPlayground icon (dark)" },
+      { url: "/icon-light.png", alt: "CAPlayground icon (light)" },
+      { url: "/icon-dark.png", alt: "CAPlayground icon (dark)" },
     ],
   },
   icons: {
     icon: [
-      { url: `${BASE}/icon-light.png`, media: "(prefers-color-scheme: light)" },
-      { url: `${BASE}/icon-dark.png`, media: "(prefers-color-scheme: dark)" },
+      { url: "/icon-light.png", media: "(prefers-color-scheme: light)" },
+      { url: "/icon-dark.png", media: "(prefers-color-scheme: dark)" },
     ],
     apple: [
-      { url: `${BASE}/icon-light.png`, media: "(prefers-color-scheme: light)" },
-      { url: `${BASE}/icon-dark.png`, media: "(prefers-color-scheme: dark)" },
+      { url: "/icon-light.png", media: "(prefers-color-scheme: light)" },
+      { url: "/icon-dark.png", media: "(prefers-color-scheme: dark)" },
     ],
     shortcut: [
-      { url: `${BASE}/icon-light.png`, media: "(prefers-color-scheme: light)" },
-      { url: `${BASE}/icon-dark.png`, media: "(prefers-color-scheme: dark)" },
+      { url: "/icon-light.png", media: "(prefers-color-scheme: light)" },
+      { url: "/icon-dark.png", media: "(prefers-color-scheme: dark)" },
     ],
   },
 }
