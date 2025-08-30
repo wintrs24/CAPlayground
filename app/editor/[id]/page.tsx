@@ -1,6 +1,5 @@
 "use client";
 
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { EditorProvider } from "@/components/editor/editor-context";
@@ -8,6 +7,10 @@ import { MenuBar } from "@/components/editor/menu-bar";
 import { LayersPanel } from "@/components/editor/layers-panel";
 import { Inspector } from "@/components/editor/inspector";
 import { CanvasPreview } from "@/components/editor/canvas-preview";
+
+export function generateStaticParams() {
+  return [] as Array<{ id: string }>
+}
 
 export default function EditorPage() {
   const params = useParams<{ id: string }>();
