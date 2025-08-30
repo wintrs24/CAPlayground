@@ -164,7 +164,7 @@ export default function ProjectsPage() {
         localStorage.setItem(`caplayground-project:${id}`, JSON.stringify(doc));
       } catch {}
 
-      router.push(`/editor/${id}`);
+      router.push(`/editor?id=${id}`);
     } catch (err) {
       console.error('Import failed', err);
     } finally {
@@ -316,7 +316,7 @@ export default function ProjectsPage() {
                       if (isSelectMode) {
                         toggleSelection(project.id);
                       } else {
-                        router.push(`/editor/${project.id}`);
+                        router.push(`/editor?id=${project.id}`);
                       }
                     }}
                   >
@@ -343,7 +343,7 @@ export default function ProjectsPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (isSelectMode) toggleSelection(project.id);
-                            else router.push(`/editor/${project.id}`);
+                            else router.push(`/editor?id=${project.id}`);
                           }}
                         >
                           <h3 className="font-medium block overflow-hidden text-ellipsis whitespace-nowrap" title={project.name}>
