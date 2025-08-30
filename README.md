@@ -1,6 +1,6 @@
 # CAPlayground
 
-Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer.
+Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer with [CAPlayground](https://caplayground.pages.dev)
 
 ## Overview
 
