@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const fileBuffer = await fs.promises.readFile(filePath);
-    const projectData = await unpackCA(fileBuffer);
+    const projectData = await unpackCA(new Blob([fileBuffer]));
 
     return NextResponse.json(projectData);
   } catch (error) {

@@ -26,7 +26,6 @@ export default function EditorPageClient() {
     }
 
     const loadProject = async () => {
-      // First, try to load from local storage
       try {
         const listRaw = localStorage.getItem("caplayground-projects");
         const list = listRaw ? (JSON.parse(listRaw) as Array<{ id: string; name: string; width?: number; height?: number }>) : [];
@@ -36,10 +35,8 @@ export default function EditorPageClient() {
           return;
         }
       } catch {
-        // Ignore local storage errors
       }
 
-      // If not in local storage, try to fetch from template API
       try {
         const res = await fetch(`/api/templates/${projectId}`);
         if (res.ok) {
@@ -54,7 +51,6 @@ export default function EditorPageClient() {
           };
           setMeta(meta);
 
-          // Also save the fetched project to local storage so it's available for the EditorProvider
           const doc = {
             meta,
             layers: root?.type === 'group' && Array.isArray(root.children) ? root.children : root ? [root] : [],
@@ -68,7 +64,6 @@ export default function EditorPageClient() {
         console.error('Failed to fetch template', err);
       }
 
-      // If all else fails, redirect
       router.replace("/projects");
     };
 
