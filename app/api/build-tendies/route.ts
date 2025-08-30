@@ -1,71 +1,60 @@
 import { NextRequest } from "next/server";
 import JSZip from "jszip";
-import plist from "plist";
+import { readFile } from "fs/promises";
+import path from "path";
+import bplistParser from "bplist-parser";
+import bplistCreator from "bplist-creator";
 
-export const runtime = "edge"; // fuck you edge
+export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
     const caArrayBuffer = await req.arrayBuffer();
-    const caBuffer = new Uint8Array(caArrayBuffer);
+    const caBuffer = Buffer.from(caArrayBuffer);
 
     const { searchParams } = new URL(req.url);
     const requestedFilename = searchParams.get("filename");
-    const caFilename =
-      (requestedFilename && requestedFilename.trim()) || "project.ca";
+    const caFilename = (requestedFilename && requestedFilename.trim()) || "project.ca";
 
-    const templateZipUrl = new URL(
-      "/lib/templates/tendies.zip",
-      req.url
-    ).toString();
-    const templateRes = await fetch(templateZipUrl);
-    if (!templateRes.ok) {
-      return new Response(
-        JSON.stringify({ error: "Template zip not found" }),
-        { status: 500 }
-      );
-    }
-    const templateZipData = await templateRes.arrayBuffer();
+    const templateZipPath = path.join(process.cwd(), "lib", "templates", "tendies.zip");
+    const templateZipData = await readFile(templateZipPath);
 
     const zip = await JSZip.loadAsync(templateZipData);
 
-    const internalDir = //i keep same
+    const internalDir = //do i shorten this to wallpaper.wallpaper? ig it dont matter
       "descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/0/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/";
-
     zip.file(internalDir + caFilename, caBuffer);
-    
+
     const plistPath = internalDir + "Wallpaper.plist";
     const plistFile = zip.file(plistPath);
-
     if (plistFile) {
       try {
-        const rawText = await plistFile.async("text");
-
-        let updatedBuffer: Uint8Array | null = null;
+        const rawBuffer = await plistFile.async("nodebuffer");
+        let updatedBuffer: Buffer | null = null;
         try {
-          const parsed = plist.parse(rawText) as any;
+          const parsed = bplistParser.parseBuffer(rawBuffer)[0] as any;
           if (parsed && parsed.assets?.lockAndHome?.default) {
-            parsed.assets.lockAndHome.default.foregroundAnimationFileName =
-              caFilename;
-            const created = plist.build(parsed);
-            updatedBuffer = new TextEncoder().encode(created);
+            parsed.assets.lockAndHome.default.foregroundAnimationFileName = caFilename;
+            const created: any = bplistCreator(parsed);
+            updatedBuffer = Buffer.isBuffer(created) ? created : Buffer.from(created as ArrayBuffer);
           }
-        } catch {
-          const replaced = rawText.replace(
-            /(<key>foregroundAnimationFileName<\/key>\s*<string>)([^<]*)(<\/string>)/,
+        } catch {} //fallback
+        if (!updatedBuffer) {
+          const plistText = rawBuffer.toString("utf8");
+          const replaced = plistText.replace(
+            /(\<key\>foregroundAnimationFileName\<\/key\>\s*\<string\>)([^<]*)(\<\/string\>)/,
             `$1${caFilename}$3`
           );
-          updatedBuffer = new TextEncoder().encode(replaced);
+          updatedBuffer = Buffer.from(replaced, "utf8");
         }
-
         if (updatedBuffer) {
           zip.file(plistPath, updatedBuffer);
         }
-      } catch { return;}
+      } catch {}
     }
 
     const output = await zip.generateAsync({
-      type: "uint8array",
+      type: "nodebuffer",
       compression: "DEFLATE",
       compressionOptions: { level: 9 },
     });
