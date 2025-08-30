@@ -5,7 +5,7 @@ import path from "path";
 import bplistParser from "bplist-parser";
 import bplistCreator from "bplist-creator";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 export async function POST(req: NextRequest) {
   try {
