@@ -1,10 +1,10 @@
 # CAPlayground
 
-Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer with [CAPlayground](https://caplayground.pages.dev)
+Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer with [CAPlayground](https://caplayground.pages.dev).
 
 ## Overview
 
-CAPlayground is a web-based Core Animation editor for making stunning wallpapers for your iPhone and iPad.
+CAPlayground is a web-based Core Animation editor for making stunning wallpapers for your iPhone and iPad. Check out the [roadmap](https://caplayground.pages.dev/roadmap) to see progress.
 
 ## Getting Started
 
