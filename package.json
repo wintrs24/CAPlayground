@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prebuild": "node scripts/prepare-templates.mjs",
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",

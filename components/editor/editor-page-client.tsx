@@ -38,7 +38,9 @@ export default function EditorPageClient() {
       }
 
       try {
-        const res = await fetch(`/api/templates/${projectId}`);
+        const injected = (globalThis as any).__NEXT_DATA__?.assetPrefix as string | undefined;
+        const base = (injected || process.env.NEXT_PUBLIC_BASE_PATH || "").replace(/\/$/, "");
+        const res = await fetch(`${base}/templates/${projectId}.json`);
         if (res.ok) {
           const projectData = await res.json();
           const { project, root } = projectData;
