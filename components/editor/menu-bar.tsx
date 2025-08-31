@@ -20,7 +20,7 @@ import { packCA } from "@/lib/ca/ca-file";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
 
@@ -43,6 +43,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -214,45 +215,66 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             Shortcuts
           </Button>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="secondary" disabled={!doc}>Export</Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Export</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer" onSelect={(e) => { e.preventDefault(); exportCA(); }} disabled={!doc}>
-              Export .ca file
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled className="opacity-50">
-              Export Tendies file (coming soon)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div>
+          <Button variant="secondary" disabled={!doc} onClick={() => setExportOpen(true)}>Export</Button>
+          <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Export</DialogTitle>
+                <DialogDescription>Select a format to export your project.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-2">
+                <Button
+                  variant="default"
+                  onClick={() => { exportCA(); setExportOpen(false); }}
+                  disabled={!doc}
+                  className="w-full justify-start text-left py-10"
+                >
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span>Export .ca file</span>
+                    <span className="text-xs text-muted-foreground">Download a .ca archive you can re-import later.</span>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled
+                  className="w-full justify-start text-left py-10 opacity-70"
+                >
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span>Export Tendies file</span>
+                    <span className="text-xs text-muted-foreground">Coming soon</span>
+                  </div>
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setExportOpen(false)}>Close</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* shortcuts modal */}
-      {shortcutsOpen && typeof window !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[9999] grid place-items-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShortcutsOpen(false)}>
-          <div className="bg-background rounded-md shadow p-5 w-full max-w-sm" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="font-medium mb-3 text-lg">Keyboard Shortcuts</div>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span>Undo</span>
-                <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Z</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Redo</span>
-                <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Z</span>
-              </div>
+      <Dialog open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Keyboard Shortcuts</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span>Undo</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Z</span>
             </div>
-            <div className="mt-4 flex justify-end">
-              <Button variant="outline" onClick={() => setShortcutsOpen(false)}>Close</Button>
+            <div className="flex items-center justify-between">
+              <span>Redo</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Z</span>
             </div>
           </div>
-        </div>,
-        document.body
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShortcutsOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Rename dialog */}
       {renameOpen && (
