@@ -269,6 +269,26 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
               <span>Redo</span>
               <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Z</span>
             </div>
+            <div className="flex items-center justify-between">
+              <span>Zoom in</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + +</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Zoom out</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + -</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Re-center</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + 0</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Zoom with scroll</span>
+              <span className="font-mono text-muted-foreground">Shift + Scroll</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Pan canvas</span>
+              <span className="font-mono text-muted-foreground">Shift + Drag</span>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShortcutsOpen(false)}>Close</Button>
