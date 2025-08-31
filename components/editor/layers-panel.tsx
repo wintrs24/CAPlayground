@@ -79,9 +79,9 @@ export function LayersPanel() {
         />
       </div>
 
-      <div className="text-sm rounded border bg-muted/30 divide-y overflow-auto">
+      <div className="text-sm rounded border bg-muted/30 divide-y flex flex-col overflow-hidden">
         <div className="px-2 py-2 font-medium select-none">Root Layer</div>
-        <div className="max-h-[260px] overflow-auto">
+        <div className="flex-1 overflow-auto">
           {layers.length === 0 && (
             <div className="px-2 py-2 text-muted-foreground">No layers yet</div>
           )}
