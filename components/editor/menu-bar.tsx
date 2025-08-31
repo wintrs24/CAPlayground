@@ -225,7 +225,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
               </DialogHeader>
               <div className="grid gap-2">
                 <Button
-                  variant="default"
+                  variant="outline"
                   onClick={() => { exportCA(); setExportOpen(false); }}
                   disabled={!doc}
                   className="w-full justify-start text-left py-10"
