@@ -11,6 +11,8 @@ import type { AnyLayer, GroupLayer, ShapeLayer } from "@/lib/ca/types";
 export function CanvasPreview() {
   const ref = useRef<HTMLDivElement | null>(null);
   const { doc, updateLayer, updateLayerTransient, selectLayer } = useEditor();
+  const docRef = useRef<typeof doc>(doc);
+  useEffect(() => { docRef.current = doc; }, [doc]);
   const [size, setSize] = useState({ w: 600, h: 400 });
   const [userScale, setUserScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -99,7 +101,6 @@ export function CanvasPreview() {
       startX: l.position.x,
       startY: l.position.y,
     };
-    // Disable text selection while dragging
     document.body.style.userSelect = "none";
 
     const onMove = (ev: MouseEvent) => {
@@ -153,7 +154,7 @@ export function CanvasPreview() {
           key={l.id}
           src={l.src}
           alt={l.name}
-          style={{ ...common, objectFit: (l as any).fit ?? ("cover" as any) }}
+          style={{ ...common, objectFit: "fill" as React.CSSProperties["objectFit"] }}
           draggable={false}
           onMouseDown={(e) => startDrag(l, e)}
         />
@@ -161,7 +162,9 @@ export function CanvasPreview() {
     }
     if (l.type === "shape") {
       const s = l as ShapeLayer;
-      const borderRadius = s.shape === "circle" ? 9999 : (s.shape === "rounded-rect" ? (s.radius ?? 8) : 0);
+      const corner = (l as any).cornerRadius as number | undefined;
+      const legacy = s.radius;
+      const borderRadius = s.shape === "circle" ? 9999 : ((corner ?? legacy ?? 0));
       return (
         <div key={l.id} style={{ ...common, background: s.fill, borderRadius }} onMouseDown={(e) => startDrag(l, e)} />
       );
@@ -171,6 +174,251 @@ export function CanvasPreview() {
     return (
       <div key={g.id} style={{ ...common, background: g.backgroundColor }} onMouseDown={(e) => startDrag(g, e)}>
         {g.children.map((c) => renderLayer(c))}
+      </div>
+    );
+  };
+
+  const findById = (layers: AnyLayer[], id: string | null | undefined): AnyLayer | undefined => {
+    if (!id) return undefined;
+    for (const l of layers) {
+      if (l.id === id) return l;
+      if (l.type === "group") {
+        const found = findById((l as GroupLayer).children, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const clientToWorld = (clientX: number, clientY: number) => {
+    if (!ref.current) return { x: 0, y: 0 };
+    const rect = ref.current.getBoundingClientRect();
+    const cx = clientX - rect.left;
+    const cy = clientY - rect.top;
+    const worldX = (cx - (baseOffsetX + pan.x)) / scale;
+    const worldY = (cy - (baseOffsetY + pan.y)) / scale;
+    return { x: worldX, y: worldY };
+  };
+
+  const resizeDragRef = useRef<
+    | {
+        id: string;
+        handle: "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+        startX: number;
+        startY: number;
+        startW: number;
+        startH: number;
+        startClientX: number;
+        startClientY: number;
+      }
+    | null
+  >(null);
+
+  const rotationDragRef = useRef<
+    | {
+        id: string;
+        centerX: number;
+        centerY: number;
+        startAngle: number;
+      }
+    | null
+  >(null);
+
+  const beginResize = (l: AnyLayer, handle: "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw", e: ReactMouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    selectLayer(l.id);
+    resizeDragRef.current = {
+      id: l.id,
+      handle,
+      startX: l.position.x,
+      startY: l.position.y,
+      startW: l.size.w,
+      startH: l.size.h,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+    };
+    const onMove = (ev: MouseEvent) => {
+      const d = resizeDragRef.current;
+      if (!d) return;
+      const startWorld = clientToWorld(d.startClientX, d.startClientY);
+      const currentWorld = clientToWorld(ev.clientX, ev.clientY);
+      const dx = currentWorld.x - startWorld.x;
+      const dy = currentWorld.y - startWorld.y;
+      let x = d.startX;
+      let y = d.startY;
+      let w = d.startW;
+      let h = d.startH;
+      switch (d.handle) {
+        case "e": w = Math.max(1, d.startW + dx); break;
+        case "w": w = Math.max(1, d.startW - dx); x = d.startX + dx; break;
+        case "s": h = Math.max(1, d.startH + dy); break;
+        case "n": h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
+        case "se": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH + dy); break;
+        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
+        case "sw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH + dy); break;
+        case "nw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
+      }
+
+      if (ev.shiftKey && d.startW > 0 && d.startH > 0) {
+        const aspect = d.startW / d.startH;
+        const affectsW = ["e", "w", "ne", "se", "sw", "nw"].includes(d.handle);
+        const affectsH = ["n", "s", "ne", "se", "sw", "nw"].includes(d.handle);
+        if (affectsW && !affectsH) {
+          h = Math.max(1, w / aspect);
+        } else if (!affectsW && affectsH) {
+          w = Math.max(1, h * aspect);
+        } else if (affectsW && affectsH) {
+          const dw = Math.abs(w - d.startW);
+          const dh = Math.abs(h - d.startH);
+          if (dw >= dh) {
+            h = Math.max(1, w / aspect);
+          } else {
+            w = Math.max(1, h * aspect);
+          }
+        }
+        switch (d.handle) {
+          case "e":
+            x = d.startX;
+            break;
+          case "w":
+            x = d.startX + (d.startW - w);
+            break;
+          case "s":
+            y = d.startY;
+            break;
+          case "n":
+            y = d.startY + (d.startH - h);
+            break;
+          case "se":
+            x = d.startX;
+            y = d.startY;
+            break;
+          case "ne":
+            x = d.startX;
+            y = d.startY + (d.startH - h);
+            break;
+          case "sw":
+            x = d.startX + (d.startW - w);
+            y = d.startY;
+            break;
+          case "nw":
+            x = d.startX + (d.startW - w);
+            y = d.startY + (d.startH - h);
+            break;
+        }
+      }
+      updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
+    };
+    const onUp = () => {
+      const d = resizeDragRef.current;
+      if (d) {
+        const currentDoc = docRef.current;
+        const current = findById(currentDoc?.layers ?? [], d.id);
+        if (current) {
+          updateLayer(current.id, { position: { ...current.position } as any, size: { ...current.size } as any });
+        }
+      }
+      resizeDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const beginRotate = (l: AnyLayer, e: ReactMouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    selectLayer(l.id);
+    const centerX = l.position.x + l.size.w / 2;
+    const centerY = l.position.y + l.size.h / 2;
+    const world = clientToWorld(e.clientX, e.clientY);
+    const angle0 = Math.atan2(world.y - centerY, world.x - centerX) * 180 / Math.PI;
+    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0) };
+    const onMove = (ev: MouseEvent) => {
+      const d = rotationDragRef.current;
+      if (!d) return;
+      const wpt = clientToWorld(ev.clientX, ev.clientY);
+      const angle = Math.atan2(wpt.y - d.centerY, wpt.x - d.centerX) * 180 / Math.PI;
+      const rot = angle - d.startAngle;
+      updateLayerTransient(d.id, { rotation: rot as any });
+    };
+    const onUp = () => {
+      const d = rotationDragRef.current;
+      if (d) {
+        const currentDoc = docRef.current;
+        const current = findById(currentDoc?.layers ?? [], d.id);
+        if (current) updateLayer(current.id, { rotation: current.rotation as any });
+      }
+      rotationDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
+
+  const renderSelectionOverlay = (l: AnyLayer) => {
+    const isSelected = doc?.selectedId === l.id;
+    if (!isSelected) return null;
+    const boxStyle: React.CSSProperties = {
+      position: "absolute",
+      left: l.position.x,
+      top: l.position.y,
+      width: l.size.w,
+      height: l.size.h,
+      transform: `rotate(${l.rotation ?? 0}deg)`,
+      outline: "1px solid rgba(59,130,246,0.9)",
+      boxShadow: "0 0 0 2px rgba(59,130,246,0.2) inset",
+      pointerEvents: "none",
+    };
+    const handleStyleBase: React.CSSProperties = {
+      position: "absolute",
+      width: 8,
+      height: 8,
+      background: "#ffffff",
+      border: "1px solid #3b82f6",
+      borderRadius: 2,
+      boxShadow: "0 0 0 1px rgba(0,0,0,0.05)",
+      transform: "translate(-50%, -50%)",
+      pointerEvents: "auto",
+      cursor: "nwse-resize",
+    };
+    const handles: Array<{ key: string; x: string | number; y: string | number; cursor: React.CSSProperties["cursor"]; h: any }>
+      = [
+        { key: "nw", x: 0, y: 0, cursor: "nwse-resize", h: (e: any) => beginResize(l, "nw", e) },
+        { key: "n", x: "50%", y: 0, cursor: "ns-resize", h: (e: any) => beginResize(l, "n", e) },
+        { key: "ne", x: "100%", y: 0, cursor: "nesw-resize", h: (e: any) => beginResize(l, "ne", e) },
+        { key: "e", x: "100%", y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "e", e) },
+        { key: "se", x: "100%", y: "100%", cursor: "nwse-resize", h: (e: any) => beginResize(l, "se", e) },
+        { key: "s", x: "50%", y: "100%", cursor: "ns-resize", h: (e: any) => beginResize(l, "s", e) },
+        { key: "sw", x: 0, y: "100%", cursor: "nesw-resize", h: (e: any) => beginResize(l, "sw", e) },
+        { key: "w", x: 0, y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "w", e) },
+      ];
+    const rotationHandleStyle: React.CSSProperties = {
+      position: "absolute",
+      left: "50%",
+      top: -20,
+      width: 10,
+      height: 10,
+      background: "#fff",
+      border: "1px solid #3b82f6",
+      borderRadius: 9999,
+      transform: "translate(-50%, -50%)",
+      cursor: "grab",
+      pointerEvents: "auto",
+    };
+    return (
+      <div style={boxStyle}>
+        {handles.map((h) => (
+          <div
+            key={h.key}
+            style={{ ...handleStyleBase, left: h.x, top: h.y, cursor: h.cursor }}
+            onMouseDown={(e) => h.h(e)}
+          />
+        ))}
+        <div style={rotationHandleStyle} onMouseDown={(e) => beginRotate(l, e)} />
       </div>
     );
   };
@@ -247,11 +495,20 @@ export function CanvasPreview() {
           transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
           transformOrigin: "top left",
           borderRadius: 0,
-          overflow: "hidden",
+          overflow: "visible",
           boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08)",
+        }}
+        onMouseDown={(e) => {
+          if (e.shiftKey) return;
+
+          selectLayer(null);
         }}
       >
         {layers.map((l) => renderLayer(l))}
+        {(() => {
+          const sel = findById(layers, doc?.selectedId ?? null);
+          return sel ? renderSelectionOverlay(sel) : null;
+        })()}
       </div>
 
       {/* Zoom controls */}

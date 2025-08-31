@@ -81,6 +81,20 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     try {
       if (!doc) return;
       const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
+      const rewriteLayer = (layer: AnyLayer): AnyLayer => {
+        if (layer.type === 'group') {
+          const g = layer as GroupLayer;
+          return { ...g, children: (g.children || []).map(rewriteLayer) } as AnyLayer;
+        }
+        if (layer.type === 'image') {
+          const asset = (doc.assets || {})[(layer as any).id];
+          if (asset) {
+            return { ...layer, src: `assets/${asset.filename}` } as AnyLayer;
+          }
+        }
+        return { ...layer } as AnyLayer;
+      };
+
       const root: GroupLayer = {
         id: doc.meta.id,
         name: doc.meta.name || 'Project',
@@ -88,8 +102,33 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
         size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
         backgroundColor: doc.meta.background,
-        children: (doc.layers as AnyLayer[]) || [],
+        children: ((doc.layers as AnyLayer[]) || []).map(rewriteLayer),
       };
+
+      const assets: Record<string, { path: string; data: Blob | ArrayBuffer | string }> = {};
+      const dataURLToBlob = (dataURL: string): Blob => {
+        const [meta, data] = dataURL.split(',');
+        const isBase64 = /;base64$/i.test(meta);
+        const mimeMatch = meta.match(/^data:([^;]+)(;base64)?$/i);
+        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        if (isBase64) {
+          const byteString = atob(data);
+          const ia = new Uint8Array(byteString.length);
+          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+          return new Blob([ia], { type: mime });
+        } else {
+          return new Blob([decodeURIComponent(data)], { type: mime });
+        }
+      };
+
+      if (doc.assets) {
+        for (const [layerId, info] of Object.entries(doc.assets)) {
+          try {
+            const blob = info.dataURL.startsWith('data:') ? dataURLToBlob(info.dataURL) : new Blob();
+            assets[info.filename] = { path: `assets/${info.filename}`, data: blob };
+          } catch {}
+        }
+      }
 
       const blob = await packCA({
         project: {
@@ -100,7 +139,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           background: doc.meta.background,
         },
         root,
-        assets: {},
+        assets,
       });
 
       const url = URL.createObjectURL(blob);

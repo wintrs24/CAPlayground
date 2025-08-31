@@ -8,6 +8,7 @@ export type ProjectDocument = {
   meta: Pick<CAProject, "id" | "name" | "width" | "height" | "background">;
   layers: AnyLayer[];
   selectedId?: string | null;
+  assets?: Record<string, { filename: string; dataURL: string }>;
 };
 
 const STORAGE_PREFIX = "caplayground-project:";
@@ -18,6 +19,8 @@ export type EditorContextValue = {
   setDoc: React.Dispatch<React.SetStateAction<ProjectDocument | null>>;
   addTextLayer: () => void;
   addImageLayer: (src?: string) => void;
+  addImageLayerFromFile: (file: File) => Promise<void>;
+  replaceImageForLayer: (layerId: string, file: File) => Promise<void>;
   addShapeLayer: (shape?: ShapeLayer["shape"]) => void;
   updateLayer: (id: string, patch: Partial<AnyLayer>) => void;
   updateLayerTransient: (id: string, patch: Partial<AnyLayer>) => void;
@@ -65,6 +68,7 @@ export function EditorProvider({
         },
         layers: [],
         selectedId: null,
+        assets: {},
       });
     }
   }, [storedDoc, initialMeta.id]);
@@ -116,6 +120,33 @@ export function EditorProvider({
     });
   }, [addBase]);
 
+  const replaceImageForLayer = useCallback(async (layerId: string, file: File) => {
+    const dataURL = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    setDoc((prev) => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const filename = sanitizeFilename(file.name) || `image-${Date.now()}.png`;
+      const assets = { ...(prev.assets || {}) };
+      assets[layerId] = { filename, dataURL };
+      const updateRec = (layers: AnyLayer[]): AnyLayer[] =>
+        layers.map((l) => {
+          if (l.id === layerId && l.type === "image") {
+            return { ...l, src: dataURL } as AnyLayer;
+          }
+          if (l.type === "group") {
+            return { ...(l as GroupLayer), children: updateRec((l as GroupLayer).children) } as AnyLayer;
+          }
+          return l;
+        });
+      return { ...prev, assets, layers: updateRec(prev.layers) };
+    });
+  }, []);
+
   const addImageLayer = useCallback((src?: string) => {
     setDoc((prev) => {
       if (!prev) return prev;
@@ -125,11 +156,45 @@ export function EditorProvider({
         type: "image",
         size: { w: 200, h: 120 },
         src: src ?? "https://placehold.co/200x120/png",
-        fit: "cover",
+        fit: "fill",
       };
       return { ...prev, layers: [...prev.layers, layer], selectedId: layer.id };
     });
   }, [addBase]);
+
+  const addImageLayerFromFile = useCallback(async (file: File) => {
+    const dataURL = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    setDoc((prev) => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const layer: ImageLayer = {
+        ...addBase(file.name || "Image Layer"),
+        type: "image",
+        size: { w: 200, h: 120 },
+        src: dataURL,
+        fit: "fill",
+      };
+      const assets = { ...(prev.assets || {}) };
+      assets[layer.id] = { filename: sanitizeFilename(file.name) || `image-${Date.now()}.png`, dataURL };
+      return { ...prev, layers: [...prev.layers, layer], selectedId: layer.id, assets };
+    });
+  }, [addBase]);
+
+  function sanitizeFilename(name: string): string {
+    const n = (name || '').trim();
+    if (!n) return '';
+    const parts = n.split('.');
+    const ext = parts.length > 1 ? parts.pop() as string : '';
+    const base = parts.join('.') || 'image';
+    const safeBase = base.replace(/[^a-z0-9\-_.]+/gi, '_');
+    const safeExt = (ext || '').replace(/[^a-z0-9]+/gi, '').toLowerCase();
+    return safeExt ? `${safeBase}.${safeExt}` : safeBase;
+  }
 
   const addShapeLayer = useCallback((shape: ShapeLayer["shape"] = "rect") => {
     setDoc((prev) => {
@@ -240,6 +305,8 @@ export function EditorProvider({
     setDoc,
     addTextLayer,
     addImageLayer,
+    addImageLayerFromFile,
+    replaceImageForLayer,
     addShapeLayer,
     updateLayer,
     updateLayerTransient,
@@ -248,7 +315,7 @@ export function EditorProvider({
     persist,
     undo,
     redo,
-  }), [doc, addTextLayer, addImageLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo]);
+  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo]);
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }

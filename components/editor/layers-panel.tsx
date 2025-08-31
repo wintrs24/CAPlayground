@@ -5,10 +5,12 @@ import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, Trash2 } from "lucide-react";
 import { useEditor } from "./editor-context";
+import { useRef } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 
 export function LayersPanel() {
-  const { doc, selectLayer, addTextLayer, addImageLayer, addShapeLayer, deleteLayer } = useEditor();
+  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, deleteLayer } = useEditor();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const layers = doc?.layers ?? [];
   const selectedId = doc?.selectedId ?? null;
 
@@ -59,9 +61,22 @@ export function LayersPanel() {
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={addTextLayer}>Text Layer</DropdownMenuItem>
             <DropdownMenuItem onClick={() => addShapeLayer("rect")}>Basic Layer</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => addImageLayer()}>Image Layer</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>Image Layer…</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              await addImageLayerFromFile(file);
+            }
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
       </div>
 
       <div className="text-sm rounded border bg-muted/30 divide-y overflow-auto">
