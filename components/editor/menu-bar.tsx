@@ -467,6 +467,14 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
               <span>Pan canvas</span>
               <span className="font-mono text-muted-foreground">Shift + Drag</span>
             </div>
+            <div className="flex items-center justify-between">
+              <span>Toggle left panel</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + L</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Toggle right panel</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + I</span>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShortcutsOpen(false)}>Close</Button>
