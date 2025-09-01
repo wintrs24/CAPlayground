@@ -114,9 +114,16 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   setAttr(el, 'id', layer.id);
   setAttr(el, 'name', layer.name);
   setAttr(el, 'bounds', `0 0 ${Math.max(0, layer.size.w)} ${Math.max(0, layer.size.h)}`);
-  setAttr(el, 'position', `${Math.round(layer.position.x)} ${Math.round(layer.position.y)}`);
+  const docHeight = project?.height ?? 844;
+  setAttr(el, 'position',
+    `${Math.round(layer.position.x + layer.size.w / 2)} ${Math.round(docHeight - (layer.position.y + layer.size.h / 2))}` //maths 🤓 (x = x+layer_width/2, y = project_height-(y+layer_height/2))
+  );
   setAttr(el, 'opacity', layer.opacity ?? undefined);
-  setAttr(el, 'backgroundColor', layer.backgroundColor);
+  if (layer.type === 'shape') {
+    setAttr(el, 'backgroundColor', (layer as any).fill || '#ffffffff'); //fixed shape fill 🤯
+  } else {
+    setAttr(el, 'backgroundColor', layer.backgroundColor || '#ffffffff');
+  }
   setAttr(el, 'cornerRadius', layer.cornerRadius);
   setAttr(el, 'borderColor', layer.borderColor);
   setAttr(el, 'borderWidth', layer.borderWidth);
@@ -141,7 +148,7 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     const sublayers = doc.createElementNS(CAML_NS, 'sublayers');
     const children = (layer as GroupLayer).children || [];
     for (const child of children) {
-      sublayers.appendChild(serializeLayer(doc, child));
+      sublayers.appendChild(serializeLayer(doc, child, project));
     }
     if (children.length) el.appendChild(sublayers);
   }
