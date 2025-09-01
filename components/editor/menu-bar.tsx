@@ -19,8 +19,10 @@ import { useEditor } from "./editor-context";
 import { packCA } from "@/lib/ca/ca-file";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import JSZip from "jszip";
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
 
@@ -36,6 +38,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const router = useRouter();
   const { doc, undo, redo } = useEditor();
   const [projects, setProjects] = useLocalStorage<ProjectMeta[]>("caplayground-projects", []);
+  const { toast } = useToast();
 
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -44,6 +47,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [mounted, setMounted] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportingTendies, setExportingTendies] = useState(false);
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -152,6 +156,138 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error('Export failed', e);
+    }
+  };
+
+  const exportTendies = async () => {
+    try {
+      setExportingTendies(true);
+      if (!doc) return;
+      
+      const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
+      const rewriteLayer = (layer: AnyLayer): AnyLayer => {
+        if (layer.type === 'group') {
+          const g = layer as GroupLayer;
+          return { ...g, children: (g.children || []).map(rewriteLayer) } as AnyLayer;
+        }
+        if (layer.type === 'image') {
+          const asset = (doc.assets || {})[(layer as any).id];
+          if (asset) {
+            return { ...layer, src: `assets/${asset.filename}` } as AnyLayer;
+          }
+        }
+        return { ...layer } as AnyLayer;
+      };
+
+      const root: GroupLayer = {
+        id: doc.meta.id,
+        name: doc.meta.name || 'Project',
+        type: 'group',
+        position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
+        size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
+        backgroundColor: doc.meta.background,
+        children: ((doc.layers as AnyLayer[]) || []).map(rewriteLayer),
+      };
+
+      const assets: Record<string, { path: string; data: Blob | ArrayBuffer | string }> = {};
+      const dataURLToBlob = (dataURL: string): Blob => {
+        const [meta, data] = dataURL.split(',');
+        const isBase64 = /;base64$/i.test(meta);
+        const mimeMatch = meta.match(/^data:([^;]+)(;base64)?$/i);
+        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        if (isBase64) {
+          const byteString = atob(data);
+          const ia = new Uint8Array(byteString.length);
+          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+          return new Blob([ia], { type: mime });
+        } else {
+          return new Blob([decodeURIComponent(data)], { type: mime });
+        }
+      };
+
+      if (doc.assets) {
+        for (const [layerId, info] of Object.entries(doc.assets)) {
+          try {
+            const blob = info.dataURL.startsWith('data:') ? dataURLToBlob(info.dataURL) : new Blob();
+            assets[info.filename] = { path: `assets/${info.filename}`, data: blob };
+          } catch {}
+        }
+      }
+
+      const caBlob = await packCA({
+        project: {
+          id: doc.meta.id,
+          name: doc.meta.name,
+          width: doc.meta.width,
+          height: doc.meta.height,
+          background: doc.meta.background,
+        },
+        root,
+        assets,
+      });
+
+      const templateResponse = await fetch('/api/templates/tendies', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/zip',
+        },
+        signal: AbortSignal.timeout(30000),
+      });
+      
+      if (!templateResponse.ok) {
+        throw new Error(`Failed to fetch tendies template: ${templateResponse.status} ${templateResponse.statusText}`);
+      }
+      
+      const templateArrayBuffer = await templateResponse.arrayBuffer();
+      
+      if (templateArrayBuffer.byteLength === 0) {
+        throw new Error('Error with length of tendies file');
+      }
+
+      const templateZip = new JSZip();
+      await templateZip.loadAsync(templateArrayBuffer);
+
+      const outputZip = new JSZip();
+
+      for (const [relativePath, file] of Object.entries(templateZip.files)) {
+        if (!file.dir) {
+          const content = await file.async('uint8array');
+          outputZip.file(relativePath, content);
+        }
+      }
+
+      const caFileName = `7400.WWDC_2022_Foreground-390w-844h@3x~iphone.ca`;
+      const caPath = `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/0/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/${caFileName}`;
+      const caArrayBuffer = await caBlob.arrayBuffer();
+      outputZip.file(caPath, caArrayBuffer);
+
+      const finalZipBlob = await outputZip.generateAsync({ type: 'blob' });
+
+      // Download the file
+      const url = URL.createObjectURL(finalZipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${nameSafe}.tendies`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export successful",
+        description: `Tendies file "${nameSafe}.tendies" has been downloaded.`,
+      });
+      
+      setExportOpen(false);
+    } catch (e) {
+      console.error('Tendies export failed', e);
+      toast({
+        title: "Export failed",
+        description: "Failed to export tendies file. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingTendies(false);
     }
   };
 
@@ -276,12 +412,15 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 </Button>
                 <Button
                   variant="outline"
-                  disabled
-                  className="w-full justify-start text-left py-10 opacity-70"
+                  onClick={() => { exportTendies(); }}
+                  disabled={!doc || exportingTendies}
+                  className="w-full justify-start text-left py-10"
                 >
                   <div className="flex flex-col items-start gap-0.5">
                     <span>Export Tendies file</span>
-                    <span className="text-xs text-muted-foreground">Coming soon</span>
+                    <span className="text-xs text-muted-foreground">
+                      {exportingTendies ? 'Creating tendies file...' : 'Create a tendies wallpaper file with your animation.'}
+                    </span>
                   </div>
                 </Button>
               </div>

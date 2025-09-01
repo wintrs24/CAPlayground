@@ -35,19 +35,14 @@ export async function packCA(bundle: CAProjectBundle): Promise<Blob> {
   const JSZip = (await import('jszip')).default;
   const zip = new JSZip();
 
-  const projectName = bundle.project.name.replace(/[^\w\-]/g, '_');
-  const projectFolder = zip.folder(projectName);
-  if (!projectFolder) {
-    throw new Error('Failed to create project folder');
-  }
-
+  // Files need to be in root not [project-name]/ :p
   const caml = serializeCAML(bundle.root, bundle.project);
-  projectFolder.file(DEFAULT_SCENE, caml);
+  zip.file(DEFAULT_SCENE, caml);
 
-  projectFolder.file(INDEX_XML_BASENAME, buildIndexXml(DEFAULT_SCENE));
+  zip.file(INDEX_XML_BASENAME, buildIndexXml(DEFAULT_SCENE));
 
   const assets = bundle.assets || {};
-  const assetsFolder = projectFolder.folder('assets');
+  const assetsFolder = zip.folder('assets');
   if (assetsFolder) {
     for (const [name, asset] of Object.entries(assets)) {
       const data = (asset.data instanceof Blob)
@@ -73,6 +68,12 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
   let indexXml = await zip.file(INDEX_XML_BASENAME)?.async('string');
   if (!indexXml) indexXml = await zip.file('Index.xml')?.async('string');
   if (!indexXml) indexXml = await zip.file('index.plist')?.async('string');
+  
+  if (!indexXml) {
+    const files = Object.keys(zip.files);
+    const indexFile = files.find(f => f.endsWith('index.xml') || f.endsWith('Index.xml'));
+    if (indexFile) indexXml = await zip.file(indexFile)?.async('string');
+  }
 
   const rootDoc = indexXml ? parseIndexXml(indexXml) : null;
   const sceneName = (rootDoc || DEFAULT_SCENE).trim();
@@ -98,7 +99,20 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
   if (!root) throw new Error('Failed to parse CAML');
 
   const assets: CAProjectBundle['assets'] = {};
-  const assetsFolder = zip.folder('assets');
+  let assetsFolder = zip.folder('assets');
+  if (!assetsFolder) {
+    const files = Object.keys(zip.files);
+    const assetsPath = files.find(f => f.includes('/assets/') || f.startsWith('assets/'));
+    if (assetsPath) {
+      const pathParts = assetsPath.split('/');
+      const projectFolder = pathParts[0];
+      const projectZip = zip.folder(projectFolder);
+      if (projectZip) {
+        assetsFolder = projectZip.folder('assets');
+      }
+    }
+  }
+  
   if (assetsFolder) {
     const files = Object.keys(assetsFolder.files);
     for (const path of files) {
