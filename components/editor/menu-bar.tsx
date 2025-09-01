@@ -256,14 +256,23 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         }
       }
 
-      const caFileName = `7400.WWDC_2022_Foreground-390w-844h@3x~iphone.ca`;
-      const caPath = `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/0/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/${caFileName}`;
-      const caArrayBuffer = await caBlob.arrayBuffer();
-      outputZip.file(caPath, caArrayBuffer);
+      // Attempt to fix applying tendies 💔
+      const caZip = new JSZip();
+      await caZip.loadAsync(await caBlob.arrayBuffer());
+      
+      const caFolderName = `7400.WWDC_2022_Foreground-390w-844h@3x~iphone.ca`;
+      const caFolderPath = `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/0/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/${caFolderName}`;
+      
+      for (const [relativePath, file] of Object.entries(caZip.files)) {
+        if (!file.dir) {
+          const content = await file.async('uint8array');
+          const fullPath = `${caFolderPath}/${relativePath}`;
+          outputZip.file(fullPath, content);
+        }
+      }
 
       const finalZipBlob = await outputZip.generateAsync({ type: 'blob' });
 
-      // Download the file
       const url = URL.createObjectURL(finalZipBlob);
       const a = document.createElement('a');
       a.href = url;

@@ -43,9 +43,9 @@ function parseCALayer(el: Element): AnyLayer {
   const align = attr(el, 'align') as TextLayer['align'] | undefined;
 
   let imageSrc: string | undefined;
-  const content = el.getElementsByTagNameNS(CAML_NS, 'content')[0];
-  if (content) {
-    const images = content.getElementsByTagNameNS(CAML_NS, 'CGImage');
+  const contents = el.getElementsByTagNameNS(CAML_NS, 'contents')[0]; //was supposed to be contents :P thats why images wouldn't render in mica 
+  if (contents) {
+    const images = contents.getElementsByTagNameNS(CAML_NS, 'CGImage');
     if (images && images[0]) {
       imageSrc = attr(images[0], 'src');
     }
@@ -101,7 +101,7 @@ export function serializeCAML(root: AnyLayer, project?: CAProject): string {
   const rootEl = serializeLayer(doc, root, project);
   caml.appendChild(rootEl);
   const xml = new XMLSerializer().serializeToString(doc);
-  return xml;
+  return '<?xml version="1.0" encoding="UTF-8"?>' + xml; //added this or else mica couldnt open the caml
 }
 
 function setAttr(el: Element, name: string, value: string | number | undefined) {
@@ -122,11 +122,11 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   setAttr(el, 'borderWidth', layer.borderWidth);
 
   if (layer.type === 'image') {
-    const content = doc.createElementNS(CAML_NS, 'content');
+    const contents = doc.createElementNS(CAML_NS, 'contents');
     const img = doc.createElementNS(CAML_NS, 'CGImage');
     setAttr(img, 'src', layer.src);
-    content.appendChild(img);
-    el.appendChild(content);
+    contents.appendChild(img);
+    el.appendChild(contents);
   }
 
   if (layer.type === 'text') {
