@@ -5,7 +5,7 @@ const INDEX_XML_BASENAME = 'index.xml';
 const DEFAULT_SCENE = 'main.caml';
 
 function buildIndexXml(rootDocument: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<plist>\n  <rootDocument>${rootDocument}</rootDocument>\n</plist>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n  <rootDocument>${rootDocument}</rootDocument>\n</plist>`;
 }
 
 function parseIndexXml(xml: string): string | null {
@@ -40,6 +40,16 @@ export async function packCA(bundle: CAProjectBundle): Promise<Blob> {
   zip.file(DEFAULT_SCENE, caml);
 
   zip.file(INDEX_XML_BASENAME, buildIndexXml(DEFAULT_SCENE));
+
+  // Add assetManifest.caml file, i think this is needed bc my other working tendies have it :p
+  const assetManifestContent = `<?xml version="1.0" encoding="UTF-8"?>
+
+<caml xmlns="http://www.apple.com/CoreAnimation/1.0">
+  <MicaAssetManifest>
+    <modules type="NSArray"/>
+  </MicaAssetManifest>
+</caml>`;
+  zip.file('assetManifest.caml', assetManifestContent);
 
   const assets = bundle.assets || {};
   const assetsFolder = zip.folder('assets');

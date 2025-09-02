@@ -43,9 +43,9 @@ function parseCALayer(el: Element): AnyLayer {
   const align = attr(el, 'align') as TextLayer['align'] | undefined;
 
   let imageSrc: string | undefined;
-  const content = el.getElementsByTagNameNS(CAML_NS, 'content')[0];
-  if (content) {
-    const images = content.getElementsByTagNameNS(CAML_NS, 'CGImage');
+  const contents = el.getElementsByTagNameNS(CAML_NS, 'contents')[0]; //was supposed to be contents :P thats why images wouldn't render in mica 
+  if (contents) {
+    const images = contents.getElementsByTagNameNS(CAML_NS, 'CGImage');
     if (images && images[0]) {
       imageSrc = attr(images[0], 'src');
     }
@@ -101,7 +101,7 @@ export function serializeCAML(root: AnyLayer, project?: CAProject): string {
   const rootEl = serializeLayer(doc, root, project);
   caml.appendChild(rootEl);
   const xml = new XMLSerializer().serializeToString(doc);
-  return xml;
+  return '<?xml version="1.0" encoding="UTF-8"?>' + xml; //added this or else mica couldnt open the caml
 }
 
 function setAttr(el: Element, name: string, value: string | number | undefined) {
@@ -114,19 +114,26 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   setAttr(el, 'id', layer.id);
   setAttr(el, 'name', layer.name);
   setAttr(el, 'bounds', `0 0 ${Math.max(0, layer.size.w)} ${Math.max(0, layer.size.h)}`);
-  setAttr(el, 'position', `${Math.round(layer.position.x)} ${Math.round(layer.position.y)}`);
+  const docHeight = project?.height ?? 844;
+  setAttr(el, 'position',
+    `${Math.round(layer.position.x + layer.size.w / 2)} ${Math.round(docHeight - (layer.position.y + layer.size.h / 2))}` //maths 🤓 (x = x+layer_width/2, y = project_height-(y+layer_height/2))
+  );
   setAttr(el, 'opacity', layer.opacity ?? undefined);
-  setAttr(el, 'backgroundColor', layer.backgroundColor);
+  if (layer.type === 'shape') {
+    setAttr(el, 'backgroundColor', (layer as any).fill || '#ffffffff'); //fixed shape fill 🤯
+  } else {
+    setAttr(el, 'backgroundColor', layer.backgroundColor || '#ffffffff');
+  }
   setAttr(el, 'cornerRadius', layer.cornerRadius);
   setAttr(el, 'borderColor', layer.borderColor);
   setAttr(el, 'borderWidth', layer.borderWidth);
 
   if (layer.type === 'image') {
-    const content = doc.createElementNS(CAML_NS, 'content');
+    const contents = doc.createElementNS(CAML_NS, 'contents');
     const img = doc.createElementNS(CAML_NS, 'CGImage');
     setAttr(img, 'src', layer.src);
-    content.appendChild(img);
-    el.appendChild(content);
+    contents.appendChild(img);
+    el.appendChild(contents);
   }
 
   if (layer.type === 'text') {
@@ -141,7 +148,7 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     const sublayers = doc.createElementNS(CAML_NS, 'sublayers');
     const children = (layer as GroupLayer).children || [];
     for (const child of children) {
-      sublayers.appendChild(serializeLayer(doc, child));
+      sublayers.appendChild(serializeLayer(doc, child, project));
     }
     if (children.length) el.appendChild(sublayers);
   }

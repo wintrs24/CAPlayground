@@ -90,7 +90,7 @@ export function CanvasPreview() {
   }, [baseOffsetX, baseOffsetY, fitScale, pan.x, pan.y, scale, userScale]);
 
   const startDrag = (l: AnyLayer, e: ReactMouseEvent) => {
-    if (e.shiftKey) return;
+    if (e.shiftKey || e.button === 1) return;
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
@@ -225,6 +225,7 @@ export function CanvasPreview() {
   >(null);
 
   const beginResize = (l: AnyLayer, handle: "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw", e: ReactMouseEvent) => {
+    if (e.button === 1) return;
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
@@ -328,6 +329,7 @@ export function CanvasPreview() {
   };
 
   const beginRotate = (l: AnyLayer, e: ReactMouseEvent) => {
+    if (e.button === 1) return;
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
@@ -447,9 +449,9 @@ export function CanvasPreview() {
         }
       }}
       onMouseDown={(e) => {
-        // Shift + drag to pan around
+        // Middle mouse button or Shift + drag to pan around
         if (!ref.current) return;
-        if (!e.shiftKey) return;
+        if (!e.shiftKey && e.button !== 1) return;
         e.preventDefault();
         const startClientX = e.clientX;
         const startClientY = e.clientY;
@@ -499,7 +501,7 @@ export function CanvasPreview() {
           boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08)",
         }}
         onMouseDown={(e) => {
-          if (e.shiftKey) return;
+          if (e.shiftKey || e.button === 1) return;
 
           selectLayer(null);
         }}

@@ -20,7 +20,7 @@ import { packCA } from "@/lib/ca/ca-file";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useState, JSX } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import JSZip from "jszip";
 
@@ -69,6 +69,9 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         } else {
           undo();
         }
+      } else if (key === 'e') {
+        e.preventDefault();
+        setExportOpen(true);
       } else if (e.shiftKey && key === 'l') {
         e.preventDefault();
         toggleLeft?.();
@@ -256,14 +259,22 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         }
       }
 
-      const caFileName = `7400.WWDC_2022_Foreground-390w-844h@3x~iphone.ca`;
-      const caPath = `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/0/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/${caFileName}`;
-      const caArrayBuffer = await caBlob.arrayBuffer();
-      outputZip.file(caPath, caArrayBuffer);
+             // Extract CA file contents and place them inside the CA folder
+       const caZip = new JSZip();
+       await caZip.loadAsync(await caBlob.arrayBuffer());
+       
+       const caFolderPath = `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Floating-390w-844h@3x~iphone.ca`;
+       
+       for (const [relativePath, file] of Object.entries(caZip.files)) {
+         if (!file.dir) {
+           const content = await file.async('uint8array');
+           const fullPath = `${caFolderPath}/${relativePath}`;
+           outputZip.file(fullPath, content);
+         }
+       }
 
       const finalZipBlob = await outputZip.generateAsync({ type: 'blob' });
 
-      // Download the file
       const url = URL.createObjectURL(finalZipBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -460,11 +471,19 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
               <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + 0</span>
             </div>
             <div className="flex items-center justify-between">
+              <span>Export</span>
+              <span className="font-mono text-muted-foreground">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + E</span>
+            </div>
+            <div className="flex items-center justify-between">
               <span>Zoom with scroll</span>
               <span className="font-mono text-muted-foreground">Shift + Scroll</span>
             </div>
             <div className="flex items-center justify-between">
               <span>Pan canvas</span>
+              <span className="font-mono text-muted-foreground">Middle Click + Drag</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>Pan canvas (alt)</span>
               <span className="font-mono text-muted-foreground">Shift + Drag</span>
             </div>
             <div className="flex items-center justify-between">
