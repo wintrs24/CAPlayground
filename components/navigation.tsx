@@ -4,17 +4,19 @@ import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Sun, Moon, ArrowRight } from "lucide-react"
+import { Menu, X, Sun, Moon, ArrowRight, User } from "lucide-react"
 import { useTheme } from "next-themes"
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { theme, setTheme } = useTheme()
+  // TODO: real auth state
+  const [isSignedIn] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768) {
+      if (window.innerWidth >= 1045) {
         setIsMenuOpen(false)
       }
     }
@@ -50,12 +52,12 @@ export function Navigation() {
   }, [isMenuOpen])
 
   return (
-    <nav className="sticky top-4 z-50 w-full">
-      <div className="container mx-auto px-4">
-        <div className="mx-auto max-w-4xl rounded-2xl border border-border bg-background/80 backdrop-blur-md shadow-md">
-          <div className="flex h-14 items-center justify-between px-4 md:px-6">
+    <nav className="z-50 w-full">
+      <div className="w-full px-4 min-[1045px]:px-6 mt-4">
+        <div className="w-full rounded-2xl border border-border bg-background/80 backdrop-blur-md shadow-md">
+          <div className="grid [grid-template-columns:auto_1fr_auto] h-14 items-center px-4 min-[1045px]:px-6">
           {/* Logo and App Name */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 justify-self-start">
             {/* light icon */}
             <Image
               src="/icon-light.png"
@@ -83,13 +85,38 @@ export function Navigation() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden min-[1045px]:flex items-center justify-center gap-6 justify-self-center">
             <Link href="/docs" className="text-foreground hover:text-accent transition-colors">
               Docs
             </Link>
             <Link href="/contributors" className="text-foreground hover:text-accent transition-colors">
               Contributors
             </Link>
+            <Link href="/roadmap" className="text-foreground hover:text-accent transition-colors">
+              Roadmap
+            </Link>
+          </div>
+
+          {/* Right actions */}
+          <div className="hidden min-[1045px]:flex items-center gap-4 justify-self-end">
+            {isSignedIn ? (
+              <Link href="/signin">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Account"
+                  className="rounded-full h-9 w-9 p-0"
+                >
+                  <User className="h-5 w-5" />
+                </Button>
+              </Link>
+            ) : (
+              <Link href="/signin">
+                <Button variant="outline" className="font-semibold">
+                  Sign In
+                </Button>
+              </Link>
+            )}
             <Link href="/projects">
               <Button variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
                 Projects <ArrowRight className="h-4 w-4 ml-2" />
@@ -113,7 +140,7 @@ export function Navigation() {
           {/* Mobile Menu Button */}
           <button
             id="mobile-menu-button"
-            className="md:hidden p-2 rounded-lg hover:bg-muted transition-colors"
+            className="min-[1045px]:hidden p-2 rounded-lg hover:bg-muted transition-colors justify-self-end"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle menu"
             aria-expanded={isMenuOpen}
@@ -124,18 +151,46 @@ export function Navigation() {
 
         <div
           id="mobile-nav"
-          className={`mx-auto max-w-4xl overflow-hidden transition-all duration-300 ease-in-out ${
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
             isMenuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
           }`}
         >
           <div className="rounded-b-2xl border border-t-0 border-border bg-background/95 backdrop-blur-sm shadow-md">
             <div className="flex flex-col space-y-1 py-2">
+              {isSignedIn ? (
+                <div className="px-2 pt-2">
+                  <Link href="/signin" onClick={() => setIsMenuOpen(false)}>
+                    <Button
+                      variant="ghost"
+                      className="w-full"
+                      aria-label="Account"
+                    >
+                      <User className="h-5 w-5 mx-auto" />
+                    </Button>
+                  </Link>
+                </div>
+              ) : (
+                <div className="px-2 pt-2">
+                  <Link href="/signin" onClick={() => setIsMenuOpen(false)}>
+                    <Button variant="outline" className="w-full font-semibold">
+                      Sign In
+                    </Button>
+                  </Link>
+                </div>
+              )}
               <Link
                 href="/docs"
                 className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Docs
+              </Link>
+              <Link
+                href="/roadmap"
+                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Roadmap
               </Link>
               <Link
                 href="/contributors"
