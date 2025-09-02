@@ -4,14 +4,20 @@ import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Sun, Moon, ArrowRight, User } from "lucide-react"
+import { Menu, X, Sun, Moon, ArrowRight, User, LogOut, LayoutDashboard } from "lucide-react"
 import { useTheme } from "next-themes"
+import { getSupabaseBrowserClient } from "@/lib/supabase"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { theme, setTheme } = useTheme()
-  // TODO: real auth state
-  const [isSignedIn] = useState(false)
+  const [isSignedIn, setIsSignedIn] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -27,6 +33,18 @@ export function Navigation() {
 
   useEffect(() => {
     setMounted(true)
+    const supabase = getSupabaseBrowserClient()
+
+    // initial check
+    supabase.auth.getSession().then(({ data }) => {
+      setIsSignedIn(!!data.session)
+    })
+
+    // subscribe to auth changes
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsSignedIn(!!session)
+    })
+
     const handleClickOutside = (event: MouseEvent) => {
       const nav = document.getElementById("mobile-nav")
       const button = document.getElementById("mobile-menu-button")
@@ -48,12 +66,13 @@ export function Navigation() {
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
+      sub.subscription.unsubscribe()
     }
   }, [isMenuOpen])
 
   return (
     <nav className="z-50 w-full">
-      <div className="w-full px-4 min-[1045px]:px-6 mt-4">
+      <div className="w-full max-w-[1385px] mx-auto px-4 min-[1045px]:px-6 mt-4">
         <div className="w-full rounded-2xl border border-border bg-background/80 backdrop-blur-md shadow-md">
           <div className="grid [grid-template-columns:auto_1fr_auto] h-14 items-center px-4 min-[1045px]:px-6">
           {/* Logo and App Name */}
@@ -100,16 +119,32 @@ export function Navigation() {
           {/* Right actions */}
           <div className="hidden min-[1045px]:flex items-center gap-4 justify-self-end">
             {isSignedIn ? (
-              <Link href="/signin">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Account"
-                  className="rounded-full h-9 w-9 p-0"
-                >
-                  <User className="h-5 w-5" />
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Account"
+                    className="rounded-full h-9 w-9 p-0"
+                  >
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem onClick={() => (window.location.href = "/dashboard") }>
+                    <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      const supabase = getSupabaseBrowserClient()
+                      await supabase.auth.signOut()
+                      window.location.href = "/"
+                    }}
+                  >
+                    <LogOut className="mr-2 h-4 w-4" /> Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Link href="/signin">
                 <Button variant="outline" className="font-semibold">
@@ -158,17 +193,33 @@ export function Navigation() {
           <div className="rounded-b-2xl border border-t-0 border-border bg-background/95 backdrop-blur-sm shadow-md">
             <div className="flex flex-col space-y-1 py-2">
               {isSignedIn ? (
-                <div className="px-2 pt-2">
-                  <Link href="/signin" onClick={() => setIsMenuOpen(false)}>
+                <>
+                  <div className="px-2 pt-2">
+                    <Link href="/dashboard" onClick={() => setIsMenuOpen(false)}>
+                      <Button
+                        variant="ghost"
+                        className="w-full"
+                        aria-label="Account"
+                      >
+                        <User className="h-5 w-5 mr-2" /> Dashboard
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="px-2">
                     <Button
                       variant="ghost"
                       className="w-full"
-                      aria-label="Account"
+                      onClick={async () => {
+                        const supabase = getSupabaseBrowserClient()
+                        await supabase.auth.signOut()
+                        setIsMenuOpen(false)
+                        window.location.href = "/"
+                      }}
                     >
-                      <User className="h-5 w-5 mx-auto" />
+                      <LogOut className="h-5 w-5 mr-2" /> Sign out
                     </Button>
-                  </Link>
-                </div>
+                  </div>
+                </>
               ) : (
                 <div className="px-2 pt-2">
                   <Link href="/signin" onClick={() => setIsMenuOpen(false)}>

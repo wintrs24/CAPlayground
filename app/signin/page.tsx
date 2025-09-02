@@ -1,17 +1,85 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AtSign, Lock, User as UserIcon, ArrowLeft, Sun, Moon } from "lucide-react"
 import { useTheme } from "next-themes"
+import { getSupabaseBrowserClient } from "@/lib/supabase"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin")
   const { theme, setTheme } = useTheme()
+
+  const [emailOrUsername, setEmailOrUsername] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const supabase = getSupabaseBrowserClient()
+
+  useEffect(() => {
+    const hash = window.location.hash
+    if (hash.includes("access_token") || hash.includes("code")) {
+      supabase.auth.getSession().then(() => {
+      })
+    }
+  }, [supabase])
+
+  async function handleSignIn() {
+    setError(null)
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailOrUsername,
+        password,
+      })
+      if (error) throw error
+      window.location.href = "/"
+    } catch (e: any) {
+      setError(e.message ?? "Failed to sign in")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSignUp() {
+    setError(null)
+    setLoading(true)
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      })
+      if (error) throw error
+      alert("Check your email for a confirmation link.")
+      setMode("signin")
+    } catch (e: any) {
+      setError(e.message ?? "Failed to sign up")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGoogle() {
+    setError(null)
+    setLoading(true)
+    try {
+      const origin = window.location.origin
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${origin}/auth/success` },
+      })
+      if (error) throw error
+    } catch (e: any) {
+      setError(e.message ?? "Google sign-in failed")
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative">
@@ -48,10 +116,10 @@ export default function AuthPage() {
             {mode === "signin" ? (
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="signin-identifier">Username or email</Label>
+                  <Label htmlFor="signin-identifier">Email</Label>
                   <div className="relative">
                     <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="signin-identifier" type="text" placeholder="Your Username or Email" className="pl-9" />
+                    <Input id="signin-identifier" type="email" placeholder="Your Email" className="pl-9" value={emailOrUsername} onChange={(e) => setEmailOrUsername(e.target.value)} />
                   </div>
                 </div>
 
@@ -59,14 +127,15 @@ export default function AuthPage() {
                   <Label htmlFor="signin-password">Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="signin-password" type="password" placeholder="Your Password" className="pl-9" />
+                    <Input id="signin-password" type="password" placeholder="Your Password" className="pl-9" value={password} onChange={(e) => setPassword(e.target.value)} />
                   </div>
                   <div className="text-right text-sm">
                     <Link href="/forgot-password" className="text-accent hover:underline">Forgot password?</Link>
                   </div>
                 </div>
 
-                <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">Sign In</Button>
+                {error && <p className="text-sm text-red-500">{error}</p>}
+                <Button disabled={loading} onClick={handleSignIn} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">{loading ? "Signing In..." : "Sign In"}</Button>
 
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
@@ -74,7 +143,7 @@ export default function AuthPage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
 
-                <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+                <Button variant="outline" className="w-full flex items-center justify-center gap-2" onClick={handleGoogle} disabled={loading}>
                   <GoogleColorIcon className="h-4 w-4" />
                   Continue with Google
                 </Button>
@@ -95,7 +164,7 @@ export default function AuthPage() {
                   <Label htmlFor="signup-username">Username</Label>
                   <div className="relative">
                     <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="signup-username" type="text" placeholder="Your Username" className="pl-9" />
+                    <Input id="signup-username" type="text" placeholder="Your Username (optional)" className="pl-9" />
                   </div>
                 </div>
 
@@ -103,7 +172,7 @@ export default function AuthPage() {
                   <Label htmlFor="signup-email">Email</Label>
                   <div className="relative">
                     <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="signup-email" type="email" placeholder="Your Email" className="pl-9" />
+                    <Input id="signup-email" type="email" placeholder="Your Email" className="pl-9" value={email} onChange={(e) => setEmail(e.target.value)} />
                   </div>
                 </div>
 
@@ -111,11 +180,12 @@ export default function AuthPage() {
                   <Label htmlFor="signup-password">Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="signup-password" type="password" placeholder="Your Password" className="pl-9" />
+                    <Input id="signup-password" type="password" placeholder="Create a Password" className="pl-9" value={password} onChange={(e) => setPassword(e.target.value)} />
                   </div>
                 </div>
 
-                <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">Sign Up</Button>
+                {error && <p className="text-sm text-red-500">{error}</p>}
+                <Button disabled={loading} onClick={handleSignUp} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">{loading ? "Signing Up..." : "Sign Up"}</Button>
 
                 <div className="flex items-center gap-3">
                   <div className="h-px flex-1 bg-border" />
@@ -123,7 +193,7 @@ export default function AuthPage() {
                   <div className="h-px flex-1 bg-border" />
                 </div>
 
-                <Button variant="outline" className="w-full flex items-center justify-center gap-2">
+                <Button variant="outline" className="w-full flex items-center justify-center gap-2" onClick={handleGoogle} disabled={loading}>
                   <GoogleColorIcon className="h-4 w-4" />
                   Sign up with Google
                 </Button>

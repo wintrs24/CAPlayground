@@ -7,9 +7,34 @@ import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { AtSign, Sun, Moon } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useState } from "react"
+import { getSupabaseBrowserClient } from "@/lib/supabase"
 
 export default function ForgotPasswordPage() {
   const { theme, setTheme } = useTheme()
+  const [email, setEmail] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const supabase = getSupabaseBrowserClient()
+
+  async function handleSend() {
+    setMsg(null)
+    setError(null)
+    setLoading(true)
+    try {
+      const origin = window.location.origin
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${origin}/reset-password`,
+      })
+      if (error) throw error
+      setMsg("If the email exists, a reset link has been sent.")
+    } catch (e: any) {
+      setError(e.message ?? "Failed to send reset link")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative">
@@ -37,12 +62,14 @@ export default function ForgotPasswordPage() {
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
                   <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="email" type="email" placeholder="you@example.com" className="pl-9" />
+                  <Input id="email" type="email" placeholder="you@example.com" className="pl-9" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
               </div>
 
-              <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
-                Send reset link
+              {error && <p className="text-sm text-red-500">{error}</p>}
+              {msg && <p className="text-sm text-green-600">{msg}</p>}
+              <Button disabled={loading} onClick={handleSend} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+                {loading ? "Sending..." : "Send reset link"}
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
