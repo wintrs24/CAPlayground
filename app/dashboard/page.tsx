@@ -11,6 +11,7 @@ export default function DashboardPage() {
   const supabase = getSupabaseBrowserClient()
   const router = useRouter()
   const [displayName, setDisplayName] = useState<string>("")
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -29,6 +30,16 @@ export default function DashboardPage() {
     return () => { mounted = false }
   }, [router, supabase])
 
+  async function handleSignOut() {
+    setLoading(true)
+    try {
+      await supabase.auth.signOut()
+      router.replace("/")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <main className="min-h-screen px-4 py-20 flex items-start justify-center relative">
       {/* Back to home */}
@@ -43,6 +54,11 @@ export default function DashboardPage() {
       <div className="w-full max-w-5xl">
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">Welcome back{displayName ? `, ${displayName}` : ""}!</h1>
         <p className="mt-6 text-muted-foreground text-lg">More coming soon.</p>
+        <div className="mt-8">
+          <Button onClick={handleSignOut} disabled={loading} variant="outline">
+            {loading ? "Signing out..." : "Sign out"}
+          </Button>
+        </div>
       </div>
     </main>
   )
