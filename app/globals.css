@@ -139,3 +139,7 @@
 .dark .squares-bg {
   --grid-color: #37415180;
 }
+
+button{
+  @apply cursor-pointer;
+}
