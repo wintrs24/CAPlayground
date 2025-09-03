@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload } from "lucide-react";
 import { unpackCA } from "@/lib/ca/ca-file";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
   Select,
   SelectContent,
@@ -57,12 +58,30 @@ export default function ProjectsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [isTosOpen, setIsTosOpen] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
 
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "7" | "30" | "year">("all");
   const [sortBy, setSortBy] = useState<"recent" | "name-asc" | "name-desc">("recent");
 
   const projectsArray = Array.isArray(projects) ? projects : [];
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    supabase.auth.getSession().then(({ data }) => {
+      const hasSession = !!data.session;
+      setIsSignedIn(hasSession);
+      try {
+        const accepted = localStorage.getItem("caplayground-tos-accepted") === "true";
+        if (!hasSession && !accepted) {
+          setIsTosOpen(true);
+        }
+      } catch {
+        if (!hasSession) setIsTosOpen(true);
+      }
+    });
+  }, []);
 
   const filteredProjects = useMemo(() => {
     const now = new Date();
@@ -547,6 +566,42 @@ export default function ProjectsPage() {
               >
                 Delete Selected
               </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* accept tos or go away when signed out */}
+        <AlertDialog open={isTosOpen && !isSignedIn}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Agree to Terms of Service</AlertDialogTitle>
+              <AlertDialogDescription>
+                Please review and accept our
+                {" "}
+                <Link href="/tos" className="underline" target="_blank" rel="noopener noreferrer">
+                  Terms of Service
+                </Link>
+                {" "}
+                to use Projects while signed out. Your projects are stored locally on your device.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setIsTosOpen(false)
+                  router.push("/")
+                }}
+              >
+                Back
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  try { localStorage.setItem("caplayground-tos-accepted", "true") } catch {}
+                  setIsTosOpen(false)
+                }}
+              >
+                I Agree              
+                </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
