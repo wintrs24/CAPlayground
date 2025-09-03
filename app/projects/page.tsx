@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -26,6 +26,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload } from "lucide-react";
 import { unpackCA } from "@/lib/ca/ca-file";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Project {
   id: string;
@@ -51,7 +58,51 @@ export default function ProjectsPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [query, setQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<"all" | "7" | "30" | "year">("all");
+  const [sortBy, setSortBy] = useState<"recent" | "name-asc" | "name-desc">("recent");
+
   const projectsArray = Array.isArray(projects) ? projects : [];
+
+  const filteredProjects = useMemo(() => {
+    const now = new Date();
+    const matchesQuery = (name: string) =>
+      query.trim() === "" || name.toLowerCase().includes(query.trim().toLowerCase());
+    const inDateRange = (createdAt: string) => {
+      if (dateFilter === "all") return true;
+      const created = new Date(createdAt);
+      if (Number.isNaN(created.getTime())) return true;
+      switch (dateFilter) {
+        case "7": {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 7);
+          return created >= d;
+        }
+        case "30": {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 30);
+          return created >= d;
+        }
+        case "year": {
+          return created.getFullYear() === now.getFullYear();
+        }
+        default:
+          return true;
+      }
+    };
+
+    const arr = projectsArray.filter((p) => matchesQuery(p.name) && inDateRange(p.createdAt));
+
+    const sorted = [...arr].sort((a, b) => {
+      if (sortBy === "recent") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortBy === "name-asc") return a.name.localeCompare(b.name);
+      if (sortBy === "name-desc") return b.name.localeCompare(a.name);
+      return 0;
+    });
+    return sorted;
+  }, [projectsArray, query, dateFilter, sortBy]);
 
   const createProject = () => {
     if (newProjectName.trim() === "") return;
@@ -210,6 +261,41 @@ export default function ProjectsPage() {
             </div>
             <h1 className="font-sfpro text-3xl md:text-4xl font-bold">Your Projects</h1>
             <p className="text-muted-foreground">Create and manage your CoreAnimation projects</p>
+            {/* Search & filters */}
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="lg:col-span-2">
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search projects by name..."
+                />
+              </div>
+              <div>
+                <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All time</SelectItem>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="year">This year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Newest first</SelectItem>
+                    <SelectItem value="name-asc">Name A → Z</SelectItem>
+                    <SelectItem value="name-desc">Name Z → A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
           <div className="w-full md:w-auto flex gap-2">
             <Button variant={isSelectMode ? "secondary" : "outline"} onClick={toggleSelectMode}>
@@ -295,18 +381,33 @@ export default function ProjectsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Projects List */}
+        {/* Projects List */
+        }
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Your Projects ({projectsArray.length})</h2>
+          <h2 className="text-xl font-semibold">
+            Your Projects ({filteredProjects.length}
+            {query || dateFilter !== "all" ? ` of ${projectsArray.length}` : ""})
+          </h2>
           
           {projectsArray.length === 0 ? (
             <div className="text-center py-12">
               <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No projects yet. Create your first project to get started!</p>
             </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="text-center py-12">
+              <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No projects match your search/filter.</p>
+              {(query || dateFilter !== "all") && (
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setQuery("")}>Clear search</Button>
+                  <Button variant="outline" size="sm" onClick={() => setDateFilter("all")}>Reset date</Button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projectsArray.map((project) => {
+              {filteredProjects.map((project) => {
                 const isSelected = selectedIds.includes(project.id);
                 return (
                   <Card 
