@@ -36,7 +36,7 @@ type MenuBarProps = {
 
 export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLeft, toggleRight }: MenuBarProps) {
   const router = useRouter();
-  const { doc, undo, redo } = useEditor();
+  const { doc, undo, redo, setDoc } = useEditor();
   const [projects, setProjects] = useLocalStorage<ProjectMeta[]>("caplayground-projects", []);
   const { toast } = useToast();
 
@@ -315,6 +315,11 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         localStorage.setItem(key, JSON.stringify(parsed));
       }
     } catch {}
+    
+    setDoc((prev) => {
+      if (!prev) return prev;
+      return { ...prev, meta: { ...prev.meta, name: name.trim() } };
+    });
     setRenameOpen(false);
   };
 
@@ -502,18 +507,27 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       </Dialog>
       
       {/* Rename dialog */}
-      {renameOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={() => setRenameOpen(false)}>
-          <div className="bg-background rounded-md shadow p-4 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="font-medium mb-2">Rename Project</div>
-            <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus onKeyDown={(e)=>{ if(e.key==='Enter') performRename(); if(e.key==='Escape') setRenameOpen(false); }} />
-            <div className="mt-3 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancel</Button>
-              <Button onClick={performRename} disabled={!name.trim()}>Save</Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+            <DialogDescription>Update the name of your project.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') performRename();
+              if (e.key === 'Escape') setRenameOpen(false);
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)}>Cancel</Button>
+            <Button onClick={performRename} disabled={!name.trim()}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirm */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

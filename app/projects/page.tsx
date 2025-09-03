@@ -48,6 +48,7 @@ export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [rootWidth, setRootWidth] = useState<number>(390);
   const [rootHeight, setRootHeight] = useState<number>(844);
@@ -158,6 +159,7 @@ export default function ProjectsPage() {
   const startEditing = (project: Project) => {
     setEditingProjectId(project.id);
     setEditingName(project.name);
+    setIsRenameOpen(true);
   };
 
   const saveEdit = () => {
@@ -171,8 +173,19 @@ export default function ProjectsPage() {
       )
     );
     
+    try {
+      const key = `caplayground-project:${editingProjectId}`;
+      const current = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (current) {
+        const parsed = JSON.parse(current);
+        if (parsed?.meta) parsed.meta.name = editingName.trim();
+        localStorage.setItem(key, JSON.stringify(parsed));
+      }
+    } catch {}
+    
     setEditingProjectId(null);
     setEditingName("");
+    setIsRenameOpen(false);
   };
 
   const deleteProject = (id: string) => {
@@ -448,16 +461,6 @@ export default function ProjectsPage() {
                         </div>
                       )}
                       <div className="flex items-start justify-between">
-                      {editingProjectId === project.id ? (
-                        <Input
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          onKeyPress={handleEditKeyPress}
-                          onBlur={saveEdit}
-                          className="flex-1 mr-2"
-                          autoFocus
-                        />
-                      ) : (
                         <div 
                           className="flex-1 min-w-0 cursor-pointer select-none"
                           onClick={(e) => {
@@ -473,35 +476,26 @@ export default function ProjectsPage() {
                             Created: {new Date(project.createdAt).toLocaleDateString()}
                           </p>
                         </div>
-                      )}
                       </div>
 
                       {/* Under-card actions */}
                       <div className="mt-3 flex items-center gap-3 text-sm">
-                        {editingProjectId === project.id ? (
-                          <Button size="sm" variant="secondary" className="h-7 px-2" onClick={saveEdit}>
-                            Save
-                          </Button>
-                        ) : (
-                          <>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 px-2"
-                              onClick={(e) => { e.stopPropagation(); startEditing(project); }}
-                            >
-                              <Edit3 className="h-4 w-4 mr-1" /> Rename
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-1" /> Delete
-                            </Button>
-                          </>
-                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 px-2"
+                          onClick={(e) => { e.stopPropagation(); startEditing(project); }}
+                        >
+                          <Edit3 className="h-4 w-4 mr-1" /> Rename
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -511,6 +505,27 @@ export default function ProjectsPage() {
           )}
         </div>
 
+        {/* Rename Project Dialog */}
+        <Dialog open={isRenameOpen} onOpenChange={(open) => { setIsRenameOpen(open); if (!open) { setEditingProjectId(null); setEditingName(""); } }}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Rename Project</DialogTitle>
+            </DialogHeader>
+            <Input
+              value={editingName}
+              onChange={(e) => setEditingName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveEdit();
+                if (e.key === 'Escape') { setIsRenameOpen(false); setEditingProjectId(null); setEditingName(""); }
+              }}
+              autoFocus
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsRenameOpen(false); setEditingProjectId(null); setEditingName(""); }}>Cancel</Button>
+              <Button onClick={saveEdit} disabled={!editingName.trim()}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
