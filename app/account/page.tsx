@@ -21,6 +21,7 @@ export default function AccountPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<"menu" | "email" | "username" | "password">("menu")
+  const [canChangeEmail, setCanChangeEmail] = useState<boolean>(true)
 
   useEffect(() => {
     let mounted = true
@@ -34,6 +35,9 @@ export default function AccountPage() {
       }
       setUserId(u.id)
       setEmail(u.email ?? "")
+      const isGoogleProvider = (u as any).app_metadata?.provider === "google" ||
+        Array.isArray((u as any).identities) && (u as any).identities.some((i: any) => i?.provider === "google")
+      setCanChangeEmail(!isGoogleProvider)
       try {
         const { data: profile } = await supabase
           .from("profiles")
@@ -63,6 +67,10 @@ export default function AccountPage() {
   async function updateEmail() {
     setMessage(null)
     setError(null)
+    if (!canChangeEmail) {
+      setError("Email is managed by your Google account. To change it, update your Google Account email.")
+      return
+    }
     const next = newEmail.trim()
     if (!next || !next.includes("@")) {
       setError("Please enter a valid email")
@@ -155,11 +163,18 @@ export default function AccountPage() {
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">Choose what you want to manage.</p>
               <div className="flex flex-col gap-3">
-                <Button onClick={() => { setMode("email"); setMessage(null); setError(null); setNewEmail(""); }}>Update Email</Button>
+                {canChangeEmail ? (
+                  <Button onClick={() => { setMode("email"); setMessage(null); setError(null); setNewEmail(""); }}>Update Email</Button>
+                ) : (
+                  <Button disabled title="Google-managed account" className="opacity-80">Update Email (Google-managed)</Button>
+                )}
                 <Button variant="outline" onClick={() => { setMode("username"); setMessage(null); setError(null); }}>Change Username</Button>
                 <Button variant="outline" onClick={() => { setMode("password"); setMessage(null); setError(null); }}>Change Password</Button>
                 <div className="pt-2">
                   <p className="text-xs text-muted-foreground">Current email: {email || "(loading)"}</p>
+                  {!canChangeEmail && (
+                    <p className="text-xs text-muted-foreground">Email changes are disabled for Google sign-ins. Update it in your Google Account.</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -172,19 +187,30 @@ export default function AccountPage() {
               <CardTitle>Update Email</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label>Current Email</Label>
-                <Input value={email} readOnly className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="new-email">New Email</Label>
-                <Input id="new-email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="mt-1" placeholder="you@example.com" />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={updateEmail}>Send Verification & Sign Out</Button>
-                <Button variant="ghost" onClick={() => setMode("menu")}>Back</Button>
-              </div>
-              <p className="text-xs text-muted-foreground">We’ll email a verification link to your new address. After confirming, sign back in.</p>
+              {!canChangeEmail ? (
+                <>
+                  <p className="text-sm text-muted-foreground">This account uses Google sign-in. You can't change your email.</p>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => setMode("menu")}>Back</Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label>Current Email</Label>
+                    <Input value={email} readOnly className="mt-1" />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-email">New Email</Label>
+                    <Input id="new-email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="mt-1" placeholder="you@example.com" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={updateEmail}>Send Verification & Sign Out</Button>
+                    <Button variant="ghost" onClick={() => setMode("menu")}>Back</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">We’ll email a verification link to your new address. After confirming, sign back in.</p>
+                </>
+              )}
             </CardContent>
           </Card>
         )}

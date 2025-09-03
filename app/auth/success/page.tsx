@@ -29,7 +29,7 @@ export default function AuthSuccessPage() {
         setStatus("not_signed_in")
         return
       }
-      // Look for username in profiles
+
       try {
         const { data: profile } = await supabase
           .from("profiles")
@@ -42,7 +42,6 @@ export default function AuthSuccessPage() {
           setStatus("need_username")
         }
       } catch {
-        // If profiles table isn't available, allow continue rather than blocking
         setStatus("ready")
       }
     }
