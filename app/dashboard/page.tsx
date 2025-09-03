@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase"
 
@@ -55,9 +56,37 @@ export default function DashboardPage() {
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">Welcome back{displayName ? `, ${displayName}` : ""}!</h1>
         <p className="mt-6 text-muted-foreground text-lg">More coming soon.</p>
         <div className="mt-8">
-          <Button onClick={handleSignOut} disabled={loading} variant="outline">
-            {loading ? "Signing out..." : "Sign out"}
-          </Button>
+          <Card className="border-border/80">
+            <CardHeader>
+              <CardTitle>Account Options</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Manage your account settings or sign out. Account management lets you update your email, set or change a username,
+                change your password, or permanently delete your account.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/account">
+                  <Button variant="default">Manage Account / Email</Button>
+                </Link>
+                <Link href="/account">
+                  <Button variant="outline">Change / Add Username</Button>
+                </Link>
+                <Link href="/account">
+                  <Button variant="outline">Change Password</Button>
+                </Link>
+                <Link href="/account">
+                  <Button variant="destructive">Delete Account</Button>
+                </Link>
+              </div>
+              <div className="pt-2">
+                <p className="text-xs text-muted-foreground mb-2">Signing out will end your session on this device.</p>
+                <Button onClick={handleSignOut} disabled={loading} variant="outline">
+                  {loading ? "Signing out..." : "Sign Out"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </main>
