@@ -279,7 +279,7 @@ export default function ProjectsPage() {
               </Link>
             </div>
             <h1 className="font-sfpro text-3xl md:text-4xl font-bold">Your Projects</h1>
-            <p className="text-muted-foreground">Create and manage your CoreAnimation projects</p>
+            <p className="text-muted-foreground">Create and manage your CoreAnimation projects stored locally on your device.</p>
             {/* Search & filters */}
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               <div className="lg:col-span-2">
