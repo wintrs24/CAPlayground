@@ -5,7 +5,7 @@ const INDEX_XML_BASENAME = 'index.xml';
 const DEFAULT_SCENE = 'main.caml';
 
 function buildIndexXml(rootDocument: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n  <rootDocument>${rootDocument}</rootDocument>\n</plist>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>${rootDocument}</string>\n</dict>\n</plist>`;
 }
 
 function parseIndexXml(xml: string): string | null {
