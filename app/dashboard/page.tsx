@@ -62,25 +62,12 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Manage your account settings or sign out. Account management lets you update your email, set or change a username,
-                change your password, or permanently delete your account.
+                Manage your email, username, password, or delete your account.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link href="/account">
-                  <Button variant="default">Manage Account / Email</Button>
+                  <Button variant="default">Manage Account</Button>
                 </Link>
-                <Link href="/account">
-                  <Button variant="outline">Change / Add Username</Button>
-                </Link>
-                <Link href="/account">
-                  <Button variant="outline">Change Password</Button>
-                </Link>
-                <Link href="/account">
-                  <Button variant="destructive">Delete Account</Button>
-                </Link>
-              </div>
-              <div className="pt-2">
-                <p className="text-xs text-muted-foreground mb-2">Signing out will end your session on this device.</p>
                 <Button onClick={handleSignOut} disabled={loading} variant="outline">
                   {loading ? "Signing out..." : "Sign Out"}
                 </Button>
