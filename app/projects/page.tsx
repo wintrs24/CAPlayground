@@ -440,14 +440,14 @@ export default function ProjectsPage() {
                         />
                       ) : (
                         <div 
-                          className="flex-1 cursor-pointer select-none"
+                          className="flex-1 min-w-0 cursor-pointer select-none"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (isSelectMode) toggleSelection(project.id);
                             else router.push(`/editor/${project.id}`);
                           }}
                         >
-                          <h3 className="font-medium block overflow-hidden text-ellipsis whitespace-nowrap" title={project.name}>
+                          <h3 className="font-medium block truncate" title={project.name}>
                             {project.name}
                           </h3>
                           <p className="text-xs text-muted-foreground mt-1">
