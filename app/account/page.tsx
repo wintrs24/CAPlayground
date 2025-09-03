@@ -156,7 +156,7 @@ export default function AccountPage() {
               <p className="text-sm text-muted-foreground">Choose what you want to manage.</p>
               <div className="flex flex-col gap-3">
                 <Button onClick={() => { setMode("email"); setMessage(null); setError(null); setNewEmail(""); }}>Update Email</Button>
-                <Button variant="outline" onClick={() => { setMode("username"); setMessage(null); setError(null); }}>Change / Add Username</Button>
+                <Button variant="outline" onClick={() => { setMode("username"); setMessage(null); setError(null); }}>Change Username</Button>
                 <Button variant="outline" onClick={() => { setMode("password"); setMessage(null); setError(null); }}>Change Password</Button>
                 <div className="pt-2">
                   <p className="text-xs text-muted-foreground">Current email: {email || "(loading)"}</p>
@@ -192,7 +192,7 @@ export default function AccountPage() {
         {mode === "username" && (
           <Card className="border-border/80 shadow-none">
             <CardHeader>
-              <CardTitle>Change / Add Username</CardTitle>
+              <CardTitle>Change Username</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
