@@ -185,6 +185,11 @@ export default function AuthPage() {
                 </div>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
+                <p className="text-xs text-muted-foreground">
+                  By signing up, you agree to our {""}
+                  <Link href="/tos" className="underline">Terms of Service</Link>. You must be at least 13 years old, or the
+                  minimum age of digital consent in your country.
+                </p>
                 <Button disabled={loading} onClick={handleSignUp} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">{loading ? "Signing Up..." : "Sign Up"}</Button>
 
                 <div className="flex items-center gap-3">

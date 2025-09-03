@@ -74,7 +74,7 @@ export function Footer() {
               <Link href="#" className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="#" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <Link href="/tos" className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 Terms of Service
               </Link>
             </div>
