@@ -71,7 +71,7 @@ export function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-sm text-muted-foreground">© 2025 CAPlayground. All rights reserved.</p>
             <div className="flex space-x-6">
-              <Link href="#" className="text-sm text-muted-foreground hover:text-accent transition-colors">
+              <Link href="/privacy" className="text-sm text-muted-foreground hover:text-accent transition-colors">
                 Privacy Policy
               </Link>
               <Link href="/tos" className="text-sm text-muted-foreground hover:text-accent transition-colors">

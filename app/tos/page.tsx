@@ -133,7 +133,10 @@ export default function TermsPage() {
             Questions? Contact us at <a className="underline" href="mailto:support@enkei64.xyz">support@enkei64.xyz</a>.
           </p>
 
-          
+          <p className="mt-10 text-sm text-muted-foreground">
+            See also our {" "}
+            <Link href="/privacy" className="underline">Privacy Policy</Link>.
+          </p>
         </div>
       </div>
     </main>
