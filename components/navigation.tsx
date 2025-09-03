@@ -187,7 +187,7 @@ export function Navigation() {
         <div
           id="mobile-nav"
           className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            isMenuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
+            isMenuOpen ? "max-h-120 opacity-100" : "max-h-0 opacity-0"
           }`}
         >
           <div className="rounded-b-2xl border border-t-0 border-border bg-background/95 backdrop-blur-sm shadow-md">
@@ -195,57 +195,59 @@ export function Navigation() {
               {/* top quick links */}
               <Link
                 href="/docs"
-                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2"
+                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2 text-4xl"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Docs
               </Link>
               <Link
                 href="/roadmap"
-                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2"
+                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2 text-4xl"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Roadmap
               </Link>
               <Link
                 href="/contributors"
-                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2"
+                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2 text-4xl"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Contributors
               </Link>
               {/* bottom primary actions */}
-              <div className="px-2 pt-2 pb-3 space-y-3">
-                {isSignedIn ? (
-                  <Link href="/dashboard" onClick={() => setIsMenuOpen(false)}>
+              <div className="px-2 pt-2 pb-3 my-2">
+                <div className="flex gap-3">
+                  {isSignedIn ? (
+                    <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="flex-1">
+                      <Button
+                        variant="outline"
+                        className="w-full text-3xl h-16"
+                        aria-label="Account"
+                      >
+                        Account
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href="/signin" onClick={() => setIsMenuOpen(false)} className="flex-1">
+                      <Button variant="outline" className="w-full text-3xl h-16">
+                        Sign In
+                      </Button>
+                    </Link>
+                  )}
+                  <Link href="/projects" onClick={() => setIsMenuOpen(false)} className="flex-1">
                     <Button
-                      variant="outline"
-                      className="w-full"
-                      aria-label="Account"
+                      variant="default"
+                      className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold w-full text-3xl h-16"
                     >
-                      <User className="h-5 w-5 mr-2" /> Account
+                      Projects <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
-                ) : (
-                  <Link href="/signin" onClick={() => setIsMenuOpen(false)}>
-                    <Button variant="outline" className="w-full font-semibold">
-                      Sign In
-                    </Button>
-                  </Link>
-                )}
-                <Link href="/projects" onClick={() => setIsMenuOpen(false)}>
-                  <Button
-                    variant="default"
-                    className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold w-full"
-                  >
-                    Projects <ArrowRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </Link>
+                </div>
               </div>
               <div className="px-1 pb-3">
                 <Button
                   variant="ghost"
-                  className="w-full"
+                  className="w-full text-2xl h-10"
                   onClick={() => {
                     setTheme(theme === "dark" ? "light" : "dark")
                     setIsMenuOpen(false)

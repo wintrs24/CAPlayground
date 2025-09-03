@@ -16,6 +16,7 @@ export default function AuthPage() {
 
   const [emailOrUsername, setEmailOrUsername] = useState("")
   const [email, setEmail] = useState("")
+  const [signupUsername, setSignupUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,13 +48,24 @@ export default function AuthPage() {
     }
   }
 
+  function isValidUsername(u: string) {
+    // 3-20 chars, A-Z a-z 0-9 and ! - _ .
+    return /^[A-Za-z0-9!._-]{3,20}$/.test(u)
+  }
+
   async function handleSignUp() {
     setError(null)
     setLoading(true)
     try {
+      if (!isValidUsername(signupUsername)) {
+        throw new Error("Username must be 3-20 chars and only letters, numbers, and ! - _ .")
+      }
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: { username: signupUsername },
+        },
       })
       if (error) throw error
       alert("Check your email for a confirmation link.")
@@ -164,8 +176,16 @@ export default function AuthPage() {
                   <Label htmlFor="signup-username">Username</Label>
                   <div className="relative">
                     <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="signup-username" type="text" placeholder="Your Username (optional)" className="pl-9" />
+                    <Input
+                      id="signup-username"
+                      type="text"
+                      placeholder="Choose a username"
+                      className="pl-9"
+                      value={signupUsername}
+                      onChange={(e) => setSignupUsername(e.target.value)}
+                    />
                   </div>
+                  <p className="text-xs text-muted-foreground">3–20 chars. Letters, numbers, and ! - _ . only.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -185,6 +205,12 @@ export default function AuthPage() {
                 </div>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
+                <p className="text-xs text-muted-foreground">
+                  By signing up, you agree to our {" "}
+                  <Link href="/tos" className="underline">Terms of Service</Link> and {" "}
+                  <Link href="/privacy" className="underline">Privacy Policy</Link>. You must be at least 13 years old, or the
+                  minimum age of digital consent in your country.
+                </p>
                 <Button disabled={loading} onClick={handleSignUp} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">{loading ? "Signing Up..." : "Sign Up"}</Button>
 
                 <div className="flex items-center gap-3">

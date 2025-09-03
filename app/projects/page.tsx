@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useLocalStorage } from "@/hooks/use-local-storage";
@@ -26,6 +26,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload } from "lucide-react";
 import { unpackCA } from "@/lib/ca/ca-file";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Project {
   id: string;
@@ -40,6 +48,7 @@ export default function ProjectsPage() {
   const [newProjectName, setNewProjectName] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [rootWidth, setRootWidth] = useState<number>(390);
   const [rootHeight, setRootHeight] = useState<number>(844);
@@ -50,8 +59,70 @@ export default function ProjectsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [isTosOpen, setIsTosOpen] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
+
+  const [query, setQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<"all" | "7" | "30" | "year">("all");
+  const [sortBy, setSortBy] = useState<"recent" | "name-asc" | "name-desc">("recent");
 
   const projectsArray = Array.isArray(projects) ? projects : [];
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    supabase.auth.getSession().then(({ data }) => {
+      const hasSession = !!data.session;
+      setIsSignedIn(hasSession);
+      try {
+        const accepted = localStorage.getItem("caplayground-tos-accepted") === "true";
+        if (!hasSession && !accepted) {
+          setIsTosOpen(true);
+        }
+      } catch {
+        if (!hasSession) setIsTosOpen(true);
+      }
+    });
+  }, []);
+
+  const filteredProjects = useMemo(() => {
+    const now = new Date();
+    const matchesQuery = (name: string) =>
+      query.trim() === "" || name.toLowerCase().includes(query.trim().toLowerCase());
+    const inDateRange = (createdAt: string) => {
+      if (dateFilter === "all") return true;
+      const created = new Date(createdAt);
+      if (Number.isNaN(created.getTime())) return true;
+      switch (dateFilter) {
+        case "7": {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 7);
+          return created >= d;
+        }
+        case "30": {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 30);
+          return created >= d;
+        }
+        case "year": {
+          return created.getFullYear() === now.getFullYear();
+        }
+        default:
+          return true;
+      }
+    };
+
+    const arr = projectsArray.filter((p) => matchesQuery(p.name) && inDateRange(p.createdAt));
+
+    const sorted = [...arr].sort((a, b) => {
+      if (sortBy === "recent") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortBy === "name-asc") return a.name.localeCompare(b.name);
+      if (sortBy === "name-desc") return b.name.localeCompare(a.name);
+      return 0;
+    });
+    return sorted;
+  }, [projectsArray, query, dateFilter, sortBy]);
 
   const createProject = () => {
     if (newProjectName.trim() === "") return;
@@ -88,6 +159,7 @@ export default function ProjectsPage() {
   const startEditing = (project: Project) => {
     setEditingProjectId(project.id);
     setEditingName(project.name);
+    setIsRenameOpen(true);
   };
 
   const saveEdit = () => {
@@ -101,8 +173,19 @@ export default function ProjectsPage() {
       )
     );
     
+    try {
+      const key = `caplayground-project:${editingProjectId}`;
+      const current = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+      if (current) {
+        const parsed = JSON.parse(current);
+        if (parsed?.meta) parsed.meta.name = editingName.trim();
+        localStorage.setItem(key, JSON.stringify(parsed));
+      }
+    } catch {}
+    
     setEditingProjectId(null);
     setEditingName("");
+    setIsRenameOpen(false);
   };
 
   const deleteProject = (id: string) => {
@@ -209,7 +292,42 @@ export default function ProjectsPage() {
               </Link>
             </div>
             <h1 className="font-sfpro text-3xl md:text-4xl font-bold">Your Projects</h1>
-            <p className="text-muted-foreground">Create and manage your CoreAnimation projects</p>
+            <p className="text-muted-foreground">Create and manage your CoreAnimation projects stored locally on your device.</p>
+            {/* Search & filters */}
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="lg:col-span-2">
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search projects by name..."
+                />
+              </div>
+              <div>
+                <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All time</SelectItem>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="year">This year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Newest first</SelectItem>
+                    <SelectItem value="name-asc">Name A → Z</SelectItem>
+                    <SelectItem value="name-desc">Name Z → A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
           <div className="w-full md:w-auto flex gap-2">
             <Button variant={isSelectMode ? "secondary" : "outline"} onClick={toggleSelectMode}>
@@ -295,18 +413,33 @@ export default function ProjectsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Projects List */}
+        {/* Projects List */
+        }
         <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Your Projects ({projectsArray.length})</h2>
+          <h2 className="text-xl font-semibold">
+            Your Projects ({filteredProjects.length}
+            {query || dateFilter !== "all" ? ` of ${projectsArray.length}` : ""})
+          </h2>
           
           {projectsArray.length === 0 ? (
             <div className="text-center py-12">
               <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No projects yet. Create your first project to get started!</p>
             </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="text-center py-12">
+              <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No projects match your search/filter.</p>
+              {(query || dateFilter !== "all") && (
+                <div className="mt-4 flex justify-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setQuery("")}>Clear search</Button>
+                  <Button variant="outline" size="sm" onClick={() => setDateFilter("all")}>Reset date</Button>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projectsArray.map((project) => {
+              {filteredProjects.map((project) => {
                 const isSelected = selectedIds.includes(project.id);
                 return (
                   <Card 
@@ -328,60 +461,41 @@ export default function ProjectsPage() {
                         </div>
                       )}
                       <div className="flex items-start justify-between">
-                      {editingProjectId === project.id ? (
-                        <Input
-                          value={editingName}
-                          onChange={(e) => setEditingName(e.target.value)}
-                          onKeyPress={handleEditKeyPress}
-                          onBlur={saveEdit}
-                          className="flex-1 mr-2"
-                          autoFocus
-                        />
-                      ) : (
                         <div 
-                          className="flex-1 cursor-pointer select-none"
+                          className="flex-1 min-w-0 cursor-pointer select-none"
                           onClick={(e) => {
                             e.stopPropagation();
                             if (isSelectMode) toggleSelection(project.id);
                             else router.push(`/editor/${project.id}`);
                           }}
                         >
-                          <h3 className="font-medium block overflow-hidden text-ellipsis whitespace-nowrap" title={project.name}>
+                          <h3 className="font-medium block truncate" title={project.name}>
                             {project.name}
                           </h3>
                           <p className="text-xs text-muted-foreground mt-1">
                             Created: {new Date(project.createdAt).toLocaleDateString()}
                           </p>
                         </div>
-                      )}
                       </div>
 
                       {/* Under-card actions */}
                       <div className="mt-3 flex items-center gap-3 text-sm">
-                        {editingProjectId === project.id ? (
-                          <Button size="sm" variant="secondary" className="h-7 px-2" onClick={saveEdit}>
-                            Save
-                          </Button>
-                        ) : (
-                          <>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 px-2"
-                              onClick={(e) => { e.stopPropagation(); startEditing(project); }}
-                            >
-                              <Edit3 className="h-4 w-4 mr-1" /> Rename
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="ghost" 
-                              className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-1" /> Delete
-                            </Button>
-                          </>
-                        )}
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 px-2"
+                          onClick={(e) => { e.stopPropagation(); startEditing(project); }}
+                        >
+                          <Edit3 className="h-4 w-4 mr-1" /> Rename
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -391,6 +505,27 @@ export default function ProjectsPage() {
           )}
         </div>
 
+        {/* Rename Project Dialog */}
+        <Dialog open={isRenameOpen} onOpenChange={(open) => { setIsRenameOpen(open); if (!open) { setEditingProjectId(null); setEditingName(""); } }}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Rename Project</DialogTitle>
+            </DialogHeader>
+            <Input
+              value={editingName}
+              onChange={(e) => setEditingName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveEdit();
+                if (e.key === 'Escape') { setIsRenameOpen(false); setEditingProjectId(null); setEditingName(""); }
+              }}
+              autoFocus
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsRenameOpen(false); setEditingProjectId(null); setEditingName(""); }}>Cancel</Button>
+              <Button onClick={saveEdit} disabled={!editingName.trim()}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
@@ -446,6 +581,42 @@ export default function ProjectsPage() {
               >
                 Delete Selected
               </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* accept tos or go away when signed out */}
+        <AlertDialog open={isTosOpen && !isSignedIn}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Agree to Terms of Service</AlertDialogTitle>
+              <AlertDialogDescription>
+                Please review and accept our
+                {" "}
+                <Link href="/tos" className="underline" target="_blank" rel="noopener noreferrer">
+                  Terms of Service
+                </Link>
+                {" "}
+                to use Projects while signed out. Your projects are stored locally on your device.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel
+                onClick={() => {
+                  setIsTosOpen(false)
+                  router.push("/")
+                }}
+              >
+                Back
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  try { localStorage.setItem("caplayground-tos-accepted", "true") } catch {}
+                  setIsTosOpen(false)
+                }}
+              >
+                I Agree              
+                </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
