@@ -35,13 +35,13 @@ export default function DocsPage() {
 
             {/* CTA */}
             <div className="pt-12">
-              <p className="text-muted-foreground mb-6">Want to be notified when documentation is available? (You can't)</p>
-              <Link href="/">
+              <p className="text-muted-foreground mb-6">Want to be notified when documentation is available?</p>
+              <Link href="https://discord.gg/8rW3SHsK8b">
                 <Button
                   variant="outline"
                   className="border-accent text-accent hover:bg-accent hover:text-accent-foreground bg-transparent"
                 >
-                  Back to Home
+                  Join our Discord
                 </Button>
               </Link>
             </div>
