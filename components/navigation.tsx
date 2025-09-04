@@ -221,7 +221,7 @@ export function Navigation() {
                     <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="flex-1">
                       <Button
                         variant="outline"
-                        className="w-full text-3xl h-16"
+                        className="w-full text-lg h-10"
                         aria-label="Account"
                       >
                         Account
@@ -229,7 +229,7 @@ export function Navigation() {
                     </Link>
                   ) : (
                     <Link href="/signin" onClick={() => setIsMenuOpen(false)} className="flex-1">
-                      <Button variant="outline" className="w-full text-3xl h-16">
+                      <Button variant="outline" className="w-full text-lg h-10">
                         Sign In
                       </Button>
                     </Link>
@@ -237,7 +237,7 @@ export function Navigation() {
                   <Link href="/projects" onClick={() => setIsMenuOpen(false)} className="flex-1">
                     <Button
                       variant="default"
-                      className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold w-full text-3xl h-16"
+                      className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold w-full text-lg h-10"
                     >
                       Projects <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
@@ -247,7 +247,7 @@ export function Navigation() {
               <div className="px-1 pb-3">
                 <Button
                   variant="ghost"
-                  className="w-full text-2xl h-10"
+                  className="w-full text-base h-9"
                   onClick={() => {
                     setTheme(theme === "dark" ? "light" : "dark")
                     setIsMenuOpen(false)

@@ -63,7 +63,7 @@ function RoadmapItem({
 }) {
   return (
     <article className="rounded-xl border border-border bg-card text-card-foreground p-5 md:p-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 md:gap-4">
         <div className="flex items-center gap-3">
           <span
             aria-hidden
@@ -73,7 +73,7 @@ function RoadmapItem({
           </span>
           <h2 className="font-heading text-xl md:text-2xl font-semibold">{title}</h2>
         </div>
-        <div aria-label="status" className="shrink-0">
+        <div aria-label="status" className="mt-2 md:mt-0 md:shrink-0">
           {status}
         </div>
       </div>
