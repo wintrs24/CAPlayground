@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AtSign, Lock, User as UserIcon, ArrowLeft, Sun, Moon } from "lucide-react"
 import { useTheme } from "next-themes"
-import { getSupabaseBrowserClient } from "@/lib/supabase"
+import { AUTH_ENABLED, getSupabaseBrowserClient } from "@/lib/supabase"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin")
@@ -30,6 +30,60 @@ export default function AuthPage() {
       })
     }
   }, [supabase])
+
+  if (!AUTH_ENABLED) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 relative">
+        {/* back*/}
+        <div className="absolute left-4 top-4">
+          <Link href="/">
+            <Button variant="ghost" size="sm" className="h-8 px-2">
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+          </Link>
+        </div>
+
+        {/* theme */}
+        <div className="absolute right-4 top-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Toggle theme"
+            className="rounded-full h-9 w-9 p-0"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </Button>
+        </div>
+
+        <div className="w-full max-w-md">
+          <Card className="border-border/80 shadow-none">
+            <CardHeader className="text-center">
+              <CardTitle className="text-3xl md:text-4xl font-bold">Sign in disabled</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-5">
+                <p className="text-sm text-muted-foreground">
+                  Authentication is disabled in this environment because required environment variables are not set.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  The rest of the site still works. To enable accounts, set <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+                </p>
+                <div className="flex gap-3">
+                  <Link href="/">
+                    <Button className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">Go to Home</Button>
+                  </Link>
+                  <Link href="/docs">
+                    <Button variant="outline">Docs</Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   async function handleSignIn() {
     setError(null)

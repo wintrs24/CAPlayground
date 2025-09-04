@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Lock } from "lucide-react"
 import Link from "next/link"
-import { getSupabaseBrowserClient } from "@/lib/supabase"
+import { AUTH_ENABLED, getSupabaseBrowserClient } from "@/lib/supabase"
 
 export default function ResetPasswordPage() {
   const supabase = getSupabaseBrowserClient()
@@ -19,6 +19,7 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    if (!AUTH_ENABLED) return
     supabase.auth.getUser().then(({ data }) => {
       setReady(!!data.user)
     })
@@ -56,13 +57,15 @@ export default function ResetPasswordPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-5">
-              {!ready && (
+              {!AUTH_ENABLED ? (
+                <p className="text-sm text-muted-foreground">Password reset is disabled because authentication is not configured for this environment.</p>
+              ) : !ready ? (
                 <p className="text-sm text-muted-foreground">
                   Verifying your reset link...
                 </p>
-              )}
+              ) : null}
 
-              {ready && (
+              {AUTH_ENABLED && ready && (
                 <>
                   <div className="space-y-2">
                     <Label htmlFor="new-password">New Password</Label>
@@ -113,3 +116,4 @@ export default function ResetPasswordPage() {
     </div>
   )
 }
+

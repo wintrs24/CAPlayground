@@ -27,6 +27,25 @@ npm run dev
 
 Open http://localhost:3000 in your browser.
 
+### Environment variables (optional for auth)
+
+Authentication is powered by Supabase. If you don't provide auth keys, the site still runs, but account features are disabled and protected routes will show a message.
+
+Create a `.env.local` in the project root with:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Only required for server-side account deletion API
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+When these are missing:
+
+- `app/signin/page.tsx` displays "Sign in disabled" and disables auth actions.
+- `app/forgot-password/page.tsx` and `app/reset-password/page.tsx` show a notice and disable actions.
+- `app/api/account/delete/route.ts` returns 501 with a clear message.
+
 ### Build & Start
 
 ```bash

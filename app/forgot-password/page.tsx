@@ -8,7 +8,7 @@ import Link from "next/link"
 import { AtSign, Sun, Moon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useState } from "react"
-import { getSupabaseBrowserClient } from "@/lib/supabase"
+import { AUTH_ENABLED, getSupabaseBrowserClient } from "@/lib/supabase"
 
 export default function ForgotPasswordPage() {
   const { theme, setTheme } = useTheme()
@@ -58,6 +58,11 @@ export default function ForgotPasswordPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-5">
+              {!AUTH_ENABLED && (
+                <p className="text-sm text-muted-foreground">
+                  Password reset is disabled because authentication is not configured for this environment.
+                </p>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -68,7 +73,7 @@ export default function ForgotPasswordPage() {
 
               {error && <p className="text-sm text-red-500">{error}</p>}
               {msg && <p className="text-sm text-green-600">{msg}</p>}
-              <Button disabled={loading} onClick={handleSend} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
+              <Button disabled={loading || !AUTH_ENABLED} onClick={handleSend} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground font-semibold">
                 {loading ? "Sending..." : "Send reset link"}
               </Button>
 
@@ -85,3 +90,4 @@ export default function ForgotPasswordPage() {
     </div>
   )
 }
+
