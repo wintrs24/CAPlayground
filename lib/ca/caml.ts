@@ -159,8 +159,6 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   setAttr(el, 'opacity', layer.opacity ?? undefined);
   if (layer.type === 'shape') {
     setAttr(el, 'backgroundColor', (layer as any).fill || '#ffffffff'); //fixed shape fill 🤯
-  } else {
-    setAttr(el, 'backgroundColor', layer.backgroundColor || '#ffffffff');
   }
   setAttr(el, 'cornerRadius', layer.cornerRadius);
   setAttr(el, 'borderColor', layer.borderColor);

@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload } from "lucide-react";
 import { unpackCA } from "@/lib/ca/ca-file";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
+// import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
   Select,
   SelectContent,
@@ -68,21 +68,21 @@ export default function ProjectsPage() {
 
   const projectsArray = Array.isArray(projects) ? projects : [];
 
-  useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    supabase.auth.getSession().then(({ data }) => {
-      const hasSession = !!data.session;
-      setIsSignedIn(hasSession);
-      try {
-        const accepted = localStorage.getItem("caplayground-tos-accepted") === "true";
-        if (!hasSession && !accepted) {
-          setIsTosOpen(true);
-        }
-      } catch {
-        if (!hasSession) setIsTosOpen(true);
-      }
-    });
-  }, []);
+  // useEffect(() => {
+  //   const supabase = getSupabaseBrowserClient();
+  //   supabase.auth.getSession().then(({ data }) => {
+  //     const hasSession = !!data.session;
+  //     setIsSignedIn(hasSession);
+  //     try {
+  //       const accepted = localStorage.getItem("caplayground-tos-accepted") === "true";
+  //       if (!hasSession && !accepted) {
+  //         setIsTosOpen(true);
+  //       }
+  //     } catch {
+  //       if (!hasSession) setIsTosOpen(true);
+  //     }
+  //   });
+  // }, []);
 
   const filteredProjects = useMemo(() => {
     const now = new Date();
