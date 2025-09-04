@@ -68,6 +68,12 @@ export default function ProjectsPage() {
 
   const projectsArray = Array.isArray(projects) ? projects : [];
 
+  const recordProjectCreated = () => {
+    try {
+      fetch("/api/analytics/project-created", { method: "POST", keepalive: true }).catch(() => {})
+    } catch {}
+  };
+
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     supabase.auth.getSession().then(({ data }) => {
@@ -132,6 +138,7 @@ export default function ProjectsPage() {
       createdAt: new Date().toISOString(),
     };
     setProjects([...projectsArray, newProject]);
+    recordProjectCreated();
     setNewProjectName("");
   };
 
@@ -150,6 +157,7 @@ export default function ProjectsPage() {
       height: Math.round(h),
     };
     setProjects([...projectsArray, newProject]);
+    recordProjectCreated();
     setNewProjectName("");
     setRootWidth(390);
     setRootHeight(844);
@@ -231,6 +239,7 @@ export default function ProjectsPage() {
         height,
       };
       setProjects([...(projectsArray || []), newProj]);
+      recordProjectCreated();
 
       const root = bundle.root as any;
       const layers = root?.type === 'group' && Array.isArray(root.children)

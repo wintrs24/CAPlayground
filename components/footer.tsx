@@ -60,7 +60,7 @@ export function Footer() {
               <Link href="https://github.com/CAPlayground/CAPlayground" className="block text-sm text-muted-foreground hover:text-accent transition-colors">
                 GitHub
               </Link>
-              <Link href="#" className="block text-sm text-muted-foreground hover:text-accent transition-colors">
+              <Link href="https://discord.gg/8rW3SHsK8b" className="block text-sm text-muted-foreground hover:text-accent transition-colors">
                 Discord
               </Link>
             </div>
