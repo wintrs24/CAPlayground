@@ -1,3 +1,4 @@
+import { set } from 'date-fns';
 import { AnyLayer, CAProject, GroupLayer, TextLayer } from './types';
 
 const CAML_NS = 'http://www.apple.com/CoreAnimation/1.0';
@@ -99,7 +100,44 @@ export function serializeCAML(root: AnyLayer, project?: CAProject): string {
   const doc = document.implementation.createDocument(CAML_NS, 'caml', null);
   const caml = doc.documentElement;
   const rootEl = serializeLayer(doc, root, project);
+  
+  const scriptComponents = doc.createElementNS(CAML_NS, 'scriptComponents');
+  const states = doc.createElementNS(CAML_NS, 'states');
+  
+  const stateNames = ['Locked', 'Unlock', 'Sleep'];
+  stateNames.forEach(stateName => {
+    const state = doc.createElementNS(CAML_NS, 'LKState');
+    state.setAttribute('name', stateName);
+    const elements = doc.createElementNS(CAML_NS, 'elements');
+    state.appendChild(elements);
+    states.appendChild(state);
+  });
+
+  const stateTransitions = doc.createElementNS(CAML_NS, 'stateTransitions');
+  const transitions = [
+    { from: '*', to: 'Unlock' },
+    { from: 'Unlock', to: '*' },
+    { from: '*', to: 'Locked' },
+    { from: 'Locked', to: '*' },
+    { from: '*', to: 'Sleep' },
+    { from: 'Sleep', to: '*' }
+  ];
+
+  transitions.forEach(({ from, to }) => {
+    const transition = doc.createElementNS(CAML_NS, 'LKStateTransition');
+    transition.setAttribute('fromState', from);
+    transition.setAttribute('toState', to);
+    const elements = doc.createElementNS(CAML_NS, 'elements');
+    transition.appendChild(elements);
+    stateTransitions.appendChild(transition);
+  });
+
+  // Append all elements
+  rootEl.appendChild(scriptComponents);
+  rootEl.appendChild(states);
+  rootEl.appendChild(stateTransitions);
   caml.appendChild(rootEl);
+
   const xml = new XMLSerializer().serializeToString(doc);
   return '<?xml version="1.0" encoding="UTF-8"?>' + xml; //added this or else mica couldnt open the caml
 }
@@ -121,18 +159,19 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   setAttr(el, 'opacity', layer.opacity ?? undefined);
   if (layer.type === 'shape') {
     setAttr(el, 'backgroundColor', (layer as any).fill || '#ffffffff'); //fixed shape fill 🤯
-  } else {
-    setAttr(el, 'backgroundColor', layer.backgroundColor || '#ffffffff');
   }
   setAttr(el, 'cornerRadius', layer.cornerRadius);
   setAttr(el, 'borderColor', layer.borderColor);
   setAttr(el, 'borderWidth', layer.borderWidth);
+  setAttr(el, 'allowsEdgeAntialiasing', '1');
+  setAttr(el, 'allowsGroupOpacity', '1');
+  setAttr(el, 'contentsFormat', 'RGBA8');
+  setAttr(el, 'cornerCurve', 'circular');
 
   if (layer.type === 'image') {
     const contents = doc.createElementNS(CAML_NS, 'contents');
-    const img = doc.createElementNS(CAML_NS, 'CGImage');
-    setAttr(img, 'src', layer.src);
-    contents.appendChild(img);
+    setAttr(contents, 'type', 'CGImage');
+    setAttr(contents, 'src', layer.src);
     el.appendChild(contents);
   }
 
