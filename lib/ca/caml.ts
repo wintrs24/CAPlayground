@@ -81,6 +81,9 @@ export function parseStateOverrides(xml: string): CAStateOverrides {
               val = vAttr;
             }
           }
+          if (typeof val === 'number' && keyPath === 'transform.rotation.z') {
+            val = (val * 180) / Math.PI;
+          }
           if (targetId && keyPath) arr.push({ targetId, keyPath, value: val });
         }
       }

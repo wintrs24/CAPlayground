@@ -275,7 +275,7 @@ export function EditorProvider({
         const p: any = patch;
         const nextState = { ...(prev.stateOverrides || {}) } as Record<string, Array<{ targetId: string; keyPath: string; value: number | string }>>;
         const list = [...(nextState[prev.activeState] || [])];
-        const upd = (keyPath: 'position.x' | 'position.y' | 'opacity' | 'bounds.size.width' | 'bounds.size.height', value: number) => {
+        const upd = (keyPath: 'position.x' | 'position.y' | 'opacity' | 'bounds.size.width' | 'bounds.size.height' | 'transform.rotation.z', value: number) => {
           const idx = list.findIndex((o) => o.targetId === id && o.keyPath === keyPath);
           if (idx >= 0) list[idx] = { ...list[idx], value };
           else list.push({ targetId: id, keyPath, value });
@@ -284,6 +284,7 @@ export function EditorProvider({
         if (p.position && typeof p.position.y === 'number') upd('position.y', p.position.y);
         if (p.size && typeof p.size.w === 'number') upd('bounds.size.width', p.size.w);
         if (p.size && typeof p.size.h === 'number') upd('bounds.size.height', p.size.h);
+        if (typeof p.rotation === 'number') upd('transform.rotation.z', p.rotation as number);
         if (typeof p.opacity === 'number') upd('opacity', p.opacity as number);
         nextState[prev.activeState] = list;
         pushHistory(prev);
@@ -305,7 +306,7 @@ export function EditorProvider({
         const p: any = patch;
         const nextState = { ...(prev.stateOverrides || {}) } as Record<string, Array<{ targetId: string; keyPath: string; value: number | string }>>;
         const list = [...(nextState[prev.activeState] || [])];
-        const upd = (keyPath: 'position.x' | 'position.y' | 'opacity' | 'bounds.size.width' | 'bounds.size.height', value: number) => {
+        const upd = (keyPath: 'position.x' | 'position.y' | 'opacity' | 'bounds.size.width' | 'bounds.size.height' | 'transform.rotation.z', value: number) => {
           const idx = list.findIndex((o) => o.targetId === id && o.keyPath === keyPath);
           if (idx >= 0) list[idx] = { ...list[idx], value };
           else list.push({ targetId: id, keyPath, value });
@@ -314,6 +315,7 @@ export function EditorProvider({
         if (p.position && typeof p.position.y === 'number') upd('position.y', p.position.y);
         if (p.size && typeof p.size.w === 'number') upd('bounds.size.width', p.size.w);
         if (p.size && typeof p.size.h === 'number') upd('bounds.size.height', p.size.h);
+        if (typeof p.rotation === 'number') upd('transform.rotation.z', p.rotation as number);
         if (typeof p.opacity === 'number') upd('opacity', p.opacity as number);
         nextState[prev.activeState] = list;
         return { ...prev, stateOverrides: nextState } as ProjectDocument;
