@@ -4,6 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
 import { useRef } from "react";
@@ -37,10 +39,14 @@ export function Inspector() {
   }
 
   return (
-    <Card className="p-3 h-full space-y-3">
+    <Card className="p-3 h-full space-y-2">
       <div className="font-medium">Inspector</div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <Accordion type="multiple" defaultValue={["geom","comp","content","text","image"]} className="space-y-1">
+        <AccordionItem value="geom">
+          <AccordionTrigger className="py-2 text-xs">Geometry</AccordionTrigger>
+          <AccordionContent className="pb-2">
+            <div className="grid grid-cols-2 gap-1.5">
         <div className="space-y-1">
           <Label htmlFor="pos-x">X</Label>
           <Input id="pos-x" type="number" step="0.01" value={fmt2(selected.position.x)}
@@ -94,10 +100,117 @@ export function Inspector() {
             }}
           />
         </div>
-      </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
 
-      {selected.type === "text" && (
-        <div className="grid grid-cols-2 gap-3">
+        <AccordionItem value="comp">
+          <AccordionTrigger className="py-2 text-xs">Compositing</AccordionTrigger>
+          <AccordionContent className="pb-2">
+            <div className="grid grid-cols-2 gap-1.5">
+        <div className="space-y-1">
+          <Label htmlFor="opacity">Opacity (%)</Label>
+          <Input
+            id="opacity"
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={fmt0(typeof selected.opacity === "number" ? Math.round((selected.opacity || 0) * 100) : 100)}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "") return;
+              const pct = Math.max(0, Math.min(100, Math.round(Number(v))));
+              const next = pct / 100;
+              updateLayer(selected.id, { opacity: Number.isFinite(next) ? next : (undefined as any) });
+            }}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label>Shadow</Label>
+          <div className="flex items-center gap-2 h-9">
+            <Checkbox disabled />
+            <span className="text-sm text-muted-foreground">(placeholder)</span>
+          </div>
+        </div>
+        {selected.type === "shape" && (
+          <div className="space-y-1">
+            <Label htmlFor="radius">Corner Radius</Label>
+            <Input
+              id="radius"
+              type="number"
+              step="1"
+              value={fmt0((selected as any).cornerRadius ?? (selected as any).radius)}
+              onChange={(e) => {
+                const v = e.target.value;
+                updateLayer(selected.id, { cornerRadius: v === "" ? (undefined as any) : Math.round(Number(v)) } as any);
+              }}
+            />
+          </div>
+        )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        <AccordionItem value="content">
+          <AccordionTrigger className="py-2 text-xs">Content</AccordionTrigger>
+          <AccordionContent className="pb-2">
+            <div className="grid grid-cols-2 gap-1.5">
+        <div className="space-y-1">
+          <Label>No background colour</Label>
+          <div className="flex items-center gap-2 h-9">
+            <Checkbox disabled />
+            <span className="text-sm text-muted-foreground">(placeholder)</span>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="backgroundColor">Background colour</Label>
+          <Input
+            id="backgroundColor"
+            type="color"
+            value={(selected as any).backgroundColor ?? "#ffffff"}
+            onChange={(e) => updateLayer(selected.id, { backgroundColor: e.target.value } as any)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="borderColor">Border colour</Label>
+          <Input
+            id="borderColor"
+            type="color"
+            value={(selected as any).borderColor ?? "#000000"}
+            onChange={(e) => updateLayer(selected.id, { borderColor: e.target.value } as any)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="borderWidth">Border width</Label>
+          <Input
+            id="borderWidth"
+            type="number"
+            step={1}
+            value={fmt0((selected as any).borderWidth)}
+            onChange={(e) => {
+              const v = e.target.value;
+              updateLayer(selected.id, { borderWidth: v === "" ? (undefined as any) : Math.max(0, Math.round(Number(v))) } as any);
+            }}
+          />
+        </div>
+        {selected.type === "shape" && (
+          <div className="space-y-1">
+            <Label htmlFor="fill">Fill</Label>
+            <Input id="fill" type="color" value={(selected as any).fill}
+              onChange={(e) => updateLayer(selected.id, { fill: e.target.value } as any)} />
+          </div>
+        )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Text */}
+        {selected.type === "text" && (
+          <AccordionItem value="text">
+            <AccordionTrigger className="py-2 text-xs">Text</AccordionTrigger>
+            <AccordionContent className="pb-2">
+              <div className="grid grid-cols-2 gap-1.5">
           <div className="space-y-1 col-span-2">
             <Label htmlFor="text">Text</Label>
             <Input id="text" value={selected.text}
@@ -117,34 +230,17 @@ export function Inspector() {
             <Input id="color" type="color" value={selected.color}
               onChange={(e) => updateLayer(selected.id, { color: e.target.value } as any)} />
           </div>
-        </div>
-      )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
 
-      {selected.type === "shape" && (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label htmlFor="fill">Fill</Label>
-            <Input id="fill" type="color" value={selected.fill}
-              onChange={(e) => updateLayer(selected.id, { fill: e.target.value } as any)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="radius">Corner Radius</Label>
-            <Input
-              id="radius"
-              type="number"
-              step="1"
-              value={fmt0((selected as any).cornerRadius ?? (selected as any).radius)}
-              onChange={(e) => {
-                const v = e.target.value;
-                updateLayer(selected.id, { cornerRadius: v === "" ? (undefined as any) : Math.round(Number(v)) } as any);
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {selected.type === "image" && (
-        <div className="grid grid-cols-2 gap-3">
+        {/* Image */}
+        {selected.type === "image" && (
+          <AccordionItem value="image">
+            <AccordionTrigger className="py-2 text-xs">Image</AccordionTrigger>
+            <AccordionContent className="pb-2">
+              <div className="grid grid-cols-2 gap-1.5">
           <div className="space-y-1 col-span-2">
             <Label>Image</Label>
             <div className="flex items-center gap-2">
@@ -191,8 +287,11 @@ export function Inspector() {
               />
             </div>
           </div>
-        </div>
-      )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        )}
+      </Accordion>
     </Card>
   );
 }
