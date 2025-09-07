@@ -1,5 +1,5 @@
 import { CAProjectBundle, AnyLayer } from './types';
-import { parseCAML, serializeCAML } from './caml';
+import { parseCAML, parseStates, serializeCAML } from './caml';
 
 const INDEX_XML_BASENAME = 'index.xml';
 const DEFAULT_SCENE = 'main.caml';
@@ -66,7 +66,7 @@ export async function packCA(bundle: CAProjectBundle): Promise<Blob> {
   const zip = new JSZip();
 
   // Files need to be in root not [project-name]/ :p
-  const camlRaw = serializeCAML(bundle.root, bundle.project);
+  const camlRaw = serializeCAML(bundle.root, bundle.project, bundle.states);
   const caml = formatXml(camlRaw);
   zip.file(DEFAULT_SCENE, caml);
 
@@ -138,6 +138,7 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
 
   const root = parseCAML(camlStr);
   if (!root) throw new Error('Failed to parse CAML');
+  const states = parseStates(camlStr);
 
   const assets: CAProjectBundle['assets'] = {};
   let assetsFolder = zip.folder('assets');
@@ -172,5 +173,5 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
     height: Math.max(0, root.size.h),
   };
 
-  return { project, root, assets };
+  return { project, root, assets, states };
 }

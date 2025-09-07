@@ -1,4 +1,3 @@
-import { set } from 'date-fns';
 import { AnyLayer, CAProject, GroupLayer, TextLayer } from './types';
 
 const CAML_NS = 'http://www.apple.com/CoreAnimation/1.0';
@@ -24,6 +23,25 @@ export function parseCAML(xml: string): AnyLayer | null {
   const root = caml.getElementsByTagNameNS(CAML_NS, 'CALayer')[0];
   if (!root) return null;
   return parseCALayer(root);
+}
+
+export function parseStates(xml: string): string[] {
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const caml = doc.getElementsByTagNameNS(CAML_NS, 'caml')[0] || doc.documentElement;
+    if (!caml) return [];
+    const statesEl = caml.getElementsByTagNameNS(CAML_NS, 'states')[0];
+    if (!statesEl) return [];
+    const arr: string[] = [];
+    const nodes = Array.from(statesEl.getElementsByTagNameNS(CAML_NS, 'LKState'));
+    for (const n of nodes) {
+      const name = n.getAttribute('name');
+      if (name && name.trim()) arr.push(name.trim());
+    }
+    return arr;
+  } catch {
+    return [];
+  }
 }
 
 function parseCALayer(el: Element): AnyLayer {
@@ -96,21 +114,22 @@ function parseCALayer(el: Element): AnyLayer {
   return group;
 }
 
-export function serializeCAML(root: AnyLayer, project?: CAProject): string {
+export function serializeCAML(root: AnyLayer, project?: CAProject, stateNamesInput?: string[]): string {
   const doc = document.implementation.createDocument(CAML_NS, 'caml', null);
   const caml = doc.documentElement;
   const rootEl = serializeLayer(doc, root, project);
   
   const scriptComponents = doc.createElementNS(CAML_NS, 'scriptComponents');
-  const states = doc.createElementNS(CAML_NS, 'states');
+  const statesEl = doc.createElementNS(CAML_NS, 'states');
   
-  const stateNames = ['Locked', 'Unlock', 'Sleep'];
+  const filtered = (stateNamesInput || []).filter((n) => !/^base(\s*state)?$/i.test(n.trim()));
+  const stateNames = (filtered.length ? filtered : ['Locked', 'Unlock', 'Sleep']);
   stateNames.forEach(stateName => {
     const state = doc.createElementNS(CAML_NS, 'LKState');
     state.setAttribute('name', stateName);
     const elements = doc.createElementNS(CAML_NS, 'elements');
     state.appendChild(elements);
-    states.appendChild(state);
+    statesEl.appendChild(state);
   });
 
   const stateTransitions = doc.createElementNS(CAML_NS, 'stateTransitions');
@@ -134,7 +153,7 @@ export function serializeCAML(root: AnyLayer, project?: CAProject): string {
 
   // Append all elements
   rootEl.appendChild(scriptComponents);
-  rootEl.appendChild(states);
+  rootEl.appendChild(statesEl);
   rootEl.appendChild(stateTransitions);
   caml.appendChild(rootEl);
 

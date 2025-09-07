@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { EditorProvider } from "@/components/editor/editor-context";
 import { MenuBar } from "@/components/editor/menu-bar";
 import { LayersPanel } from "@/components/editor/layers-panel";
+import { StatesPanel } from "@/components/editor/states-panel";
 import { Inspector } from "@/components/editor/inspector";
 import { CanvasPreview } from "@/components/editor/canvas-preview";
 
@@ -18,6 +19,8 @@ export default function EditorPage() {
   const [meta, setMeta] = useState<{ id: string; name: string; width: number; height: number; background?: string } | null>(null);
   const [leftWidth, setLeftWidth] = useState(320);
   const [rightWidth, setRightWidth] = useState(340);
+  const [statesHeight, setStatesHeight] = useState(350);
+  const leftPaneRef = useRef<HTMLDivElement | null>(null);
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(true);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -55,7 +58,45 @@ export default function EditorPage() {
             {showLeft && (
               <>
                 <div className="min-h-0 flex-shrink-0" style={{ width: leftWidth }}>
-                  <LayersPanel />
+                  <div ref={leftPaneRef} className="h-full flex flex-col pr-1">
+                    <div className="min-h-[160px] overflow-auto" style={{ flex: '1 1 auto' }}>
+                      <LayersPanel />
+                    </div>
+                    <div
+                      className="relative w-full h-2 cursor-row-resize flex-shrink-0"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        const startY = e.clientY;
+                        const start = statesHeight;
+                        const RESIZER = 2;
+                        const MIN_TOP = 140;
+                        const MIN_BOTTOM = 120;
+                        const paneEl = leftPaneRef.current;
+                        const total = paneEl ? paneEl.getBoundingClientRect().height : 0;
+                        const onMove = (ev: MouseEvent) => {
+                          const dy = ev.clientY - startY;
+                          let next = start - dy;
+                          if (total > 0) {
+                            const maxBottom = Math.max(MIN_BOTTOM, total - MIN_TOP - RESIZER);
+                            next = Math.max(MIN_BOTTOM, Math.min(maxBottom, next));
+                          } else {
+                            next = Math.max(MIN_BOTTOM, next);
+                          }
+                          setStatesHeight(next);
+                        };
+                        const onUp = () => {
+                          window.removeEventListener('mousemove', onMove);
+                          window.removeEventListener('mouseup', onUp);
+                        };
+                        window.addEventListener('mousemove', onMove);
+                        window.addEventListener('mouseup', onUp);
+                      }}
+                      aria-label="Resize layers/states panels"
+                    />
+                    <div className="min-h-[120px] overflow-auto" style={{ flex: `0 0 ${statesHeight}px` }}>
+                      <StatesPanel />
+                    </div>
+                  </div>
                 </div>
                 <div
                   className="relative w-2 mx-0 h-full self-stretch cursor-col-resize flex-shrink-0"

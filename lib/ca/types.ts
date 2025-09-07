@@ -64,4 +64,5 @@ export type CAProjectBundle = {
   project: CAProject;
   root: AnyLayer;
   assets?: Record<string, CAAsset>;
+  states?: string[];
 };

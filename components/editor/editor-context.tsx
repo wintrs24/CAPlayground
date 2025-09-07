@@ -9,6 +9,7 @@ export type ProjectDocument = {
   layers: AnyLayer[];
   selectedId?: string | null;
   assets?: Record<string, { filename: string; dataURL: string }>;
+  states: string[];
 };
 
 const STORAGE_PREFIX = "caplayground-project:";
@@ -29,6 +30,9 @@ export type EditorContextValue = {
   persist: () => void;
   undo: () => void;
   redo: () => void;
+  addState: (name?: string) => void;
+  renameState: (oldName: string, newName: string) => void;
+  deleteState: (name: string) => void;
 };
 
 const EditorContext = createContext<EditorContextValue | undefined>(undefined);
@@ -55,8 +59,16 @@ export function EditorProvider({
   }, []);
 
   useEffect(() => {
+    if (doc !== null) return;
     if (storedDoc) {
-      setDoc(storedDoc);
+      const defaults = ["Locked", "Unlock", "Sleep"];
+      const loaded = Array.isArray((storedDoc as any).states) ? (storedDoc as any).states as string[] : [];
+      const filtered = loaded.filter((n) => !/^base(\s*state)?$/i.test((n || '').trim()));
+      const next: ProjectDocument = {
+        ...(storedDoc as any),
+        states: filtered.length > 0 ? filtered : defaults,
+      } as ProjectDocument;
+      setDoc(next);
     } else {
       setDoc({
         meta: {
@@ -69,9 +81,10 @@ export function EditorProvider({
         layers: [],
         selectedId: null,
         assets: {},
+        states: ["Locked", "Unlock", "Sleep"],
       });
     }
-  }, [storedDoc, initialMeta.id]);
+  }, [doc, storedDoc, initialMeta.id]);
 
   const persist = useCallback(() => {
     if (doc) setStoredDoc(doc);
@@ -300,6 +313,50 @@ export function EditorProvider({
     });
   }, []);
 
+  const addState = useCallback((name?: string) => {
+    const desired = ((name ?? 'New State').trim()) || 'New State';
+    if (/^base(\s*state)?$/i.test(desired)) return;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const existing = (prev.states || []);
+      const lower = new Set(existing.map((s) => s.toLowerCase()));
+      let candidate = desired;
+      if (lower.has(candidate.toLowerCase())) {
+        let i = 1;
+        while (lower.has(`${desired} ${i}`.toLowerCase())) i++;
+        candidate = `${desired} ${i}`;
+      }
+      pushHistory(prev);
+      return { ...prev, states: [...existing, candidate] };
+    });
+  }, [pushHistory]);
+
+  const renameState = useCallback((oldName: string, newName: string) => {
+    const nn = (newName || '').trim();
+    if (!nn) return;
+    if (/^base(\s*state)?$/i.test(oldName) || /^base(\s*state)?$/i.test(nn)) return;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const idx = (prev.states || []).findIndex(s => s === oldName);
+      if (idx === -1) return prev;
+      if (prev.states.some(s => s.toLowerCase() === nn.toLowerCase())) return prev;
+      pushHistory(prev);
+      const copy = [...prev.states];
+      copy[idx] = nn;
+      return { ...prev, states: copy };
+    });
+  }, [pushHistory]);
+
+  const deleteState = useCallback((name: string) => {
+    if (/^base(\s*state)?$/i.test(name)) return;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const next = (prev.states || []).filter(s => s !== name);
+      pushHistory(prev);
+      return { ...prev, states: next };
+    });
+  }, [pushHistory]);
+
   const value = useMemo<EditorContextValue>(() => ({
     doc,
     setDoc,
@@ -315,7 +372,10 @@ export function EditorProvider({
     persist,
     undo,
     redo,
-  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo]);
+    addState,
+    renameState,
+    deleteState,
+  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState]);
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }

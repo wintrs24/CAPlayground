@@ -360,10 +360,12 @@ export default function ProjectsPage() {
         : root
           ? [root]
           : [];
+      const importedStates = Array.isArray(bundle.states) ? bundle.states.filter((n) => !/^base(\s*state)?$/i.test((n || '').trim())) : [];
       const doc = {
         meta: { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb' },
         layers,
         selectedId: null,
+        states: importedStates.length > 0 ? importedStates : ["Locked", "Unlock", "Sleep"],
       };
       try {
         localStorage.setItem(`caplayground-project:${id}`, JSON.stringify(doc));
