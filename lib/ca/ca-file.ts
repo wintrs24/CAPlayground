@@ -1,5 +1,5 @@
 import { CAProjectBundle, AnyLayer } from './types';
-import { parseCAML, parseStates, serializeCAML } from './caml';
+import { parseCAML, parseStates, parseStateOverrides, serializeCAML } from './caml';
 
 const INDEX_XML_BASENAME = 'index.xml';
 const DEFAULT_SCENE = 'main.caml';
@@ -139,6 +139,7 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
   const root = parseCAML(camlStr);
   if (!root) throw new Error('Failed to parse CAML');
   const states = parseStates(camlStr);
+  const stateOverrides = parseStateOverrides(camlStr);
 
   const assets: CAProjectBundle['assets'] = {};
   let assetsFolder = zip.folder('assets');
@@ -173,5 +174,5 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
     height: Math.max(0, root.size.h),
   };
 
-  return { project, root, assets, states };
+  return { project, root, assets, states, stateOverrides };
 }

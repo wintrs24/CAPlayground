@@ -1,10 +1,51 @@
-import { AnyLayer, CAProject, GroupLayer, TextLayer } from './types';
+import { AnyLayer, CAProject, GroupLayer, TextLayer, CAStateOverrides } from './types';
 
 const CAML_NS = 'http://www.apple.com/CoreAnimation/1.0';
 
 function attr(node: Element, name: string): string | undefined {
   const v = node.getAttribute(name);
   return v === null ? undefined : v;
+}
+
+export function parseStateOverrides(xml: string): CAStateOverrides {
+  const result: CAStateOverrides = {};
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const caml = doc.getElementsByTagNameNS(CAML_NS, 'caml')[0] || doc.documentElement;
+    if (!caml) return result;
+    const statesEl = caml.getElementsByTagNameNS(CAML_NS, 'states')[0];
+    if (!statesEl) return result;
+    const stateNodes = Array.from(statesEl.getElementsByTagNameNS(CAML_NS, 'LKState'));
+    for (const stateNode of stateNodes) {
+      const name = stateNode.getAttribute('name') || '';
+      const elements = stateNode.getElementsByTagNameNS(CAML_NS, 'elements')[0];
+      const arr: { targetId: string; keyPath: string; value: string | number }[] = [];
+      if (elements) {
+        const setNodes = Array.from(elements.getElementsByTagNameNS(CAML_NS, 'LKStateSetValue'));
+        for (const sn of setNodes) {
+          const targetId = sn.getAttribute('targetId') || '';
+          const keyPath = sn.getAttribute('keyPath') || '';
+          let val: string | number = '';
+          const valueNodes = sn.getElementsByTagNameNS(CAML_NS, 'value');
+          if (valueNodes && valueNodes[0]) {
+            const type = valueNodes[0].getAttribute('type') || '';
+            const vAttr = valueNodes[0].getAttribute('value') || '';
+            if (/^(integer|float|number)$/i.test(type)) {
+              const n = Number(vAttr);
+              val = Number.isFinite(n) ? n : vAttr;
+            } else {
+              val = vAttr;
+            }
+          }
+          if (targetId && keyPath) arr.push({ targetId, keyPath, value: val });
+        }
+      }
+      result[name] = arr;
+    }
+  } catch {
+    // ignore
+  }
+  return result;
 }
 
 function parseNumberList(input?: string): number[] {

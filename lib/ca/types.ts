@@ -60,9 +60,18 @@ export type CAAsset = {
   data: Blob | ArrayBuffer | string;
 };
 
+export type CAStateOverride = {
+  targetId: string;
+  keyPath: string; // e.g. "position.y", "opacity"
+  value: string | number;
+};
+
+export type CAStateOverrides = Record<string, CAStateOverride[]>; // stateName -> overrides
+
 export type CAProjectBundle = {
   project: CAProject;
   root: AnyLayer;
   assets?: Record<string, CAAsset>;
   states?: string[];
+  stateOverrides?: CAStateOverrides;
 };

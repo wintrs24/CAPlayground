@@ -52,7 +52,41 @@ export function CanvasPreview() {
   const offsetX = baseOffsetX + pan.x;
   const offsetY = baseOffsetY + pan.y;
 
-  const layers = doc?.layers ?? [];
+  const applyOverrides = (layers: AnyLayer[], overrides: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> | undefined, state: string | undefined): AnyLayer[] => {
+    if (!overrides || !state || state === 'Base State') return layers;
+    const map: Record<string, AnyLayer> = {};
+    const cloneTree = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
+      const copy = JSON.parse(JSON.stringify(l)) as AnyLayer;
+      map[copy.id] = copy;
+      if ((copy as any).type === 'group' && Array.isArray((copy as any).children)) {
+        (copy as any).children = cloneTree((copy as any).children);
+      }
+      return copy;
+    });
+    const rootCopy = cloneTree(layers);
+    const list = overrides[state] || [];
+    for (const o of list) {
+      const target = map[o.targetId?.trim()] || map[o.targetId];
+      if (!target) continue;
+      const kp = (o.keyPath || '').toLowerCase();
+      const v = o.value;
+      if (kp === 'position.y' && typeof v === 'number') {
+        (target as any).position = { ...(target as any).position, y: v };
+      } else if (kp === 'position.x' && typeof v === 'number') {
+        (target as any).position = { ...(target as any).position, x: v };
+      } else if ((kp === 'opacity' || kp === 'cornerRadius' || kp === 'borderWidth' || kp === 'fontSize') && typeof v === 'number') {
+        (target as any)[kp] = v as any;
+      } else if ((kp === 'backgroundColor' || kp === 'borderColor' || kp === 'color') && typeof v === 'string') {
+        (target as any)[kp] = v as any;
+      }
+    }
+    return rootCopy;
+  };
+
+  const layers = useMemo(() => {
+    if (!doc) return [] as AnyLayer[];
+    return applyOverrides(doc.layers, doc.stateOverrides, doc.activeState);
+  }, [doc?.layers, doc?.stateOverrides, doc?.activeState]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

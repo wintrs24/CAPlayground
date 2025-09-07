@@ -10,6 +10,8 @@ export type ProjectDocument = {
   selectedId?: string | null;
   assets?: Record<string, { filename: string; dataURL: string }>;
   states: string[];
+  stateOverrides?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>;
+  activeState?: 'Base State' | 'Locked' | 'Unlock' | 'Sleep';
 };
 
 const STORAGE_PREFIX = "caplayground-project:";
@@ -33,6 +35,7 @@ export type EditorContextValue = {
   addState: (name?: string) => void;
   renameState: (oldName: string, newName: string) => void;
   deleteState: (name: string) => void;
+  setActiveState: (state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => void;
 };
 
 const EditorContext = createContext<EditorContextValue | undefined>(undefined);
@@ -65,6 +68,8 @@ export function EditorProvider({
       const next: ProjectDocument = {
         ...(storedDoc as any),
         states: [...fixedStates],
+        activeState: (storedDoc as any).activeState || 'Base State',
+        stateOverrides: (storedDoc as any).stateOverrides || {},
       } as ProjectDocument;
       setDoc(next);
     } else {
@@ -80,6 +85,8 @@ export function EditorProvider({
         selectedId: null,
         assets: {},
         states: [...fixedStates],
+        activeState: 'Base State',
+        stateOverrides: {},
       });
     }
   }, [doc, storedDoc, initialMeta.id]);
@@ -320,7 +327,15 @@ export function EditorProvider({
   }, []);
 
   const deleteState = useCallback((_name: string) => {
+    // No-op: state deletion disabled
     return;
+  }, []);
+
+  const setActiveState = useCallback((state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => {
+    setDoc((prev) => {
+      if (!prev) return prev;
+      return { ...prev, activeState: state };
+    });
   }, []);
 
   const value = useMemo<EditorContextValue>(() => ({
@@ -341,7 +356,8 @@ export function EditorProvider({
     addState,
     renameState,
     deleteState,
-  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState]);
+    setActiveState,
+  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState, setActiveState]);
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }
