@@ -4,6 +4,36 @@ import { parseCAML, serializeCAML } from './caml';
 const INDEX_XML_BASENAME = 'index.xml';
 const DEFAULT_SCENE = 'main.caml';
 
+function formatXml(xml: string): string {
+  const normalized = xml.replace(/\?>\s*</, '?>\n<');
+  const reg = /(>)(<)(\/*)/g;
+  const xmlWithBreaks = normalized.replace(reg, '$1\n$2$3');
+  let pad = 0;
+  const lines = xmlWithBreaks.split('\n');
+  const formatted = lines
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      let indentChange = 0;
+      if (/^<\/.+>/.test(line)) {
+        pad = Math.max(pad - 1, 0);
+      } else if (/^<[^!?][^>]*[^\/]>$/.test(line)) {
+        indentChange = 1;
+      } else if (/^<[^!?].*\/>$/.test(line)) {
+        indentChange = 0;
+      } else if (/^<\?xml/.test(line) || /^<!/.test(line)) {
+        indentChange = 0;
+      } else if (/^<[^>]+>.*<\/[^>]+>$/.test(line)) {
+        indentChange = 0;
+      }
+      const indented = `${'  '.repeat(pad)}${line}`;
+      pad += indentChange;
+      return indented;
+    })
+    .join('\n');
+  return formatted + '\n';
+}
+
 function buildIndexXml(rootDocument: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>${rootDocument}</string>\n</dict>\n</plist>`;
 }
@@ -36,7 +66,8 @@ export async function packCA(bundle: CAProjectBundle): Promise<Blob> {
   const zip = new JSZip();
 
   // Files need to be in root not [project-name]/ :p
-  const caml = serializeCAML(bundle.root, bundle.project);
+  const camlRaw = serializeCAML(bundle.root, bundle.project);
+  const caml = formatXml(camlRaw);
   zip.file(DEFAULT_SCENE, caml);
 
   zip.file(INDEX_XML_BASENAME, buildIndexXml(DEFAULT_SCENE));
