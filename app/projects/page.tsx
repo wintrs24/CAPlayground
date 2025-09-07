@@ -25,6 +25,9 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload } from "lucide-react";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import type React from "react";
+import type { AnyLayer, CAProject } from "@/lib/ca/types";
 import { unpackCA } from "@/lib/ca/ca-file";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
@@ -61,6 +64,8 @@ export default function ProjectsPage() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [isTosOpen, setIsTosOpen] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [previews, setPreviews] = useState<Record<string, { bg: string; width?: number; height?: number }>>({});
+  const [thumbDocs, setThumbDocs] = useState<Record<string, { meta: Pick<CAProject, 'id'|'name'|'width'|'height'|'background'>; layers: AnyLayer[] }>>({});
 
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "7" | "30" | "year">("all");
@@ -89,6 +94,114 @@ export default function ProjectsPage() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    try {
+      const map: Record<string, { bg: string; width?: number; height?: number }> = {};
+      const docs: Record<string, { meta: Pick<CAProject,'id'|'name'|'width'|'height'|'background'>; layers: AnyLayer[] }> = {};
+      for (const p of projectsArray) {
+        const key = `caplayground-project:${p.id}`;
+        const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            const meta = parsed?.meta ?? {};
+            const bg = typeof meta.background === 'string' ? meta.background : '#e5e7eb';
+            const width = Number(meta.width) || p.width;
+            const height = Number(meta.height) || p.height;
+            map[p.id] = { bg, width, height };
+            const layers = Array.isArray(parsed?.layers) ? parsed.layers as AnyLayer[] : [];
+            docs[p.id] = { meta: { id: p.id, name: p.name, width: width || 390, height: height || 844, background: bg }, layers };
+          } catch {}
+        } else {
+          map[p.id] = { bg: '#e5e7eb', width: p.width, height: p.height };
+          docs[p.id] = { meta: { id: p.id, name: p.name, width: p.width || 390, height: p.height || 844, background: '#e5e7eb' }, layers: [] };
+        }
+      }
+      setPreviews(map);
+      setThumbDocs(docs);
+    } catch {}
+  }, [projectsArray]);
+
+  function ProjectThumb({ doc }: { doc: { meta: Pick<CAProject, 'width'|'height'|'background'>; layers: AnyLayer[] } }) {
+    const wrapRef = useRef<HTMLDivElement | null>(null);
+    const [wrapSize, setWrapSize] = useState({ w: 0, h: 0 });
+    useEffect(() => {
+      const el = wrapRef.current;
+      if (!el) return;
+      const ro = new ResizeObserver(() => {
+        const r = el.getBoundingClientRect();
+        setWrapSize({ w: Math.round(r.width), h: Math.round(r.height) });
+      });
+      ro.observe(el);
+      return () => ro.disconnect();
+    }, []);
+    const w = doc.meta.width || 390;
+    const h = doc.meta.height || 844;
+    const s = wrapSize.w > 0 && wrapSize.h > 0 ? Math.min(wrapSize.w / w, wrapSize.h / h) : 1;
+    const ox = (wrapSize.w - w * s) / 2;
+    const oy = (wrapSize.h - h * s) / 2;
+
+    const renderLayer = (l: AnyLayer): React.ReactNode => {
+      const common: React.CSSProperties = {
+        position: 'absolute',
+        left: l.position.x,
+        top: l.position.y,
+        width: l.size.w,
+        height: l.size.h,
+        transform: `rotate(${(l as any).rotation ?? 0}deg)`,
+        opacity: (l as any).opacity ?? 1,
+        display: (l as any).visible === false ? 'none' as any : undefined,
+        overflow: 'hidden',
+      };
+      if (l.type === 'text') {
+        const t = l as any;
+        return <div key={l.id} style={{ ...common, color: t.color, fontSize: t.fontSize, textAlign: t.align ?? 'left' }}>{t.text}</div>;
+      }
+      if (l.type === 'image') {
+        const im = l as any;
+        return <img key={l.id} src={im.src} alt={im.name} draggable={false} style={{ ...common, objectFit: 'fill' as const }} />;
+      }
+      if (l.type === 'shape') {
+        const s = l as any;
+        const corner = (s.cornerRadius ?? s.radius) ?? 0;
+        const borderRadius = s.shape === 'circle' ? 9999 : corner;
+        const style: React.CSSProperties = { ...common, background: s.fill, borderRadius };
+        if (s.borderColor && s.borderWidth) {
+          style.border = `${Math.max(0, Math.round(s.borderWidth))}px solid ${s.borderColor}`;
+        }
+        return <div key={l.id} style={style} />;
+      }
+      if ((l as any).type === 'group') {
+        const g = l as any;
+        return (
+          <div key={g.id} style={{ ...common, background: g.backgroundColor }}>
+            {Array.isArray(g.children) ? g.children.map((c: AnyLayer) => renderLayer(c)) : null}
+          </div>
+        );
+      }
+      return null;
+    };
+
+    return (
+      <div ref={wrapRef} className="w-full h-full relative bg-background">
+        <div
+          className="absolute"
+          style={{
+            width: w,
+            height: h,
+            background: doc.meta.background ?? '#e5e7eb',
+            transform: `translate(${ox}px, ${oy}px) scale(${s})`,
+            transformOrigin: 'top left',
+            borderRadius: 4,
+            boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)'
+          }}
+        >
+          {(doc.layers || []).map((l) => renderLayer(l))}
+        </div>
+      </div>
+    );
+  }
 
   const filteredProjects = useMemo(() => {
     const now = new Date();
@@ -450,6 +563,8 @@ export default function ProjectsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredProjects.map((project) => {
                 const isSelected = selectedIds.includes(project.id);
+                const pv = previews[project.id];
+                const doc = thumbDocs[project.id] ?? { meta: { width: pv?.width || project.width || 390, height: pv?.height || project.height || 844, background: pv?.bg || '#e5e7eb' }, layers: [] } as any;
                 return (
                   <Card 
                     key={project.id} 
@@ -469,6 +584,12 @@ export default function ProjectsPage() {
                           {isSelected && <Check className="h-4 w-4 text-accent" />}
                         </div>
                       )}
+                      {/* Preview thumbnail square */}
+                      <div className="mb-3 overflow-hidden rounded-md border bg-background">
+                        <AspectRatio ratio={1}>
+                          <ProjectThumb doc={doc} />
+                        </AspectRatio>
+                      </div>
                       <div className="flex items-start justify-between">
                         <div 
                           className="flex-1 min-w-0 cursor-pointer select-none"
@@ -488,22 +609,26 @@ export default function ProjectsPage() {
                       </div>
 
                       {/* Under-card actions */}
-                      <div className="mt-3 flex items-center gap-3 text-sm">
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 px-2"
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          aria-label="Rename project"
+                          title="Rename"
                           onClick={(e) => { e.stopPropagation(); startEditing(project); }}
                         >
-                          <Edit3 className="h-4 w-4 mr-1" /> Rename
+                          <Edit3 className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-7 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          aria-label="Delete project"
+                          title="Delete"
                           onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
                         >
-                          <Trash2 className="h-4 w-4 mr-1" /> Delete
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </CardContent>
