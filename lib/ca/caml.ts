@@ -1,10 +1,54 @@
-import { AnyLayer, CAProject, GroupLayer, TextLayer, CAStateOverrides } from './types';
+import { AnyLayer, CAProject, GroupLayer, TextLayer, CAStateOverrides, CAStateTransitions } from './types';
 
 const CAML_NS = 'http://www.apple.com/CoreAnimation/1.0';
 
 function attr(node: Element, name: string): string | undefined {
   const v = node.getAttribute(name);
   return v === null ? undefined : v;
+}
+
+export function parseStateTransitions(xml: string): CAStateTransitions {
+  const out: CAStateTransitions = [];
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const caml = doc.getElementsByTagNameNS(CAML_NS, 'caml')[0] || doc.documentElement;
+    if (!caml) return out;
+    const transEl = caml.getElementsByTagNameNS(CAML_NS, 'stateTransitions')[0];
+    if (!transEl) return out;
+    const transNodes = Array.from(transEl.getElementsByTagNameNS(CAML_NS, 'LKStateTransition'));
+    for (const tn of transNodes) {
+      const fromState = tn.getAttribute('fromState') || '';
+      const toState = tn.getAttribute('toState') || '';
+      const elementsEl = tn.getElementsByTagNameNS(CAML_NS, 'elements')[0];
+      const elements: any[] = [];
+      if (elementsEl) {
+        const elNodes = Array.from(elementsEl.getElementsByTagNameNS(CAML_NS, 'LKStateTransitionElement'));
+        for (const en of elNodes) {
+          const targetId = en.getAttribute('targetId') || '';
+          const keyPath = en.getAttribute('key') || '';
+          let animation: any = undefined;
+          const animEl = en.getElementsByTagNameNS(CAML_NS, 'animation')[0];
+          if (animEl) {
+            const type = animEl.getAttribute('type') || '';
+            animation = {
+              type,
+              damping: Number(animEl.getAttribute('damping') || '') || undefined,
+              mass: Number(animEl.getAttribute('mass') || '') || undefined,
+              stiffness: Number(animEl.getAttribute('stiffness') || '') || undefined,
+              velocity: Number(animEl.getAttribute('velocity') || '') || undefined,
+              duration: Number(animEl.getAttribute('duration') || '') || undefined,
+              fillMode: animEl.getAttribute('fillMode') || undefined,
+              keyPath: animEl.getAttribute('keyPath') || undefined,
+            };
+          }
+          if (targetId && keyPath) elements.push({ targetId, keyPath, animation });
+        }
+      }
+      out.push({ fromState, toState, elements });
+    }
+  } catch {
+  }
+  return out;
 }
 
 export function parseStateOverrides(xml: string): CAStateOverrides {

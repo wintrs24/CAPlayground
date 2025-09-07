@@ -12,6 +12,7 @@ export type ProjectDocument = {
   states: string[];
   stateOverrides?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>;
   activeState?: 'Base State' | 'Locked' | 'Unlock' | 'Sleep';
+  stateTransitions?: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }>; }>;
 };
 
 const STORAGE_PREFIX = "caplayground-project:";
@@ -36,6 +37,8 @@ export type EditorContextValue = {
   renameState: (oldName: string, newName: string) => void;
   deleteState: (name: string) => void;
   setActiveState: (state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => void;
+  updateStateOverride: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
+  updateStateOverrideTransient: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
 };
 
 const EditorContext = createContext<EditorContextValue | undefined>(undefined);
@@ -70,6 +73,7 @@ export function EditorProvider({
         states: [...fixedStates],
         activeState: (storedDoc as any).activeState || 'Base State',
         stateOverrides: (storedDoc as any).stateOverrides || {},
+        stateTransitions: (storedDoc as any).stateTransitions || [],
       } as ProjectDocument;
       setDoc(next);
     } else {
@@ -87,6 +91,7 @@ export function EditorProvider({
         states: [...fixedStates],
         activeState: 'Base State',
         stateOverrides: {},
+        stateTransitions: [],
       });
     }
   }, [doc, storedDoc, initialMeta.id]);
@@ -266,6 +271,22 @@ export function EditorProvider({
   const updateLayer = useCallback((id: string, patch: Partial<AnyLayer>) => {
     setDoc((prev) => {
       if (!prev) return prev;
+      if (prev.activeState && prev.activeState !== 'Base State') {
+        const p: any = patch;
+        const nextState = { ...(prev.stateOverrides || {}) } as Record<string, Array<{ targetId: string; keyPath: string; value: number | string }>>;
+        const list = [...(nextState[prev.activeState] || [])];
+        const upd = (keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => {
+          const idx = list.findIndex((o) => o.targetId === id && o.keyPath === keyPath);
+          if (idx >= 0) list[idx] = { ...list[idx], value };
+          else list.push({ targetId: id, keyPath, value });
+        };
+        if (p.position && typeof p.position.x === 'number') upd('position.x', p.position.x);
+        if (p.position && typeof p.position.y === 'number') upd('position.y', p.position.y);
+        if (typeof p.opacity === 'number') upd('opacity', p.opacity as number);
+        nextState[prev.activeState] = list;
+        pushHistory(prev);
+        return { ...prev, stateOverrides: nextState } as ProjectDocument;
+      }
       pushHistory(prev);
       return {
         ...prev,
@@ -278,7 +299,21 @@ export function EditorProvider({
     skipPersistRef.current = true;
     setDoc((prev) => {
       if (!prev) return prev;
-      
+      if (prev.activeState && prev.activeState !== 'Base State') {
+        const p: any = patch;
+        const nextState = { ...(prev.stateOverrides || {}) } as Record<string, Array<{ targetId: string; keyPath: string; value: number | string }>>;
+        const list = [...(nextState[prev.activeState] || [])];
+        const upd = (keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => {
+          const idx = list.findIndex((o) => o.targetId === id && o.keyPath === keyPath);
+          if (idx >= 0) list[idx] = { ...list[idx], value };
+          else list.push({ targetId: id, keyPath, value });
+        };
+        if (p.position && typeof p.position.x === 'number') upd('position.x', p.position.x);
+        if (p.position && typeof p.position.y === 'number') upd('position.y', p.position.y);
+        if (typeof p.opacity === 'number') upd('opacity', p.opacity as number);
+        nextState[prev.activeState] = list;
+        return { ...prev, stateOverrides: nextState } as ProjectDocument;
+      }
       return {
         ...prev,
         layers: updateInTree(prev.layers, id, patch),
@@ -327,7 +362,6 @@ export function EditorProvider({
   }, []);
 
   const deleteState = useCallback((_name: string) => {
-    // No-op: state deletion disabled
     return;
   }, []);
 
@@ -335,6 +369,38 @@ export function EditorProvider({
     setDoc((prev) => {
       if (!prev) return prev;
       return { ...prev, activeState: state };
+    });
+  }, []);
+
+  const updateStateOverride = useCallback((targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => {
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const state = prev.activeState && prev.activeState !== 'Base State' ? prev.activeState : null;
+      if (!state) return prev;
+      const next = { ...(prev.stateOverrides || {}) } as Record<string, Array<{ targetId: string; keyPath: string; value: number | string }>>;
+      const list = [...(next[state] || [])];
+      const idx = list.findIndex((o) => o.targetId === targetId && o.keyPath === keyPath);
+      if (idx >= 0) list[idx] = { ...list[idx], value };
+      else list.push({ targetId, keyPath, value });
+      next[state] = list;
+      pushHistory(prev);
+      return { ...prev, stateOverrides: next } as ProjectDocument;
+    });
+  }, [pushHistory]);
+
+  const updateStateOverrideTransient = useCallback((targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => {
+    skipPersistRef.current = true;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const state = prev.activeState && prev.activeState !== 'Base State' ? prev.activeState : null;
+      if (!state) return prev;
+      const next = { ...(prev.stateOverrides || {}) } as Record<string, Array<{ targetId: string; keyPath: string; value: number | string }>>;
+      const list = [...(next[state] || [])];
+      const idx = list.findIndex((o) => o.targetId === targetId && o.keyPath === keyPath);
+      if (idx >= 0) list[idx] = { ...list[idx], value };
+      else list.push({ targetId, keyPath, value });
+      next[state] = list;
+      return { ...prev, stateOverrides: next } as ProjectDocument;
     });
   }, []);
 
@@ -357,7 +423,9 @@ export function EditorProvider({
     renameState,
     deleteState,
     setActiveState,
-  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState, setActiveState]);
+    updateStateOverride,
+    updateStateOverrideTransient,
+  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState, setActiveState, updateStateOverride, updateStateOverrideTransient]);
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }

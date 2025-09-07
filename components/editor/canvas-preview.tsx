@@ -83,10 +83,123 @@ export function CanvasPreview() {
     return rootCopy;
   };
 
-  const layers = useMemo(() => {
+  const appliedLayers = useMemo(() => {
     if (!doc) return [] as AnyLayer[];
     return applyOverrides(doc.layers, doc.stateOverrides, doc.activeState);
   }, [doc?.layers, doc?.stateOverrides, doc?.activeState]);
+
+  const [renderedLayers, setRenderedLayers] = useState<AnyLayer[]>(appliedLayers);
+  useEffect(() => { setRenderedLayers(appliedLayers); }, []);
+
+  const prevStateRef = useRef<string | undefined>(doc?.activeState);
+  const animRef = useRef<number | null>(null);
+
+  const indexById = (arr: AnyLayer[]) => {
+    const map: Record<string, AnyLayer> = {};
+    const walk = (l: AnyLayer) => {
+      map[l.id] = l;
+      if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
+        (l as any).children.forEach(walk);
+      }
+    };
+    arr.forEach(walk);
+    return map;
+  };
+
+  const getProp = (l: AnyLayer, keyPath: string): number | undefined => {
+    if (keyPath === 'position.x') return (l as any).position?.x;
+    if (keyPath === 'position.y') return (l as any).position?.y;
+    if (keyPath === 'opacity') return (l as any).opacity ?? 1;
+    return undefined;
+  };
+  const setProp = (l: AnyLayer, keyPath: string, v: number) => {
+    if (keyPath === 'position.x') (l as any).position = { ...(l as any).position, x: v };
+    else if (keyPath === 'position.y') (l as any).position = { ...(l as any).position, y: v };
+    else if (keyPath === 'opacity') (l as any).opacity = v as any;
+  };
+
+  useEffect(() => {
+    const prevState = prevStateRef.current;
+    const nextState = doc?.activeState;
+    if (!doc) return;
+    if (prevState === nextState) {
+      setRenderedLayers(appliedLayers);
+      return;
+    }
+
+    const transitions = (doc.stateTransitions || []).filter(t =>
+      (t.fromState === prevState || t.fromState === '*') &&
+      (t.toState === nextState || t.toState === '*')
+    );
+
+    if (!transitions.length) {
+      setRenderedLayers(appliedLayers);
+      prevStateRef.current = nextState;
+      return;
+    }
+
+    const startMap = indexById(renderedLayers.length ? renderedLayers : appliedLayers);
+    const endMap = indexById(appliedLayers);
+    type Track = { id: string; key: string; from: number; to: number; duration: number };
+    const tracks: Track[] = [];
+
+    const addTrack = (id: string, keyPath: string, duration: number) => {
+      const sL = startMap[id];
+      const eL = endMap[id];
+      if (!sL || !eL) return;
+      const from = getProp(sL, keyPath);
+      const to = getProp(eL, keyPath);
+      if (typeof from === 'number' && typeof to === 'number' && from !== to) {
+        tracks.push({ id, key: keyPath, from, to, duration });
+      }
+    };
+
+    for (const tr of transitions) {
+      for (const el of tr.elements) {
+        const key = el.keyPath;
+        if (!['position.x', 'position.y', 'opacity'].includes(key)) continue;
+        const dur = Math.max(0.1, el.animation?.duration || 0.5);
+        addTrack(el.targetId, key, dur);
+      }
+    }
+
+    if (!tracks.length) {
+      setRenderedLayers(appliedLayers);
+      prevStateRef.current = nextState;
+      return;
+    }
+
+    const startTime = performance.now();
+    const maxDur = Math.max(...tracks.map(t => t.duration)) * 1000;
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const step = () => {
+      const now = performance.now();
+      const p = Math.min(1, (now - startTime) / maxDur);
+      const frame = JSON.parse(JSON.stringify(appliedLayers)) as AnyLayer[];
+      const frameMap = indexById(frame);
+      for (const trk of tracks) {
+        const localP = Math.min(1, (now - startTime) / (trk.duration * 1000));
+        const v = trk.from + (trk.to - trk.from) * ease(localP);
+        const L = frameMap[trk.id];
+        if (L) setProp(L, trk.key, v);
+      }
+      setRenderedLayers(frame);
+      if (p < 1) animRef.current = requestAnimationFrame(step);
+      else {
+        animRef.current = null;
+        prevStateRef.current = nextState;
+      }
+    };
+
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    animRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+    };
+  }, [doc?.activeState, appliedLayers, doc?.stateTransitions]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -540,9 +653,9 @@ export function CanvasPreview() {
           selectLayer(null);
         }}
       >
-        {layers.map((l) => renderLayer(l))}
+        {renderedLayers.map((l) => renderLayer(l))}
         {(() => {
-          const sel = findById(layers, doc?.selectedId ?? null);
+          const sel = findById(renderedLayers, doc?.selectedId ?? null);
           return sel ? renderSelectionOverlay(sel) : null;
         })()}
       </div>
