@@ -214,6 +214,7 @@ export function serializeCAML(
   const rootEl = serializeLayer(doc, root, project);
   
   const scriptComponents = doc.createElementNS(CAML_NS, 'scriptComponents');
+  const statesEl = doc.createElementNS(CAML_NS, 'states');
   const layerIndex: Record<string, AnyLayer> = {};
   const indexWalk = (l: AnyLayer) => {
     layerIndex[l.id] = l as AnyLayer;
