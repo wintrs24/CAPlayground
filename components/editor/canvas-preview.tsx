@@ -74,6 +74,10 @@ export function CanvasPreview() {
         (target as any).position = { ...(target as any).position, y: v };
       } else if (kp === 'position.x' && typeof v === 'number') {
         (target as any).position = { ...(target as any).position, x: v };
+      } else if (kp === 'bounds.size.width' && typeof v === 'number') {
+        (target as any).size = { ...(target as any).size, w: v };
+      } else if (kp === 'bounds.size.height' && typeof v === 'number') {
+        (target as any).size = { ...(target as any).size, h: v };
       } else if ((kp === 'opacity' || kp === 'cornerRadius' || kp === 'borderWidth' || kp === 'fontSize') && typeof v === 'number') {
         (target as any)[kp] = v as any;
       } else if ((kp === 'backgroundColor' || kp === 'borderColor' || kp === 'color') && typeof v === 'string') {
@@ -109,12 +113,16 @@ export function CanvasPreview() {
   const getProp = (l: AnyLayer, keyPath: string): number | undefined => {
     if (keyPath === 'position.x') return (l as any).position?.x;
     if (keyPath === 'position.y') return (l as any).position?.y;
+    if (keyPath === 'bounds.size.width') return (l as any).size?.w;
+    if (keyPath === 'bounds.size.height') return (l as any).size?.h;
     if (keyPath === 'opacity') return (l as any).opacity ?? 1;
     return undefined;
   };
   const setProp = (l: AnyLayer, keyPath: string, v: number) => {
     if (keyPath === 'position.x') (l as any).position = { ...(l as any).position, x: v };
     else if (keyPath === 'position.y') (l as any).position = { ...(l as any).position, y: v };
+    else if (keyPath === 'bounds.size.width') (l as any).size = { ...(l as any).size, w: v };
+    else if (keyPath === 'bounds.size.height') (l as any).size = { ...(l as any).size, h: v };
     else if (keyPath === 'opacity') (l as any).opacity = v as any;
   };
 
@@ -157,7 +165,7 @@ export function CanvasPreview() {
     for (const tr of transitions) {
       for (const el of tr.elements) {
         const key = el.keyPath;
-        if (!['position.x', 'position.y', 'opacity'].includes(key)) continue;
+        if (!['position.x', 'position.y', 'bounds.size.width', 'bounds.size.height', 'opacity'].includes(key)) continue;
         const dur = Math.max(0.1, el.animation?.duration || 0.5);
         addTrack(el.targetId, key, dur);
       }
