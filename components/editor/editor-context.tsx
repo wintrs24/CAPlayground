@@ -60,13 +60,11 @@ export function EditorProvider({
 
   useEffect(() => {
     if (doc !== null) return;
+    const fixedStates = ["Locked", "Unlock", "Sleep"] as const;
     if (storedDoc) {
-      const defaults = ["Locked", "Unlock", "Sleep"];
-      const loaded = Array.isArray((storedDoc as any).states) ? (storedDoc as any).states as string[] : [];
-      const filtered = loaded.filter((n) => !/^base(\s*state)?$/i.test((n || '').trim()));
       const next: ProjectDocument = {
         ...(storedDoc as any),
-        states: filtered.length > 0 ? filtered : defaults,
+        states: [...fixedStates],
       } as ProjectDocument;
       setDoc(next);
     } else {
@@ -81,7 +79,7 @@ export function EditorProvider({
         layers: [],
         selectedId: null,
         assets: {},
-        states: ["Locked", "Unlock", "Sleep"],
+        states: [...fixedStates],
       });
     }
   }, [doc, storedDoc, initialMeta.id]);
@@ -313,49 +311,17 @@ export function EditorProvider({
     });
   }, []);
 
-  const addState = useCallback((name?: string) => {
-    const desired = ((name ?? 'New State').trim()) || 'New State';
-    if (/^base(\s*state)?$/i.test(desired)) return;
-    setDoc((prev) => {
-      if (!prev) return prev;
-      const existing = (prev.states || []);
-      const lower = new Set(existing.map((s) => s.toLowerCase()));
-      let candidate = desired;
-      if (lower.has(candidate.toLowerCase())) {
-        let i = 1;
-        while (lower.has(`${desired} ${i}`.toLowerCase())) i++;
-        candidate = `${desired} ${i}`;
-      }
-      pushHistory(prev);
-      return { ...prev, states: [...existing, candidate] };
-    });
-  }, [pushHistory]);
+  const addState = useCallback((_name?: string) => {
+    return;
+  }, []);
 
-  const renameState = useCallback((oldName: string, newName: string) => {
-    const nn = (newName || '').trim();
-    if (!nn) return;
-    if (/^base(\s*state)?$/i.test(oldName) || /^base(\s*state)?$/i.test(nn)) return;
-    setDoc((prev) => {
-      if (!prev) return prev;
-      const idx = (prev.states || []).findIndex(s => s === oldName);
-      if (idx === -1) return prev;
-      if (prev.states.some(s => s.toLowerCase() === nn.toLowerCase())) return prev;
-      pushHistory(prev);
-      const copy = [...prev.states];
-      copy[idx] = nn;
-      return { ...prev, states: copy };
-    });
-  }, [pushHistory]);
+  const renameState = useCallback((_oldName: string, _newName: string) => {
+    return;
+  }, []);
 
-  const deleteState = useCallback((name: string) => {
-    if (/^base(\s*state)?$/i.test(name)) return;
-    setDoc((prev) => {
-      if (!prev) return prev;
-      const next = (prev.states || []).filter(s => s !== name);
-      pushHistory(prev);
-      return { ...prev, states: next };
-    });
-  }, [pushHistory]);
+  const deleteState = useCallback((_name: string) => {
+    return;
+  }, []);
 
   const value = useMemo<EditorContextValue>(() => ({
     doc,
