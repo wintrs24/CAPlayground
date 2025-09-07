@@ -199,13 +199,26 @@ function parseCALayer(el: Element): AnyLayer {
   return group;
 }
 
-export function serializeCAML(root: AnyLayer, project?: CAProject, stateNamesInput?: string[]): string {
+export function serializeCAML(
+  root: AnyLayer,
+  project?: CAProject,
+  stateNamesInput?: string[],
+  stateOverridesInput?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>,
+  stateTransitionsInput?: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }>; }>
+): string {
   const doc = document.implementation.createDocument(CAML_NS, 'caml', null);
   const caml = doc.documentElement;
   const rootEl = serializeLayer(doc, root, project);
   
   const scriptComponents = doc.createElementNS(CAML_NS, 'scriptComponents');
-  const statesEl = doc.createElementNS(CAML_NS, 'states');
+  const layerIndex: Record<string, AnyLayer> = {};
+  const indexWalk = (l: AnyLayer) => {
+    layerIndex[l.id] = l as AnyLayer;
+    if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
+      ((l as any).children as AnyLayer[]).forEach(indexWalk);
+    }
+  };
+  indexWalk(root);
   
   const filtered = (stateNamesInput || []).filter((n) => !/^base(\s*state)?$/i.test(n.trim()));
   const stateNames = (filtered.length ? filtered : ['Locked', 'Unlock', 'Sleep']);
@@ -213,25 +226,72 @@ export function serializeCAML(root: AnyLayer, project?: CAProject, stateNamesInp
     const state = doc.createElementNS(CAML_NS, 'LKState');
     state.setAttribute('name', stateName);
     const elements = doc.createElementNS(CAML_NS, 'elements');
+    const ovs = (stateOverridesInput || {})[stateName] || [];
+    for (const ov of ovs) {
+      const el = doc.createElementNS(CAML_NS, 'LKStateSetValue');
+      el.setAttribute('targetId', ov.targetId);
+      el.setAttribute('keyPath', ov.keyPath);
+      const vEl = doc.createElementNS(CAML_NS, 'value');
+      if (typeof ov.value === 'number') {
+        let outVal = ov.value;
+        const target = layerIndex[ov.targetId];
+        if (target && (ov.keyPath === 'position.x' || ov.keyPath === 'position.y')) {
+          const docHeight = project?.height ?? 844;
+          if (ov.keyPath === 'position.x') {
+            outVal = Math.round((ov.value as number) + (target.size.w / 2));
+          } else if (ov.keyPath === 'position.y') {
+            outVal = Math.round(docHeight - ((ov.value as number) + (target.size.h / 2)));
+          }
+        }
+        const isInt = Number.isInteger(outVal);
+        vEl.setAttribute('type', isInt ? 'integer' : 'float');
+        vEl.setAttribute('value', String(outVal));
+      } else {
+        vEl.setAttribute('type', 'string');
+        vEl.setAttribute('value', String(ov.value));
+      }
+      el.appendChild(vEl);
+      elements.appendChild(el);
+    }
     state.appendChild(elements);
     statesEl.appendChild(state);
   });
 
   const stateTransitions = doc.createElementNS(CAML_NS, 'stateTransitions');
-  const transitions = [
-    { from: '*', to: 'Unlock' },
-    { from: 'Unlock', to: '*' },
-    { from: '*', to: 'Locked' },
-    { from: 'Locked', to: '*' },
-    { from: '*', to: 'Sleep' },
-    { from: 'Sleep', to: '*' }
-  ];
+  const transitionsToWrite = (stateTransitionsInput && stateTransitionsInput.length
+    ? stateTransitionsInput
+    : [
+        { fromState: '*', toState: 'Unlock', elements: [] },
+        { fromState: 'Unlock', toState: '*', elements: [] },
+        { fromState: '*', toState: 'Locked', elements: [] },
+        { fromState: 'Locked', toState: '*', elements: [] },
+        { fromState: '*', toState: 'Sleep', elements: [] },
+        { fromState: 'Sleep', toState: '*', elements: [] },
+      ]);
 
-  transitions.forEach(({ from, to }) => {
+  transitionsToWrite.forEach((t) => {
     const transition = doc.createElementNS(CAML_NS, 'LKStateTransition');
-    transition.setAttribute('fromState', from);
-    transition.setAttribute('toState', to);
+    transition.setAttribute('fromState', t.fromState);
+    transition.setAttribute('toState', t.toState);
     const elements = doc.createElementNS(CAML_NS, 'elements');
+    for (const elSpec of (t.elements || [])) {
+      const el = doc.createElementNS(CAML_NS, 'LKStateTransitionElement');
+      el.setAttribute('targetId', elSpec.targetId);
+      el.setAttribute('key', elSpec.keyPath);
+      if (elSpec.animation) {
+        const a = doc.createElementNS(CAML_NS, 'animation');
+        if (elSpec.animation.type) a.setAttribute('type', String(elSpec.animation.type));
+        if (typeof elSpec.animation.damping === 'number') a.setAttribute('damping', String(elSpec.animation.damping));
+        if (typeof elSpec.animation.mass === 'number') a.setAttribute('mass', String(elSpec.animation.mass));
+        if (typeof elSpec.animation.stiffness === 'number') a.setAttribute('stiffness', String(elSpec.animation.stiffness));
+        if (typeof elSpec.animation.velocity === 'number') a.setAttribute('velocity', String(elSpec.animation.velocity));
+        if (typeof elSpec.animation.duration === 'number') a.setAttribute('duration', String(elSpec.animation.duration));
+        if (elSpec.animation.fillMode) a.setAttribute('fillMode', String(elSpec.animation.fillMode));
+        if (elSpec.animation.keyPath) a.setAttribute('keyPath', String(elSpec.animation.keyPath));
+        el.appendChild(a);
+      }
+      elements.appendChild(el);
+    }
     transition.appendChild(elements);
     stateTransitions.appendChild(transition);
   });
@@ -274,8 +334,9 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
 
   if (layer.type === 'image') {
     const contents = doc.createElementNS(CAML_NS, 'contents');
-    setAttr(contents, 'type', 'CGImage');
-    setAttr(contents, 'src', layer.src);
+    const cg = doc.createElementNS(CAML_NS, 'CGImage');
+    setAttr(cg, 'src', layer.src);
+    contents.appendChild(cg);
     el.appendChild(contents);
   }
 

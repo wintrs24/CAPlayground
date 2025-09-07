@@ -66,7 +66,41 @@ export async function packCA(bundle: CAProjectBundle): Promise<Blob> {
   const zip = new JSZip();
 
   // Files need to be in root not [project-name]/ :p
-  const camlRaw = serializeCAML(bundle.root, bundle.project, bundle.states);
+  const makeGeneratedTransitions = () => {
+    const states = (bundle.states || []).filter((n) => !/^base(\s*state)?$/i.test((n || '').trim()));
+    const overrides = bundle.stateOverrides || {};
+    const anyProvided = Array.isArray(bundle.stateTransitions) && bundle.stateTransitions.length > 0;
+    if (anyProvided) return bundle.stateTransitions;
+    const gens: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }> }> = [];
+    const ensure = (fromState: string, toState: string) => {
+      let tr = gens.find((t) => t.fromState === fromState && t.toState === toState);
+      if (!tr) { tr = { fromState, toState, elements: [] }; gens.push(tr); }
+      return tr;
+    };
+    for (const s of states) {
+      const list = overrides[s] || [];
+      if (!list.length) continue;
+      for (const ov of list) {
+        const anim = { type: 'CASpringAnimation', damping: 50, mass: 2, stiffness: 300, velocity: 0, duration: 0.8, fillMode: 'backwards', keyPath: ov.keyPath };
+        ensure('*', s).elements.push({ targetId: ov.targetId, keyPath: ov.keyPath, animation: anim });
+        ensure(s, '*').elements.push({ targetId: ov.targetId, keyPath: ov.keyPath, animation: anim });
+      }
+    }
+    for (const s of states) {
+      if (!gens.find(g => g.fromState === '*' && g.toState === s)) gens.push({ fromState: '*', toState: s, elements: [] });
+      if (!gens.find(g => g.fromState === s && g.toState === '*')) gens.push({ fromState: s, toState: '*', elements: [] });
+    }
+    return gens;
+  };
+
+  const generatedTransitions = makeGeneratedTransitions();
+  const camlRaw = serializeCAML(
+    bundle.root,
+    bundle.project,
+    bundle.states,
+    bundle.stateOverrides,
+    generatedTransitions,
+  );
   const caml = formatXml(camlRaw);
   zip.file(DEFAULT_SCENE, caml);
 

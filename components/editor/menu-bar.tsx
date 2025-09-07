@@ -148,6 +148,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         root,
         assets,
         states: (doc as any).states,
+        stateOverrides: (doc as any).stateOverrides,
+        stateTransitions: (doc as any).stateTransitions,
       });
 
       const url = URL.createObjectURL(blob);
@@ -229,6 +231,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         root,
         assets,
         states: (doc as any).states,
+        stateOverrides: (doc as any).stateOverrides,
+        stateTransitions: (doc as any).stateTransitions,
       });
 
       const templateResponse = await fetch('/api/templates/tendies', {
