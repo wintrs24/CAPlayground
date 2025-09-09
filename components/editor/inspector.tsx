@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
@@ -60,6 +61,13 @@ export function Inspector() {
   return (
     <Card className="p-3 h-full space-y-2">
       <div className="font-medium">Inspector</div>
+      {doc?.activeState && doc.activeState !== 'Base State' && (
+        <Alert className="text-xs">
+          <AlertDescription>
+            Note: Rotation and Bound state transitions don't work when tested. If you know a fix or it just works for you, please report in the CAPlayground Discord server.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Accordion type="multiple" defaultValue={["geom","comp","content","text","image"]} className="space-y-1">
         <AccordionItem value="geom">
