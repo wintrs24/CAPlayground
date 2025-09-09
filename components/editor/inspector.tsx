@@ -27,7 +27,26 @@ export function Inspector() {
     }
     return undefined;
   };
-  const selected = doc ? findById(doc.layers, doc.selectedId) : undefined;
+  const selectedBase = doc ? findById(doc.layers, doc.selectedId) : undefined;
+  const selected = (() => {
+    if (!doc || !selectedBase) return selectedBase;
+    const state = doc.activeState;
+    if (!state || state === 'Base State') return selectedBase;
+    const eff: AnyLayer = JSON.parse(JSON.stringify(selectedBase));
+    const ovs = (doc.stateOverrides || {})[state] || [];
+    const me = ovs.filter(o => o.targetId === eff.id);
+    for (const o of me) {
+      const kp = (o.keyPath || '').toLowerCase();
+      const v = o.value as number | string;
+      if (kp === 'position.x' && typeof v === 'number') eff.position.x = v;
+      else if (kp === 'position.y' && typeof v === 'number') eff.position.y = v;
+      else if (kp === 'bounds.size.width' && typeof v === 'number') eff.size.w = v;
+      else if (kp === 'bounds.size.height' && typeof v === 'number') eff.size.h = v;
+      else if (kp === 'transform.rotation.z' && typeof v === 'number') (eff as any).rotation = v as number;
+      else if (kp === 'opacity' && typeof v === 'number') (eff as any).opacity = v as number;
+    }
+    return eff;
+  })();
 
   if (!selected) {
     return (

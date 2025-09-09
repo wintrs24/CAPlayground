@@ -405,6 +405,10 @@ export function CanvasPreview() {
         startH: number;
         startClientX: number;
         startClientY: number;
+        lastX: number;
+        lastY: number;
+        lastW: number;
+        lastH: number;
       }
     | null
   >(null);
@@ -415,6 +419,7 @@ export function CanvasPreview() {
         centerX: number;
         centerY: number;
         startAngle: number;
+        lastRot: number;
       }
     | null
   >(null);
@@ -433,6 +438,10 @@ export function CanvasPreview() {
       startH: l.size.h,
       startClientX: e.clientX,
       startClientY: e.clientY,
+      lastX: l.position.x,
+      lastY: l.position.y,
+      lastW: l.size.w,
+      lastH: l.size.h,
     };
     const onMove = (ev: MouseEvent) => {
       const d = resizeDragRef.current;
@@ -455,7 +464,6 @@ export function CanvasPreview() {
         case "sw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH + dy); break;
         case "nw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
       }
-
       if (ev.shiftKey && d.startW > 0 && d.startH > 0) {
         const aspect = d.startW / d.startH;
         const affectsW = ["e", "w", "ne", "se", "sw", "nw"].includes(d.handle);
@@ -467,53 +475,27 @@ export function CanvasPreview() {
         } else if (affectsW && affectsH) {
           const dw = Math.abs(w - d.startW);
           const dh = Math.abs(h - d.startH);
-          if (dw >= dh) {
-            h = Math.max(1, w / aspect);
-          } else {
-            w = Math.max(1, h * aspect);
-          }
+          if (dw >= dh) h = Math.max(1, w / aspect);
+          else w = Math.max(1, h * aspect);
         }
         switch (d.handle) {
-          case "e":
-            x = d.startX;
-            break;
-          case "w":
-            x = d.startX + (d.startW - w);
-            break;
-          case "s":
-            y = d.startY;
-            break;
-          case "n":
-            y = d.startY + (d.startH - h);
-            break;
-          case "se":
-            x = d.startX;
-            y = d.startY;
-            break;
-          case "ne":
-            x = d.startX;
-            y = d.startY + (d.startH - h);
-            break;
-          case "sw":
-            x = d.startX + (d.startW - w);
-            y = d.startY;
-            break;
-          case "nw":
-            x = d.startX + (d.startW - w);
-            y = d.startY + (d.startH - h);
-            break;
+          case "e": x = d.startX; break;
+          case "w": x = d.startX + (d.startW - w); break;
+          case "s": y = d.startY; break;
+          case "n": y = d.startY + (d.startH - h); break;
+          case "se": x = d.startX; y = d.startY; break;
+          case "ne": x = d.startX; y = d.startY + (d.startH - h); break;
+          case "sw": x = d.startX + (d.startW - w); y = d.startY; break;
+          case "nw": x = d.startX + (d.startW - w); y = d.startY + (d.startH - h); break;
         }
       }
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
+      d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
     const onUp = () => {
       const d = resizeDragRef.current;
       if (d) {
-        const currentDoc = docRef.current;
-        const current = findById(currentDoc?.layers ?? [], d.id);
-        if (current) {
-          updateLayer(current.id, { position: { ...current.position } as any, size: { ...current.size } as any });
-        }
+        updateLayer(d.id, { position: { x: d.lastX, y: d.lastY } as any, size: { w: d.lastW, h: d.lastH } as any });
       }
       resizeDragRef.current = null;
       window.removeEventListener("mousemove", onMove);
@@ -532,21 +514,20 @@ export function CanvasPreview() {
     const centerY = l.position.y + l.size.h / 2;
     const world = clientToWorld(e.clientX, e.clientY);
     const angle0 = Math.atan2(world.y - centerY, world.x - centerX) * 180 / Math.PI;
-    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0) };
+    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0), lastRot: l.rotation ?? 0 };
     const onMove = (ev: MouseEvent) => {
       const d = rotationDragRef.current;
       if (!d) return;
       const wpt = clientToWorld(ev.clientX, ev.clientY);
       const angle = Math.atan2(wpt.y - d.centerY, wpt.x - d.centerX) * 180 / Math.PI;
       const rot = angle - d.startAngle;
+      d.lastRot = rot;
       updateLayerTransient(d.id, { rotation: rot as any });
     };
     const onUp = () => {
       const d = rotationDragRef.current;
       if (d) {
-        const currentDoc = docRef.current;
-        const current = findById(currentDoc?.layers ?? [], d.id);
-        if (current) updateLayer(current.id, { rotation: current.rotation as any });
+        updateLayer(d.id, { rotation: d.lastRot as any });
       }
       rotationDragRef.current = null;
       window.removeEventListener("mousemove", onMove);
@@ -557,8 +538,6 @@ export function CanvasPreview() {
   };
 
   const renderSelectionOverlay = (l: AnyLayer) => {
-    const isSelected = doc?.selectedId === l.id;
-    if (!isSelected) return null;
     const boxStyle: React.CSSProperties = {
       position: "absolute",
       left: l.position.x,

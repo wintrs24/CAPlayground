@@ -246,6 +246,8 @@ export function serializeCAML(
           } else if (ov.keyPath === 'position.y') {
             outVal = Math.round(docHeight - ((ov.value as number) + (target.size.h / 2)));
           }
+        } else if (ov.keyPath === 'transform.rotation.z') {
+          outVal = (ov.value as number) * Math.PI / 180;
         }
         const isInt = Number.isInteger(outVal);
         vEl.setAttribute('type', isInt ? 'integer' : 'float');
@@ -281,7 +283,7 @@ export function serializeCAML(
     for (const elSpec of (t.elements || [])) {
       const el = doc.createElementNS(CAML_NS, 'LKStateTransitionElement');
       el.setAttribute('targetId', elSpec.targetId);
-      el.setAttribute('key', elSpec.keyPath);
+      el.setAttribute('keyPath', elSpec.keyPath);
       if (elSpec.animation) {
         const a = doc.createElementNS(CAML_NS, 'animation');
         if (elSpec.animation.type) a.setAttribute('type', String(elSpec.animation.type));
