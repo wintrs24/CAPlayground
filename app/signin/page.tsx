@@ -419,6 +419,16 @@ export default function AuthPage() {
                 <Button
                   variant="outline"
                   className="w-full flex items-center justify-center gap-2"
+                  onClick={handleGithub}
+                  disabled={loading}
+                >
+                  <GithubIcon className="h-4 w-4" />
+                  Sign up with GitHub
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center gap-2"
                   onClick={handleDiscord}
                   disabled={loading}
                 >
