@@ -212,6 +212,19 @@ export default function AuthSuccessPage() {
                 <Button className="w-full" onClick={() => (window.location.href = "/")}>Continue</Button>
                 <Button className="w-full" variant="outline" onClick={() => (window.location.href = "/projects")}>Create a Project</Button>
                 <Button className="w-full" variant="outline" onClick={() => (window.location.href = "/dashboard")}>Account Dashboard</Button>
+                <Button
+                  className="w-full"
+                  variant="destructive"
+                  onClick={async () => {
+                    try {
+                      await supabase.auth.signOut()
+                    } finally {
+                      window.location.href = "/signin"
+                    }
+                  }}
+                >
+                  Sign out
+                </Button>
               </div>
             </div>
           ) : (
