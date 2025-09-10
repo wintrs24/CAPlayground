@@ -43,11 +43,14 @@ export default function AuthSuccessPage() {
             const meta: any = (user as any).user_metadata || {}
             const identities: any[] = Array.isArray((user as any).identities) ? (user as any).identities : []
             const ghIdentity: any = identities.find((i: any) => i?.provider === "github")?.identity_data || {}
+            const dcIdentity: any = identities.find((i: any) => i?.provider === "discord")?.identity_data || {}
             const candidates = [
               meta.user_name,
               meta.preferred_username,
               ghIdentity.user_name,
               ghIdentity.login,
+              dcIdentity.username,
+              dcIdentity.global_name,
               meta.name,
               meta.full_name,
             ].filter(Boolean) as string[]
