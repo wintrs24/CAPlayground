@@ -39,6 +39,27 @@ export default function AuthSuccessPage() {
         if (profile?.username) {
           setStatus("ready")
         } else {
+          try {
+            const meta: any = (user as any).user_metadata || {}
+            const identities: any[] = Array.isArray((user as any).identities) ? (user as any).identities : []
+            const ghIdentity: any = identities.find((i: any) => i?.provider === "github")?.identity_data || {}
+            const candidates = [
+              meta.user_name,
+              meta.preferred_username,
+              ghIdentity.user_name,
+              ghIdentity.login,
+              meta.name,
+              meta.full_name,
+            ].filter(Boolean) as string[]
+
+            if (candidates.length > 0) {
+              const raw = candidates[0] as string
+              const suggested = raw.replace(/[^A-Za-z0-9!._-]/g, "").slice(0, 20)
+              if (/^[A-Za-z0-9!._-]{3,20}$/.test(suggested)) {
+                setUsername(suggested)
+              }
+            }
+          } catch {}
           setStatus("need_username")
         }
       } catch {
