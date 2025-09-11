@@ -230,6 +230,52 @@ export function serializeCAML(
     const state = doc.createElementNS(CAML_NS, 'LKState');
     state.setAttribute('name', stateName);
     const elements = doc.createElementNS(CAML_NS, 'elements');
+
+  // state animations wont work unless every state overrides exists in every state. its really stupid and this next section of code should fix that problem when exporting from caplayground
+  // - retronbv
+
+  stateNames.forEach((stateName) => {
+    let ovs = (stateOverridesInput || {})[stateName] || [];
+    for (let override of ovs) {
+      let defaultVal: any;
+      switch (override.keyPath) {
+        case "position.x":
+          defaultVal = layerIndex[override.targetId].position.x;
+          break;
+        case "position.y":
+          defaultVal = layerIndex[override.targetId].position.x;
+          break;
+        case "bounds.size.width":
+          defaultVal = layerIndex[override.targetId].size.w;
+          break;
+        case "bounds.size.height":
+          defaultVal = layerIndex[override.targetId].size.h;
+          break;
+        case "transform.rotation.z":
+          defaultVal = layerIndex[override.targetId].rotation;
+          break;
+        case "opacity":
+          defaultVal = layerIndex[override.targetId].opacity;
+          break;
+      }
+      stateNames.forEach((checkState) => {
+        let checkOverrides = (stateOverridesInput || {})[checkState] || [];
+        let filtered = checkOverrides.filter(
+          (o) =>
+            o.targetId == override.targetId && o.keyPath == override.keyPath
+        );
+        if (filtered.length == 0) {
+          checkOverrides.push({
+            targetId: override.targetId,
+            keyPath: override.keyPath,
+            value: defaultVal,
+          });
+        }
+        (stateOverridesInput || {})[checkState] = checkOverrides;
+      });
+    }
+  });
+
     const ovs = (stateOverridesInput || {})[stateName] || [];
     for (const ov of ovs) {
       const el = doc.createElementNS(CAML_NS, 'LKStateSetValue');
