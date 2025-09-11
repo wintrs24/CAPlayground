@@ -125,7 +125,7 @@ export default function PrivacyPage() {
           </p>
 
           <p className="mt-10 text-sm text-muted-foreground">
-            See also our {" "}
+            Also see our {" "}
             <Link href="/tos" className="underline">Terms of Service</Link>.
           </p>
         </div>
