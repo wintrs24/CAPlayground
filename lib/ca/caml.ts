@@ -250,7 +250,7 @@ export function serializeCAML(
           outVal = (ov.value as number) * Math.PI / 180;
         }
         const isInt = Number.isInteger(outVal);
-        vEl.setAttribute('type', isInt ? 'integer' : 'float');
+        vEl.setAttribute("type", isInt ? "integer" : "real");
         vEl.setAttribute('value', String(outVal));
       } else {
         vEl.setAttribute('type', 'string');
