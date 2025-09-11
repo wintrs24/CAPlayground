@@ -138,7 +138,7 @@ export default function TermsPage() {
           </p>
 
           <p className="mt-10 text-sm text-muted-foreground">
-            See also our {" "}
+            Also see our {" "}
             <Link href="/privacy" className="underline">Privacy Policy</Link>.
           </p>
         </div>
