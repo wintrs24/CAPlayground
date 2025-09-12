@@ -52,7 +52,202 @@ export function CanvasPreview() {
   const offsetX = baseOffsetX + pan.x;
   const offsetY = baseOffsetY + pan.y;
 
-  const layers = doc?.layers ?? [];
+  const applyOverrides = (layers: AnyLayer[], overrides: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> | undefined, state: string | undefined): AnyLayer[] => {
+    if (!overrides || !state || state === 'Base State') return layers;
+    const map: Record<string, AnyLayer> = {};
+    const cloneTree = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
+      const copy = JSON.parse(JSON.stringify(l)) as AnyLayer;
+      map[copy.id] = copy;
+      if ((copy as any).type === 'group' && Array.isArray((copy as any).children)) {
+        (copy as any).children = cloneTree((copy as any).children);
+      }
+      return copy;
+    });
+    const rootCopy = cloneTree(layers);
+    const list = overrides[state] || [];
+    for (const o of list) {
+      const target = map[o.targetId?.trim()] || map[o.targetId];
+      if (!target) continue;
+      const kp = (o.keyPath || '').toLowerCase();
+      const v = o.value;
+      if (kp === 'position.y' && typeof v === 'number') {
+        (target as any).position = { ...(target as any).position, y: v };
+      } else if (kp === 'position.x' && typeof v === 'number') {
+        (target as any).position = { ...(target as any).position, x: v };
+      } else if (kp === 'bounds.size.width' && typeof v === 'number') {
+        (target as any).size = { ...(target as any).size, w: v };
+      } else if (kp === 'bounds.size.height' && typeof v === 'number') {
+        (target as any).size = { ...(target as any).size, h: v };
+      } else if (kp === 'transform.rotation.z' && typeof v === 'number') {
+        (target as any).rotation = v;
+      } else if ((kp === 'opacity' || kp === 'cornerRadius' || kp === 'borderWidth' || kp === 'fontSize') && typeof v === 'number') {
+        (target as any)[kp] = v as any;
+      } else if ((kp === 'backgroundColor' || kp === 'borderColor' || kp === 'color') && typeof v === 'string') {
+        (target as any)[kp] = v as any;
+      }
+    }
+    return rootCopy;
+  };
+
+  const appliedLayers = useMemo(() => {
+    if (!doc) return [] as AnyLayer[];
+    return applyOverrides(doc.layers, doc.stateOverrides, doc.activeState);
+  }, [doc?.layers, doc?.stateOverrides, doc?.activeState]);
+
+  const [renderedLayers, setRenderedLayers] = useState<AnyLayer[]>(appliedLayers);
+  useEffect(() => { setRenderedLayers(appliedLayers); }, []);
+
+  const prevStateRef = useRef<string | undefined>(doc?.activeState);
+  const animRef = useRef<number | null>(null);
+
+  const indexById = (arr: AnyLayer[]) => {
+    const map: Record<string, AnyLayer> = {};
+    const walk = (l: AnyLayer) => {
+      map[l.id] = l;
+      if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
+        (l as any).children.forEach(walk);
+      }
+    };
+    arr.forEach(walk);
+    return map;
+  };
+
+  const getProp = (l: AnyLayer, keyPath: string): number | undefined => {
+    if (keyPath === 'position.x') return (l as any).position?.x;
+    if (keyPath === 'position.y') return (l as any).position?.y;
+    if (keyPath === 'bounds.size.width') return (l as any).size?.w;
+    if (keyPath === 'bounds.size.height') return (l as any).size?.h;
+    if (keyPath === 'transform.rotation.z') return (l as any).rotation ?? 0;
+    if (keyPath === 'opacity') return (l as any).opacity ?? 1;
+    return undefined;
+  };
+  const setProp = (l: AnyLayer, keyPath: string, v: number) => {
+    if (keyPath === 'position.x') (l as any).position = { ...(l as any).position, x: v };
+    else if (keyPath === 'position.y') (l as any).position = { ...(l as any).position, y: v };
+    else if (keyPath === 'bounds.size.width') (l as any).size = { ...(l as any).size, w: v };
+    else if (keyPath === 'bounds.size.height') (l as any).size = { ...(l as any).size, h: v };
+    else if (keyPath === 'transform.rotation.z') (l as any).rotation = v as any;
+    else if (keyPath === 'opacity') (l as any).opacity = v as any;
+  };
+
+  useEffect(() => {
+    const prevState = prevStateRef.current;
+    const nextState = doc?.activeState;
+    if (!doc) return;
+    if (prevState === nextState) {
+      setRenderedLayers(appliedLayers);
+      return;
+    }
+
+    const provided = (doc.stateTransitions || []).filter(t =>
+      (t.fromState === prevState || t.fromState === '*') &&
+      (t.toState === nextState || t.toState === '*')
+    );
+    let transitions = provided;
+    if (!provided.length) {
+      const gens: Array<{ elements: { targetId: string; keyPath: string; animation?: { duration?: number } }[] }> = [];
+      const addGen = (targetId: string, keyPath: string, duration = 0.8) => {
+        if (!gens.length) gens.push({ elements: [] });
+        gens[0].elements.push({ targetId, keyPath, animation: { duration } });
+      };
+      const ovs = doc.stateOverrides || {};
+      const toList = ovs[nextState || ''] || [];
+      const fromList = ovs[prevState || ''] || [];
+      const keys = [
+        'position.x','position.y','bounds.size.width','bounds.size.height','transform.rotation.z','opacity'
+      ];
+      const byKey = (arr: any[]) => {
+        const m = new Map<string, Map<string, number>>();
+        for (const it of arr) {
+          if (typeof it.value !== 'number') continue;
+          if (!m.has(it.targetId)) m.set(it.targetId, new Map());
+          m.get(it.targetId)!.set(it.keyPath, it.value);
+        }
+        return m;
+      };
+      const fromMap = byKey(fromList);
+      const toMap = byKey(toList);
+      const ids = new Set<string>([...fromMap.keys(), ...toMap.keys()]);
+      ids.forEach(id => {
+        keys.forEach(k => {
+          const a = fromMap.get(id)?.get(k);
+          const b = toMap.get(id)?.get(k);
+          if (typeof a === 'number' || typeof b === 'number') {
+            addGen(id, k as any, 0.8);
+          }
+        });
+      });
+      transitions = gens as any;
+    }
+
+    if (!transitions.length) {
+      setRenderedLayers(appliedLayers);
+      prevStateRef.current = nextState;
+      return;
+    }
+
+    const startMap = indexById(renderedLayers.length ? renderedLayers : appliedLayers);
+    const endMap = indexById(appliedLayers);
+    type Track = { id: string; key: string; from: number; to: number; duration: number };
+    const tracks: Track[] = [];
+
+    const addTrack = (id: string, keyPath: string, duration: number) => {
+      const sL = startMap[id];
+      const eL = endMap[id];
+      if (!sL || !eL) return;
+      const from = getProp(sL, keyPath);
+      const to = getProp(eL, keyPath);
+      if (typeof from === 'number' && typeof to === 'number' && from !== to) {
+        tracks.push({ id, key: keyPath, from, to, duration });
+      }
+    };
+
+    for (const tr of transitions) {
+      for (const el of tr.elements) {
+        const key = el.keyPath;
+        if (!['position.x', 'position.y', 'bounds.size.width', 'bounds.size.height', 'transform.rotation.z', 'opacity'].includes(key)) continue;
+        const dur = Math.max(0.1, el.animation?.duration || 0.5);
+        addTrack(el.targetId, key, dur);
+      }
+    }
+
+    if (!tracks.length) {
+      setRenderedLayers(appliedLayers);
+      prevStateRef.current = nextState;
+      return;
+    }
+
+    const startTime = performance.now();
+    const maxDur = Math.max(...tracks.map(t => t.duration)) * 1000;
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const step = () => {
+      const now = performance.now();
+      const p = Math.min(1, (now - startTime) / maxDur);
+      const frame = JSON.parse(JSON.stringify(appliedLayers)) as AnyLayer[];
+      const frameMap = indexById(frame);
+      for (const trk of tracks) {
+        const localP = Math.min(1, (now - startTime) / (trk.duration * 1000));
+        const v = trk.from + (trk.to - trk.from) * ease(localP);
+        const L = frameMap[trk.id];
+        if (L) setProp(L, trk.key, v);
+      }
+      setRenderedLayers(frame);
+      if (p < 1) animRef.current = requestAnimationFrame(step);
+      else {
+        animRef.current = null;
+        prevStateRef.current = nextState;
+      }
+    };
+
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    animRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+    };
+  }, [doc?.activeState, appliedLayers, doc?.stateTransitions]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -210,6 +405,10 @@ export function CanvasPreview() {
         startH: number;
         startClientX: number;
         startClientY: number;
+        lastX: number;
+        lastY: number;
+        lastW: number;
+        lastH: number;
       }
     | null
   >(null);
@@ -220,6 +419,7 @@ export function CanvasPreview() {
         centerX: number;
         centerY: number;
         startAngle: number;
+        lastRot: number;
       }
     | null
   >(null);
@@ -238,6 +438,10 @@ export function CanvasPreview() {
       startH: l.size.h,
       startClientX: e.clientX,
       startClientY: e.clientY,
+      lastX: l.position.x,
+      lastY: l.position.y,
+      lastW: l.size.w,
+      lastH: l.size.h,
     };
     const onMove = (ev: MouseEvent) => {
       const d = resizeDragRef.current;
@@ -260,7 +464,6 @@ export function CanvasPreview() {
         case "sw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH + dy); break;
         case "nw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
       }
-
       if (ev.shiftKey && d.startW > 0 && d.startH > 0) {
         const aspect = d.startW / d.startH;
         const affectsW = ["e", "w", "ne", "se", "sw", "nw"].includes(d.handle);
@@ -272,53 +475,27 @@ export function CanvasPreview() {
         } else if (affectsW && affectsH) {
           const dw = Math.abs(w - d.startW);
           const dh = Math.abs(h - d.startH);
-          if (dw >= dh) {
-            h = Math.max(1, w / aspect);
-          } else {
-            w = Math.max(1, h * aspect);
-          }
+          if (dw >= dh) h = Math.max(1, w / aspect);
+          else w = Math.max(1, h * aspect);
         }
         switch (d.handle) {
-          case "e":
-            x = d.startX;
-            break;
-          case "w":
-            x = d.startX + (d.startW - w);
-            break;
-          case "s":
-            y = d.startY;
-            break;
-          case "n":
-            y = d.startY + (d.startH - h);
-            break;
-          case "se":
-            x = d.startX;
-            y = d.startY;
-            break;
-          case "ne":
-            x = d.startX;
-            y = d.startY + (d.startH - h);
-            break;
-          case "sw":
-            x = d.startX + (d.startW - w);
-            y = d.startY;
-            break;
-          case "nw":
-            x = d.startX + (d.startW - w);
-            y = d.startY + (d.startH - h);
-            break;
+          case "e": x = d.startX; break;
+          case "w": x = d.startX + (d.startW - w); break;
+          case "s": y = d.startY; break;
+          case "n": y = d.startY + (d.startH - h); break;
+          case "se": x = d.startX; y = d.startY; break;
+          case "ne": x = d.startX; y = d.startY + (d.startH - h); break;
+          case "sw": x = d.startX + (d.startW - w); y = d.startY; break;
+          case "nw": x = d.startX + (d.startW - w); y = d.startY + (d.startH - h); break;
         }
       }
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
+      d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
     const onUp = () => {
       const d = resizeDragRef.current;
       if (d) {
-        const currentDoc = docRef.current;
-        const current = findById(currentDoc?.layers ?? [], d.id);
-        if (current) {
-          updateLayer(current.id, { position: { ...current.position } as any, size: { ...current.size } as any });
-        }
+        updateLayer(d.id, { position: { x: d.lastX, y: d.lastY } as any, size: { w: d.lastW, h: d.lastH } as any });
       }
       resizeDragRef.current = null;
       window.removeEventListener("mousemove", onMove);
@@ -337,21 +514,20 @@ export function CanvasPreview() {
     const centerY = l.position.y + l.size.h / 2;
     const world = clientToWorld(e.clientX, e.clientY);
     const angle0 = Math.atan2(world.y - centerY, world.x - centerX) * 180 / Math.PI;
-    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0) };
+    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0), lastRot: l.rotation ?? 0 };
     const onMove = (ev: MouseEvent) => {
       const d = rotationDragRef.current;
       if (!d) return;
       const wpt = clientToWorld(ev.clientX, ev.clientY);
       const angle = Math.atan2(wpt.y - d.centerY, wpt.x - d.centerX) * 180 / Math.PI;
       const rot = angle - d.startAngle;
+      d.lastRot = rot;
       updateLayerTransient(d.id, { rotation: rot as any });
     };
     const onUp = () => {
       const d = rotationDragRef.current;
       if (d) {
-        const currentDoc = docRef.current;
-        const current = findById(currentDoc?.layers ?? [], d.id);
-        if (current) updateLayer(current.id, { rotation: current.rotation as any });
+        updateLayer(d.id, { rotation: d.lastRot as any });
       }
       rotationDragRef.current = null;
       window.removeEventListener("mousemove", onMove);
@@ -362,8 +538,6 @@ export function CanvasPreview() {
   };
 
   const renderSelectionOverlay = (l: AnyLayer) => {
-    const isSelected = doc?.selectedId === l.id;
-    if (!isSelected) return null;
     const boxStyle: React.CSSProperties = {
       position: "absolute",
       left: l.position.x,
@@ -506,9 +680,9 @@ export function CanvasPreview() {
           selectLayer(null);
         }}
       >
-        {layers.map((l) => renderLayer(l))}
+        {renderedLayers.map((l) => renderLayer(l))}
         {(() => {
-          const sel = findById(layers, doc?.selectedId ?? null);
+          const sel = findById(renderedLayers, doc?.selectedId ?? null);
           return sel ? renderSelectionOverlay(sel) : null;
         })()}
       </div>

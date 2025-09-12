@@ -60,9 +60,43 @@ export type CAAsset = {
   data: Blob | ArrayBuffer | string;
 };
 
+export type CAStateOverride = {
+  targetId: string;
+  keyPath: string;
+  value: string | number;
+};
+
+export type CAStateOverrides = Record<string, CAStateOverride[]>;
+
+export type CAStateTransitionAnim = {
+  type: 'CASpringAnimation' | string;
+  damping?: number;
+  mass?: number;
+  stiffness?: number;
+  velocity?: number;
+  duration?: number;
+  fillMode?: string;
+  keyPath?: string;
+};
+
+export type CAStateTransitionElement = {
+  targetId: string;
+  keyPath: string;
+  animation?: CAStateTransitionAnim;
+};
+export type CAStateTransition = {
+  fromState: string;
+  toState: string;
+  elements: CAStateTransitionElement[];
+};
+
+export type CAStateTransitions = CAStateTransition[];
+
 export type CAProjectBundle = {
   project: CAProject;
   root: AnyLayer;
   assets?: Record<string, CAAsset>;
   states?: string[];
+  stateOverrides?: CAStateOverrides;
+  stateTransitions?: CAStateTransitions;
 };

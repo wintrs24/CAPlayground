@@ -366,6 +366,8 @@ export default function ProjectsPage() {
         layers,
         selectedId: null,
         states: importedStates.length > 0 ? importedStates : ["Locked", "Unlock", "Sleep"],
+        stateOverrides: bundle.stateOverrides || {},
+        stateTransitions: bundle.stateTransitions || [],
       };
       try {
         localStorage.setItem(`caplayground-project:${id}`, JSON.stringify(doc));

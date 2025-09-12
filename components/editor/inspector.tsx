@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
@@ -27,7 +28,26 @@ export function Inspector() {
     }
     return undefined;
   };
-  const selected = doc ? findById(doc.layers, doc.selectedId) : undefined;
+  const selectedBase = doc ? findById(doc.layers, doc.selectedId) : undefined;
+  const selected = (() => {
+    if (!doc || !selectedBase) return selectedBase;
+    const state = doc.activeState;
+    if (!state || state === 'Base State') return selectedBase;
+    const eff: AnyLayer = JSON.parse(JSON.stringify(selectedBase));
+    const ovs = (doc.stateOverrides || {})[state] || [];
+    const me = ovs.filter(o => o.targetId === eff.id);
+    for (const o of me) {
+      const kp = (o.keyPath || '').toLowerCase();
+      const v = o.value as number | string;
+      if (kp === 'position.x' && typeof v === 'number') eff.position.x = v;
+      else if (kp === 'position.y' && typeof v === 'number') eff.position.y = v;
+      else if (kp === 'bounds.size.width' && typeof v === 'number') eff.size.w = v;
+      else if (kp === 'bounds.size.height' && typeof v === 'number') eff.size.h = v;
+      else if (kp === 'transform.rotation.z' && typeof v === 'number') (eff as any).rotation = v as number;
+      else if (kp === 'opacity' && typeof v === 'number') (eff as any).opacity = v as number;
+    }
+    return eff;
+  })();
 
   if (!selected) {
     return (
@@ -41,6 +61,13 @@ export function Inspector() {
   return (
     <Card className="p-3 h-full space-y-2">
       <div className="font-medium">Inspector</div>
+      {doc?.activeState && doc.activeState !== 'Base State' && (
+        <Alert className="text-xs">
+          <AlertDescription>
+            Note: Rotation and Bound state transitions don't work when tested. If you know a fix or it just works for you, please report in the CAPlayground Discord server.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Accordion type="multiple" defaultValue={["geom","comp","content","text","image"]} className="space-y-1">
         <AccordionItem value="geom">
