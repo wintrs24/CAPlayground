@@ -3,13 +3,13 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Copy } from "lucide-react";
 import { useEditor } from "./editor-context";
 import { useRef } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 
 export function LayersPanel() {
-  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, deleteLayer } = useEditor();
+  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, deleteLayer, duplicateLayer } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const layers = doc?.layers ?? [];
   const selectedId = doc?.selectedId ?? null;
@@ -25,15 +25,28 @@ export function LayersPanel() {
         <div className="truncate">
           {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type})</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-muted-foreground"
-          onClick={(e) => { e.stopPropagation(); deleteLayer(l.id); }}
-          aria-label="Delete layer"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground"
+            onClick={(e) => { e.stopPropagation(); duplicateLayer(l.id); }}
+            aria-label="Duplicate layer"
+            title="Duplicate layer"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground"
+            onClick={(e) => { e.stopPropagation(); deleteLayer(l.id); }}
+            aria-label="Delete layer"
+            title="Delete layer"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     );
     if (l.type === "group") {

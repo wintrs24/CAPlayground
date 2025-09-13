@@ -24,12 +24,16 @@ export type EditorContextValue = {
   addTextLayer: () => void;
   addImageLayer: (src?: string) => void;
   addImageLayerFromFile: (file: File) => Promise<void>;
+  addImageLayerFromBlob: (blob: Blob, filename?: string) => Promise<void>;
   replaceImageForLayer: (layerId: string, file: File) => Promise<void>;
   addShapeLayer: (shape?: ShapeLayer["shape"]) => void;
   updateLayer: (id: string, patch: Partial<AnyLayer>) => void;
   updateLayerTransient: (id: string, patch: Partial<AnyLayer>) => void;
   selectLayer: (id: string | null) => void;
   deleteLayer: (id: string) => void;
+  copySelectedLayer: () => void;
+  pasteFromClipboard: (payload?: any) => void;
+  duplicateLayer: (id?: string) => void;
   persist: () => void;
   undo: () => void;
   redo: () => void;
@@ -58,10 +62,47 @@ export function EditorProvider({
   const pastRef = useRef<ProjectDocument[]>([]);
   const futureRef = useRef<ProjectDocument[]>([]);
   const skipPersistRef = useRef(false);
+  const clipboardRef = useRef<{
+    type: 'layers';
+    data: AnyLayer[];
+    assets?: Record<string, { filename: string; dataURL: string }>;
+  } | null>(null);
 
   const pushHistory = useCallback((prev: ProjectDocument) => {
     pastRef.current.push(JSON.parse(JSON.stringify(prev)) as ProjectDocument);
     futureRef.current = [];
+  }, []);
+
+  const findById = useCallback((layers: AnyLayer[], id: string | null | undefined): AnyLayer | undefined => {
+    if (!id) return undefined;
+    for (const l of layers) {
+      if (l.id === id) return l;
+      if ((l as any).type === 'group') {
+        const g = l as GroupLayer;
+        const found = findById(g.children, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  }, []);
+
+  const cloneLayerDeep = useCallback((layer: AnyLayer): AnyLayer => {
+    const newId = genId();
+    if (layer.type === 'group') {
+      const g = layer as GroupLayer;
+      return {
+        ...JSON.parse(JSON.stringify({ ...g, id: newId })) as GroupLayer,
+        id: newId,
+        children: g.children.map(cloneLayerDeep),
+        position: { x: (g.position?.x ?? 0) + 10, y: (g.position?.y ?? 0) + 10 },
+        name: `${g.name} copy`,
+      } as AnyLayer;
+    }
+    const base = JSON.parse(JSON.stringify({ ...layer })) as AnyLayer;
+    (base as any).id = newId;
+    (base as any).name = `${layer.name} copy`;
+    (base as any).position = { x: (layer as any).position?.x + 10, y: (layer as any).position?.y + 10 };
+    return base;
   }, []);
 
   useEffect(() => {
@@ -140,6 +181,29 @@ export function EditorProvider({
         align: "left",
       };
       return { ...prev, layers: [...prev.layers, layer], selectedId: layer.id };
+    });
+  }, [addBase]);
+
+  const addImageLayerFromBlob = useCallback(async (blob: Blob, filename?: string) => {
+    const dataURL = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    setDoc((prev) => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const layer: ImageLayer = {
+        ...addBase(filename || "Pasted Image"),
+        type: "image",
+        size: { w: 200, h: 120 },
+        src: dataURL,
+        fit: "fill",
+      };
+      const assets = { ...(prev.assets || {}) };
+      assets[layer.id] = { filename: sanitizeFilename(filename || `pasted-${Date.now()}.png`), dataURL };
+      return { ...prev, layers: [...prev.layers, layer], selectedId: layer.id, assets };
     });
   }, [addBase]);
 
@@ -337,6 +401,98 @@ export function EditorProvider({
     });
   }, [deleteInTree, containsId]);
 
+  const copySelectedLayer = useCallback(() => {
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const sel = findById(prev.layers, prev.selectedId ?? null);
+      if (!sel) return prev;
+      const images: Record<string, { filename: string; dataURL: string }> = {};
+      const walk = (l: AnyLayer) => {
+        if (l.type === 'image') {
+          const a = (prev.assets || {})[l.id];
+          if (a) images[l.id] = { ...a };
+        } else if (l.type === 'group') {
+          (l as GroupLayer).children.forEach(walk);
+        }
+      };
+      walk(sel);
+      clipboardRef.current = { type: 'layers', data: [JSON.parse(JSON.stringify(sel)) as AnyLayer], assets: images };
+      try {
+        navigator.clipboard?.writeText?.(JSON.stringify({ __caplay__: true, type: 'layers', data: clipboardRef.current.data, assets: clipboardRef.current.assets }));
+      } catch {}
+      return prev;
+    });
+  }, [findById]);
+
+  const pasteFromClipboard = useCallback((payload?: any) => {
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const src = payload && payload.__caplay__ ? payload : clipboardRef.current;
+      if (!src || src.type !== 'layers') return prev;
+      const cloned: AnyLayer[] = (src.data || []).map(cloneLayerDeep);
+      const idMap = new Map<string, string>();
+      const collectMap = (orig: AnyLayer[], copies: AnyLayer[]) => {
+        for (let i = 0; i < orig.length; i++) {
+          const o = orig[i];
+          const c = copies[i];
+          if (o && c) {
+            idMap.set((o as any).id, (c as any).id);
+            if (o.type === 'group' && c.type === 'group') {
+              collectMap((o as GroupLayer).children, (c as GroupLayer).children);
+            }
+          }
+        }
+      };
+      collectMap(src.data as AnyLayer[], cloned);
+      const assets = { ...(prev.assets || {}) };
+      const srcAssets = ((src as any).assets || {}) as Record<string, { filename: string; dataURL: string }>;
+      for (const [oldId, asset] of Object.entries(srcAssets) as Array<[string, { filename: string; dataURL: string }]>) {
+        const newId = idMap.get(oldId);
+        if (newId) assets[newId] = { filename: asset.filename, dataURL: asset.dataURL };
+      }
+      pushHistory(prev);
+      return { ...prev, layers: [...prev.layers, ...cloned], selectedId: cloned[cloned.length - 1]?.id ?? prev.selectedId, assets };
+    });
+  }, [cloneLayerDeep, pushHistory]);
+
+  const duplicateLayer = useCallback((id?: string) => {
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const targetId = id || prev.selectedId || null;
+      if (!targetId) return prev;
+      const sel = findById(prev.layers, targetId);
+      if (!sel) return prev;
+      const images: Record<string, { filename: string; dataURL: string }> = {};
+      const walk = (l: AnyLayer) => {
+        if (l.type === 'image') {
+          const a = (prev.assets || {})[l.id];
+          if (a) images[l.id] = { ...a };
+        } else if (l.type === 'group') {
+          (l as GroupLayer).children.forEach(walk);
+        }
+      };
+      walk(sel);
+      const cloned = cloneLayerDeep(sel);
+      const assets = { ...(prev.assets || {}) };
+      const idMap = new Map<string, string>();
+      const buildMap = (o: AnyLayer, c: AnyLayer) => {
+        idMap.set((o as any).id, (c as any).id);
+        if (o.type === 'group' && c.type === 'group') {
+          const oc = (o as GroupLayer).children;
+          const cc = (c as GroupLayer).children;
+          for (let i = 0; i < oc.length; i++) buildMap(oc[i], cc[i]);
+        }
+      };
+      buildMap(sel, cloned);
+      for (const [oldId, asset] of Object.entries(images)) {
+        const newId = idMap.get(oldId);
+        if (newId) assets[newId] = { filename: asset.filename, dataURL: asset.dataURL };
+      }
+      pushHistory(prev);
+      return { ...prev, layers: [...prev.layers, cloned], selectedId: (cloned as any).id, assets };
+    });
+  }, [findById, cloneLayerDeep]);
+
   const undo = useCallback(() => {
     setDoc((current) => {
       if (!current) return current;
@@ -416,12 +572,16 @@ export function EditorProvider({
     addTextLayer,
     addImageLayer,
     addImageLayerFromFile,
+    addImageLayerFromBlob,
     replaceImageForLayer,
     addShapeLayer,
     updateLayer,
     updateLayerTransient,
     selectLayer,
     deleteLayer,
+    copySelectedLayer,
+    pasteFromClipboard,
+    duplicateLayer,
     persist,
     undo,
     redo,
