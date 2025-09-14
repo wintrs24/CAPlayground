@@ -478,7 +478,12 @@ export function CanvasPreview() {
           key={l.id}
           src={l.src}
           alt={l.name}
-          style={{ ...common, objectFit: "fill" as React.CSSProperties["objectFit"] }}
+          style={{
+            ...common,
+            objectFit: "fill" as React.CSSProperties["objectFit"],
+            maxWidth: "none",
+            maxHeight: "none",
+          }}
           draggable={false}
           onMouseDown={(e) => startDrag(l, e)}
         />
