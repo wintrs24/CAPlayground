@@ -409,5 +409,59 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     if (children.length) el.appendChild(sublayers);
   }
 
+  // Animations (position, position.x, position.y)
+  const anim = (layer as any).animations as
+    | { enabled?: boolean; keyPath?: 'position' | 'position.x' | 'position.y'; autoreverses?: 0 | 1; values?: Array<{ x: number; y: number } | number> }
+    | undefined;
+  if (anim?.enabled && Array.isArray(anim.values) && anim.values.length > 0) {
+    const keyPath = (anim.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y';
+    const animationsEl = doc.createElementNS(CAML_NS, 'animations');
+    const a = doc.createElementNS(CAML_NS, 'animation');
+    a.setAttribute('type', 'CAKeyframeAnimation');
+    a.setAttribute('keyPath', keyPath);
+    a.setAttribute('autoreverses', String((anim.autoreverses ?? 0) as number));
+    a.setAttribute('beginTime', '1e-100');
+    const providedDur = Number((anim as any).durationSeconds);
+    const duration = Number.isFinite(providedDur) && providedDur > 0
+      ? providedDur
+      : Math.max(1, (anim.values?.length || 1) - 1);
+    a.setAttribute('duration', String(duration));
+    a.setAttribute('removedOnCompletion', '0');
+    a.setAttribute('repeatCount', 'inf');
+    a.setAttribute('repeatDuration', 'inf');
+    a.setAttribute('calculationMode', 'linear');
+    const valuesEl = doc.createElementNS(CAML_NS, 'values');
+    const docHeight = project?.height ?? 844;
+    if (keyPath === 'position') {
+      for (const ptRaw of anim.values as Array<any>) {
+        const pt = ptRaw || {};
+        const p = doc.createElementNS(CAML_NS, 'CGPoint');
+        const cx = Math.round((Number(pt?.x ?? 0)) + (layer.size.w / 2));
+        const cy = Math.round(docHeight - ((Number(pt?.y ?? 0)) + (layer.size.h / 2)));
+        p.setAttribute('value', `${cx} ${cy}`);
+        valuesEl.appendChild(p);
+      }
+    } else if (keyPath === 'position.x') {
+      for (const v of anim.values as Array<any>) {
+        const n = Number(v);
+        const cx = Math.round((Number.isFinite(n) ? n : 0) + (layer.size.w / 2));
+        const numEl = doc.createElementNS(CAML_NS, 'NSNumber');
+        numEl.setAttribute('value', String(cx));
+        valuesEl.appendChild(numEl);
+      }
+    } else if (keyPath === 'position.y') {
+      for (const v of anim.values as Array<any>) {
+        const n = Number(v);
+        const cy = Math.round(docHeight - ((Number.isFinite(n) ? n : 0) + (layer.size.h / 2)));
+        const numEl = doc.createElementNS(CAML_NS, 'NSNumber');
+        numEl.setAttribute('value', String(cy));
+        valuesEl.appendChild(numEl);
+      }
+    }
+    a.appendChild(valuesEl);
+    animationsEl.appendChild(a);
+    el.appendChild(animationsEl);
+  }
+
   return el;
 }

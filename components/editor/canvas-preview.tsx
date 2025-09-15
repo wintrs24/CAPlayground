@@ -259,6 +259,104 @@ export function CanvasPreview() {
     else if (keyPath === 'opacity') (l as any).opacity = v as any;
   };
 
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [timeSec, setTimeSec] = useState(0);
+  const lastTsRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isPlaying) { lastTsRef.current = null; return; }
+    let raf: number | null = null;
+    const step = (ts: number) => {
+      const last = lastTsRef.current;
+      lastTsRef.current = ts;
+      if (last != null) {
+        const dt = Math.max(0, (ts - last) / 1000);
+        setTimeSec((t) => t + dt);
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [isPlaying]);
+
+  const evalLayerAnimation = (l: AnyLayer, t: number) => {
+    const anim: any = (l as any).animations;
+    if (!anim || !anim.enabled) return;
+    const keyPath = (anim.keyPath || 'position') as 'position' | 'position.x' | 'position.y';
+    const values = Array.isArray(anim.values) ? anim.values : [];
+    const n = values.length;
+    if (n <= 1) return;
+    const intervals = n - 1;
+    const providedDur = Number(anim.durationSeconds);
+    const baseDuration = (Number.isFinite(providedDur) && providedDur > 0)
+      ? providedDur
+      : Math.max(1, intervals);
+    const autorev = Number(anim.autoreverses ?? 0) === 1;
+    let localT = t;
+    if (autorev) {
+      const cycle = baseDuration * 2;
+      const m = localT % cycle;
+      localT = m <= baseDuration ? m : (cycle - m);
+    } else {
+      localT = localT % baseDuration;
+    }
+    const segDur = baseDuration / intervals;
+    let seg = Math.min(intervals - 1, Math.floor(localT / segDur));
+    const segStartT = seg * segDur;
+    const f = Math.min(1, Math.max(0, (localT - segStartT) / segDur));
+
+    const lerp = (a: number, b: number, p: number) => a + (b - a) * p;
+    if (keyPath === 'position') {
+      const a: any = values[seg] || { x: (l as any).position?.x ?? 0, y: (l as any).position?.y ?? 0 };
+      const b: any = values[seg + 1] || a;
+      const nx = lerp(Number(a?.x ?? 0), Number(b?.x ?? 0), f);
+      const ny = lerp(Number(a?.y ?? 0), Number(b?.y ?? 0), f);
+      (l as any).position = { ...(l as any).position, x: nx, y: ny };
+    } else if (keyPath === 'position.x') {
+      const a = Number(values[seg] ?? (l as any).position?.x ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const nx = lerp(a, b, f);
+      (l as any).position = { ...(l as any).position, x: nx };
+    } else if (keyPath === 'position.y') {
+      const a = Number(values[seg] ?? (l as any).position?.y ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const ny = lerp(a, b, f);
+      (l as any).position = { ...(l as any).position, y: ny };
+    }
+  };
+
+  useEffect(() => {
+    const frame = JSON.parse(JSON.stringify(appliedLayers)) as AnyLayer[];
+    const walk = (arr: AnyLayer[]) => {
+      for (const l of arr) {
+        evalLayerAnimation(l, timeSec);
+        if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
+          walk((l as any).children as AnyLayer[]);
+        }
+      }
+    };
+    walk(frame);
+    setRenderedLayers(frame);
+  }, [timeSec, appliedLayers]);
+
+  const hasAnyEnabledAnimation = useMemo(() => {
+    const check = (arr: AnyLayer[]): boolean => {
+      for (const l of arr) {
+        const anim: any = (l as any).animations;
+        if (anim && anim.enabled) return true;
+        if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
+          if (check((l as any).children as AnyLayer[])) return true;
+        }
+      }
+      return false;
+    };
+    return check(doc?.layers || []);
+  }, [doc?.layers]);
+
+  useEffect(() => {
+    if (!hasAnyEnabledAnimation && isPlaying) setIsPlaying(false);
+  }, [hasAnyEnabledAnimation, isPlaying]);
+
   useEffect(() => {
     const prevState = prevStateRef.current;
     const nextState = doc?.activeState;
@@ -891,6 +989,29 @@ export function CanvasPreview() {
           <Crosshair className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Playback controls - visible only if any animation is enabled */}
+      {hasAnyEnabledAnimation && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-white/80 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1 shadow-sm">
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => setIsPlaying((p) => !p)}
+          >
+            {isPlaying ? 'Pause' : 'Play'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => { setTimeSec(0); lastTsRef.current = null; }}
+          >
+            Restart
+          </Button>
+          <div className="text-xs tabular-nums px-2">{`${timeSec.toFixed(2)}s`}</div>
+        </div>
+      )}
     </Card>
   );
 }

@@ -21,6 +21,13 @@ export type LayerBase = {
   borderWidth?: number;
   cornerRadius?: number;
   visible?: boolean;
+  animations?: {
+    enabled?: boolean;
+    keyPath?: 'position' | 'position.x' | 'position.y';
+    autoreverses?: 0 | 1;
+    values?: Array<Vec2 | number>;
+    durationSeconds?: number;
+  };
 };
 
 export type ImageLayer = LayerBase & {

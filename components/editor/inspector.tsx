@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
-import { useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export function Inspector() {
   const { doc, updateLayer, replaceImageForLayer } = useEditor();
@@ -29,6 +31,28 @@ export function Inspector() {
     return undefined;
   };
   const selectedBase = doc ? findById(doc.layers, doc.selectedId) : undefined;
+
+  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const selKey = selectedBase ? selectedBase.id : "__none__";
+  useEffect(() => {
+    setInputs({});
+  }, [selKey]);
+  const getBuf = (key: string, fallback: string): string => {
+    const bufKey = `${selKey}:${key}`;
+    return inputs[bufKey] !== undefined ? inputs[bufKey] : fallback;
+  };
+  const setBuf = (key: string, val: string) => {
+    const bufKey = `${selKey}:${key}`;
+    setInputs((prev) => ({ ...prev, [bufKey]: val }));
+  };
+  const clearBuf = (key: string) => {
+    const bufKey = `${selKey}:${key}`;
+    setInputs((prev) => {
+      const next = { ...prev } as any;
+      delete next[bufKey];
+      return next;
+    });
+  };
   const selected = (() => {
     if (!doc || !selectedBase) return selectedBase;
     const state = doc.activeState;
@@ -49,6 +73,8 @@ export function Inspector() {
     return eff;
   })();
 
+  const animEnabled: boolean = !!(selectedBase as any)?.animations?.enabled;
+
   if (!selected) {
     return (
       <Card className="p-3 h-full">
@@ -59,8 +85,9 @@ export function Inspector() {
   }
 
   return (
-    <Card className="p-3 h-full space-y-2">
-      <div className="font-medium">Inspector</div>
+    <Card className="p-3 h-full flex flex-col overflow-hidden">
+      <div className="font-medium mb-2 shrink-0">Inspector</div>
+      <div className="min-h-0 overflow-y-auto pr-1">
       {doc?.activeState && doc.activeState !== 'Base State' && (
         <Alert className="text-xs">
           <AlertDescription>
@@ -69,49 +96,57 @@ export function Inspector() {
         </Alert>
       )}
 
-      <Accordion type="multiple" defaultValue={["geom","comp","content","text","image"]} className="space-y-1">
+      <Accordion type="multiple" defaultValue={["geom","comp","content","text","image","anim"]} className="space-y-1">
         <AccordionItem value="geom">
           <AccordionTrigger className="py-2 text-xs">Geometry</AccordionTrigger>
           <AccordionContent className="pb-2">
             <div className="grid grid-cols-2 gap-1.5">
         <div className="space-y-1">
           <Label htmlFor="pos-x">X</Label>
-          <Input id="pos-x" type="number" step="0.01" value={fmt2(selected.position.x)}
+          <Input id="pos-x" type="number" step="0.01" value={getBuf('pos-x', fmt2(selected.position.x))}
             onChange={(e) => {
-              const v = e.target.value;
-              if (v === "") return;
-              const num = round2(Number(v));
+              setBuf('pos-x', e.target.value);
+            }}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              const num = v === "" ? 0 : round2(Number(v));
               updateLayer(selected.id, { position: { ...selected.position, x: num } as any });
+              clearBuf('pos-x');
             }} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="pos-y">Y</Label>
-          <Input id="pos-y" type="number" step="0.01" value={fmt2(selected.position.y)}
+          <Input id="pos-y" type="number" step="0.01" value={getBuf('pos-y', fmt2(selected.position.y))}
             onChange={(e) => {
-              const v = e.target.value;
-              if (v === "") return;
-              const num = round2(Number(v));
+              setBuf('pos-y', e.target.value);
+            }}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              const num = v === "" ? 0 : round2(Number(v));
               updateLayer(selected.id, { position: { ...selected.position, y: num } as any });
+              clearBuf('pos-y');
             }} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="w">Width</Label>
-          <Input id="w" type="number" step="0.01" value={fmt2(selected.size.w)}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "") return;
-              const num = round2(Number(v));
+          <Input id="w" type="number" step="0.01" value={getBuf('w', fmt2(selected.size.w))}
+            onChange={(e) => setBuf('w', e.target.value)}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              const num = v === "" ? 50 : round2(Number(v));
               updateLayer(selected.id, { size: { ...selected.size, w: num } as any });
+              clearBuf('w');
             }} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="h">Height</Label>
-          <Input id="h" type="number" step="0.01" value={fmt2(selected.size.h)}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "") return;
-              const num = round2(Number(v));
+          <Input id="h" type="number" step="0.01" value={getBuf('h', fmt2(selected.size.h))}
+            onChange={(e) => setBuf('h', e.target.value)}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              const num = v === "" ? 50 : round2(Number(v));
               updateLayer(selected.id, { size: { ...selected.size, h: num } as any });
+              clearBuf('h');
             }} />
         </div>
         <div className="space-y-1 col-span-2">
@@ -120,10 +155,13 @@ export function Inspector() {
             id="rotation"
             type="number"
             step="1"
-            value={fmt0(selected.rotation)}
-            onChange={(e) => {
-              const v = e.target.value;
-              updateLayer(selected.id, { rotation: v === "" ? (undefined as any) : Math.round(Number(v)) });
+            value={getBuf('rotation', fmt0(selected.rotation))}
+            onChange={(e) => setBuf('rotation', e.target.value)}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              const num = v === "" ? 0 : Math.round(Number(v));
+              updateLayer(selected.id, { rotation: num as any });
+              clearBuf('rotation');
             }}
           />
         </div>
@@ -167,10 +205,13 @@ export function Inspector() {
               id="radius"
               type="number"
               step="1"
-              value={fmt0((selected as any).cornerRadius ?? (selected as any).radius)}
-              onChange={(e) => {
-                const v = e.target.value;
-                updateLayer(selected.id, { cornerRadius: v === "" ? (undefined as any) : Math.round(Number(v)) } as any);
+              value={getBuf('cornerRadius', fmt0((selected as any).cornerRadius ?? (selected as any).radius))}
+              onChange={(e) => setBuf('cornerRadius', e.target.value)}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                const num = v === "" ? 0 : Math.round(Number(v));
+                updateLayer(selected.id, { cornerRadius: num as any } as any);
+                clearBuf('cornerRadius');
               }}
             />
           </div>
@@ -318,7 +359,239 @@ export function Inspector() {
             </AccordionContent>
           </AccordionItem>
         )}
+
+        {/* Animations */}
+        <AccordionItem value="anim">
+          <AccordionTrigger className="py-2 text-xs">Animations</AccordionTrigger>
+          <AccordionContent className="pb-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Enable animation</Label>
+                <Switch
+                  checked={!!(selectedBase as any)?.animations?.enabled}
+                  onCheckedChange={(checked) => {
+                    const enabled = !!checked;
+                    const current = (selectedBase as any)?.animations || {};
+                    updateLayer(selectedBase!.id, { animations: { ...current, enabled, keyPath: (current.keyPath ?? 'position'), autoreverses: (current.autoreverses ?? 0), values: (current.values ?? []) } } as any);
+                  }}
+                />
+              </div>
+              <div className={`grid grid-cols-2 gap-2 ${animEnabled ? '' : 'opacity-50'}`}>
+                <div className="space-y-1">
+                  <Label>Key path</Label>
+                  <Select
+                    value={((selectedBase as any)?.animations?.keyPath ?? 'position') as any}
+                    onValueChange={(v) => {
+                      const current = (selectedBase as any)?.animations || {};
+                      const kp = v as 'position' | 'position.x' | 'position.y';
+                      const prevVals = (current.values || []) as Array<{ x: number; y: number } | number>;
+                      let values: Array<{ x: number; y: number } | number> = [];
+                      if (kp === 'position') {
+                        values = prevVals.map((pv: any) => {
+                          if (typeof pv === 'number') {
+                            return { x: (selectedBase as any).position?.x ?? 0, y: (selectedBase as any).position?.y ?? 0 };
+                          }
+                          return { x: Number(pv?.x ?? 0), y: Number(pv?.y ?? 0) };
+                        });
+                      } else if (kp === 'position.x') {
+                        values = prevVals.map((pv: any) => typeof pv === 'number' ? pv : Number(pv?.x ?? (selectedBase as any).position?.x ?? 0));
+                      } else if (kp === 'position.y') {
+                        values = prevVals.map((pv: any) => typeof pv === 'number' ? pv : Number(pv?.y ?? (selectedBase as any).position?.y ?? 0));
+                      }
+                      updateLayer(selectedBase!.id, { animations: { ...current, keyPath: kp, values } } as any);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select key path" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="position">position</SelectItem>
+                      <SelectItem value="position.x">position.x</SelectItem>
+                      <SelectItem value="position.y">position.y</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Autoreverse</Label>
+                  <div className="flex items-center gap-2 h-8">
+                    <Switch
+                      checked={((selectedBase as any)?.animations?.autoreverses ?? 0) === 1}
+                      onCheckedChange={(checked) => {
+                        const current = (selectedBase as any)?.animations || {};
+                        updateLayer(selectedBase!.id, { animations: { ...current, autoreverses: checked ? 1 : 0 } } as any);
+                      }}
+                      disabled={!animEnabled}
+                    />
+                    <span className="text-xs text-muted-foreground">Reverse on repeat</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="anim-duration">Duration (s)</Label>
+                  <Input
+                    id="anim-duration"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="h-8"
+                    value={getBuf('anim-duration', (() => { const d = Number((selectedBase as any)?.animations?.durationSeconds); return Number.isFinite(d) && d > 0 ? String(d) : ''; })())}
+                    onChange={(e) => setBuf('anim-duration', e.target.value)}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      const current = (selectedBase as any)?.animations || {};
+                      const n = v === '' ? 1 : Number(v);
+                      const dur = Number.isFinite(n) && n > 0 ? n : 1;
+                      updateLayer(selectedBase!.id, { animations: { ...current, durationSeconds: dur } } as any);
+                      clearBuf('anim-duration');
+                    }}
+                    disabled={!animEnabled}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Values (CGPoint)</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      const current = (selectedBase as any)?.animations || {};
+                      const kp = (current.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y';
+                      const values = [...(current.values || [])] as any[];
+                      if (kp === 'position') {
+                        values.push({ x: (selectedBase as any).position?.x ?? 0, y: (selectedBase as any).position?.y ?? 0 });
+                      } else if (kp === 'position.x') {
+                        values.push((selectedBase as any).position?.x ?? 0);
+                      } else if (kp === 'position.y') {
+                        values.push((selectedBase as any).position?.y ?? 0);
+                      }
+                      updateLayer(selectedBase!.id, { animations: { ...current, values } } as any);
+                    }}
+                    disabled={!animEnabled}
+                  >
+                    + Add key value
+                  </Button>
+                </div>
+                <div className={`space-y-2 ${animEnabled ? '' : 'opacity-50'}`}>
+                  {(() => {
+                    const kp = ((selectedBase as any)?.animations?.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y';
+                    const values = (((selectedBase as any)?.animations?.values || []) as Array<any>);
+                    if (kp === 'position') {
+                      return (
+                        <>
+                          {values.map((pt, idx) => (
+                            <div key={idx} className="grid grid-cols-3 gap-2 items-end">
+                              <div className="space-y-1">
+                                <Label className="text-xs">X</Label>
+                                <Input
+                                  type="number"
+                                  step="1"
+                                  className="h-8"
+                                  value={Number.isFinite(pt?.x) ? String(Math.round(pt.x)) : ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    const current = (selectedBase as any)?.animations || {};
+                                    const arr = [...(current.values || [])];
+                                    const n = Number(v);
+                                    arr[idx] = { x: Number.isFinite(n) ? n : 0, y: arr[idx]?.y ?? 0 };
+                                    updateLayer(selectedBase!.id, { animations: { ...current, values: arr } } as any);
+                                  }}
+                                  disabled={!animEnabled}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Y</Label>
+                                <Input
+                                  type="number"
+                                  step="1"
+                                  className="h-8"
+                                  value={Number.isFinite(pt?.y) ? String(Math.round(pt.y)) : ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    const current = (selectedBase as any)?.animations || {};
+                                    const arr = [...(current.values || [])];
+                                    const n = Number(v);
+                                    arr[idx] = { x: arr[idx]?.x ?? 0, y: Number.isFinite(n) ? n : 0 };
+                                    updateLayer(selectedBase!.id, { animations: { ...current, values: arr } } as any);
+                                  }}
+                                  disabled={!animEnabled}
+                                />
+                              </div>
+                              <div className="flex items-center justify-end pb-0.5">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => {
+                                    const current = (selectedBase as any)?.animations || {};
+                                    const arr = [...(current.values || [])];
+                                    arr.splice(idx, 1);
+                                    updateLayer(selectedBase!.id, { animations: { ...current, values: arr } } as any);
+                                  }}
+                                  disabled={!animEnabled}
+                                >
+                                  Remove
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        {values.map((val, idx) => (
+                          <div key={idx} className="grid grid-cols-2 gap-2 items-end">
+                            <div className="space-y-1">
+                              <Label className="text-xs">{kp === 'position.x' ? 'X' : 'Y'}</Label>
+                              <Input
+                                type="number"
+                                step="1"
+                                className="h-8"
+                                value={Number.isFinite(Number(val)) ? String(Math.round(Number(val))) : ''}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  const current = (selectedBase as any)?.animations || {};
+                                  const arr = [...(current.values || [])];
+                                  const n = Number(v);
+                                  arr[idx] = Number.isFinite(n) ? n : 0;
+                                  updateLayer(selectedBase!.id, { animations: { ...current, values: arr } } as any);
+                                }}
+                                disabled={!animEnabled}
+                              />
+                            </div>
+                            <div className="flex items-center justify-end pb-0.5">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  const current = (selectedBase as any)?.animations || {};
+                                  const arr = [...(current.values || [])];
+                                  arr.splice(idx, 1);
+                                  updateLayer(selectedBase!.id, { animations: { ...current, values: arr } } as any);
+                                }}
+                                disabled={!animEnabled}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
+                  {(((selectedBase as any)?.animations?.values || []) as any[]).length === 0 && (
+                    <div className="text-xs text-muted-foreground">No key values yet. Click "+ Add key value" to add the first keyframe.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
+      </div>
     </Card>
   );
 }
