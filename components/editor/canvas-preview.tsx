@@ -577,7 +577,7 @@ export function CanvasPreview() {
       height: l.size.h,
       transform: `perspective(800px) rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${l.rotation ?? 0}deg)`,
       transformOrigin: "50% 50%",
-      backfaceVisibility: "hidden",
+      backfaceVisibility: "visible",
       transformStyle: "preserve-3d",
       display: l.visible === false ? "none" : undefined,
       cursor: "move",
