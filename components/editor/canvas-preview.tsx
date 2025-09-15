@@ -207,8 +207,12 @@ export function CanvasPreview() {
         (target as any).size = { ...(target as any).size, w: v };
       } else if (kp === 'bounds.size.height' && typeof v === 'number') {
         (target as any).size = { ...(target as any).size, h: v };
-      } else if (kp === 'transform.rotation.z' && typeof v === 'number') {
+      } else if ((kp === 'transform.rotation' || kp === 'transform.rotation.z') && typeof v === 'number') {
         (target as any).rotation = v;
+      } else if (kp === 'transform.rotation.x' && typeof v === 'number') {
+        (target as any).rotationX = v as number;
+      } else if (kp === 'transform.rotation.y' && typeof v === 'number') {
+        (target as any).rotationY = v as number;
       } else if ((kp === 'opacity' || kp === 'cornerRadius' || kp === 'borderWidth' || kp === 'fontSize') && typeof v === 'number') {
         (target as any)[kp] = v as any;
       } else if ((kp === 'backgroundColor' || kp === 'borderColor' || kp === 'color') && typeof v === 'string') {
@@ -256,6 +260,8 @@ export function CanvasPreview() {
     else if (keyPath === 'bounds.size.width') (l as any).size = { ...(l as any).size, w: v };
     else if (keyPath === 'bounds.size.height') (l as any).size = { ...(l as any).size, h: v };
     else if (keyPath === 'transform.rotation.z') (l as any).rotation = v as any;
+    else if (keyPath === 'transform.rotation.x') (l as any).rotationX = v as any;
+    else if (keyPath === 'transform.rotation.y') (l as any).rotationY = v as any;
     else if (keyPath === 'opacity') (l as any).opacity = v as any;
   };
 
@@ -322,6 +328,21 @@ export function CanvasPreview() {
       const b = Number(values[seg + 1] ?? a);
       const ny = lerp(a, b, f);
       (l as any).position = { ...(l as any).position, y: ny };
+    } else if (keyPath === 'transform.rotation.z') {
+      const a = Number(values[seg] ?? (l as any).rotation ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const nz = lerp(a, b, f);
+      (l as any).rotation = nz;
+    } else if (keyPath === 'transform.rotation.x') {
+      const a = Number(values[seg] ?? (l as any).rotationX ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const nx = lerp(a, b, f);
+      (l as any).rotationX = nx;
+    } else if (keyPath === 'transform.rotation.y') {
+      const a = Number(values[seg] ?? (l as any).rotationY ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const ny = lerp(a, b, f);
+      (l as any).rotationY = ny;
     }
   };
 
@@ -554,10 +575,13 @@ export function CanvasPreview() {
       top: l.position.y,
       width: l.size.w,
       height: l.size.h,
-      transform: `rotate(${l.rotation ?? 0}deg)`,
+      transform: `perspective(800px) rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${l.rotation ?? 0}deg)`,
+      transformOrigin: "50% 50%",
+      backfaceVisibility: "hidden",
+      transformStyle: "preserve-3d",
       display: l.visible === false ? "none" : undefined,
       cursor: "move",
-    };
+  };
 
     if (l.type === "text") {
       return (
@@ -776,7 +800,10 @@ export function CanvasPreview() {
       top: l.position.y,
       width: l.size.w,
       height: l.size.h,
-      transform: `rotate(${l.rotation ?? 0}deg)`,
+      transform: `perspective(800px) rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${l.rotation ?? 0}deg)`,
+      transformOrigin: "50% 50%",
+      backfaceVisibility: "hidden",
+      transformStyle: "preserve-3d",
       outline: "1px solid rgba(59,130,246,0.9)",
       boxShadow: "0 0 0 2px rgba(59,130,246,0.2) inset",
       pointerEvents: "none",
