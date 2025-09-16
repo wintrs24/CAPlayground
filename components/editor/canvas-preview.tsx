@@ -19,7 +19,7 @@ export function CanvasPreview() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [snapState, setSnapState] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
-  const SNAP_THRESHOLD = 12;
+  const [SNAP_THRESHOLD] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [snapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const panDragRef = useRef<{

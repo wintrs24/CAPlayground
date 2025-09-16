@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, JSX } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import JSZip from "jszip";
+import { Slider } from "../ui/slider";
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
 
@@ -52,6 +53,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [exportingTendies, setExportingTendies] = useState(false);
   const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
+  const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -414,8 +416,10 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 <Gear className="h-4 w-4" /> Settings
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 p-2">
+            <DropdownMenuContent align="end" className="w-100 p-2">
               <DropdownMenuLabel>Settings</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Snapping</DropdownMenuLabel>
               <div className="px-2 py-1.5 space-y-1">
                 <div className="flex items-center justify-between gap-3 py-2">
                   <Label htmlFor="snap-edges" className="text-sm">Snap to canvas edges</Label>
@@ -424,6 +428,11 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 <div className="flex items-center justify-between gap-3 py-2">
                   <Label htmlFor="snap-layers" className="text-sm">Snap to other layers</Label>
                   <Switch id="snap-layers" checked={!!snapLayersEnabled} onCheckedChange={(c) => setSnapLayersEnabled(!!c)} />
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <Label htmlFor="snap-threshold" className="text-sm">Sensitivity</Label>
+                  <Slider id="snap-threshold" value={[SNAP_THRESHOLD]} min={3} max={25} onValueChange={([c]) => setSnapThreshold(c)} />
+                  <Button onClick={()=>{setSnapThreshold(12)}}>Reset</Button>
                 </div>
               </div>
               <DropdownMenuSeparator />
