@@ -4,7 +4,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Menu, X, Sun, Moon, ArrowRight, User, LogOut, LayoutDashboard } from "lucide-react"
+import { Menu, X, Sun, Moon, ArrowRight, User, LogOut, LayoutDashboard, Settings as Gear } from "lucide-react"
 import { useTheme } from "next-themes"
 import { getSupabaseBrowserClient } from "@/lib/supabase"
 import {
@@ -12,7 +12,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { useLocalStorage } from "@/hooks/use-local-storage"
 
 export function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -20,6 +25,8 @@ export function Navigation() {
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [showPolicyBanner, setShowPolicyBanner] = useState(false)
+  const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true)
+  const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true)
 
   useEffect(() => {
     const handleResize = () => {
@@ -186,6 +193,37 @@ export function Navigation() {
                 Projects <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             </Link>
+            {/* Settings menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Gear className="h-4 w-4" /> Settings
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 p-2">
+                <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                <div className="px-2 py-1.5">
+                  <div className="flex items-center justify-between gap-3 py-2">
+                    <Label htmlFor="snap-edges" className="text-sm">Snap to canvas edges</Label>
+                    <Switch id="snap-edges" checked={!!snapEdgesEnabled} onCheckedChange={(c) => setSnapEdgesEnabled(!!c)} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 py-2">
+                    <Label htmlFor="snap-layers" className="text-sm">Snap to other layers</Label>
+                    <Switch id="snap-layers" checked={!!snapLayersEnabled} onCheckedChange={(c) => setSnapLayersEnabled(!!c)} />
+                  </div>
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Keyboard Shortcuts</DropdownMenuLabel>
+                <div className="px-2 py-1.5 text-xs text-muted-foreground space-y-1">
+                  <div className="flex items-center justify-between"><span>Copy</span><span className="font-mono">Cmd/Ctrl + C</span></div>
+                  <div className="flex items-center justify-between"><span>Paste</span><span className="font-mono">Cmd/Ctrl + V</span></div>
+                  <div className="flex items-center justify-between"><span>Zoom In</span><span className="font-mono">Cmd/Ctrl + +</span></div>
+                  <div className="flex items-center justify-between"><span>Zoom Out</span><span className="font-mono">Cmd/Ctrl + -</span></div>
+                  <div className="flex items-center justify-between"><span>Reset Zoom</span><span className="font-mono">Cmd/Ctrl + 0</span></div>
+                  <div className="flex items-center justify-between"><span>Pan</span><span className="font-mono">Shift + Drag or Middle Button</span></div>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="ghost"
               size="icon"

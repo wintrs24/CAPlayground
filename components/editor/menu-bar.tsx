@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import { packCA } from "@/lib/ca/ca-file";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, JSX } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -48,6 +50,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportingTendies, setExportingTendies] = useState(false);
+  const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
+  const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -402,15 +406,41 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             )}
           </Button>
         </div>
+        {/* Settings dropdown */}
         <div className="border rounded-md p-0.5">
-          <Button
-            variant="ghost"
-            className="h-8 px-2"
-            onClick={() => setShortcutsOpen(true)}
-          >
-            <Keyboard className="h-4 w-4 mr-2" />
-            Shortcuts
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 px-2 gap-2">
+                <Gear className="h-4 w-4" /> Settings
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80 p-2">
+              <DropdownMenuLabel>Settings</DropdownMenuLabel>
+              <div className="px-2 py-1.5 space-y-1">
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <Label htmlFor="snap-edges" className="text-sm">Snap to canvas edges</Label>
+                  <Switch id="snap-edges" checked={!!snapEdgesEnabled} onCheckedChange={(c) => setSnapEdgesEnabled(!!c)} />
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <Label htmlFor="snap-layers" className="text-sm">Snap to other layers</Label>
+                  <Switch id="snap-layers" checked={!!snapLayersEnabled} onCheckedChange={(c) => setSnapLayersEnabled(!!c)} />
+                </div>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Keyboard Shortcuts</DropdownMenuLabel>
+              <div className="px-2 py-1.5 text-xs text-muted-foreground space-y-1">
+                <div className="flex items-center justify-between"><span>Undo</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Z</span></div>
+                <div className="flex items-center justify-between"><span>Redo</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Z</span></div>
+                <div className="flex items-center justify-between"><span>Zoom In</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + +</span></div>
+                <div className="flex items-center justify-between"><span>Zoom Out</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + -</span></div>
+                <div className="flex items-center justify-between"><span>Reset Zoom</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + 0</span></div>
+                <div className="flex items-center justify-between"><span>Export</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + E</span></div>
+                <div className="flex items-center justify-between"><span>Pan</span><span className="font-mono">Shift + Drag or Middle Click</span></div>
+                <div className="flex items-center justify-between"><span>Toggle Left Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + L</span></div>
+                <div className="flex items-center justify-between"><span>Toggle Right Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + I</span></div>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div>
           <Button variant="secondary" disabled={!doc} onClick={() => setExportOpen(true)}>Export</Button>

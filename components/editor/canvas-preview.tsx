@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Crosshair } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
 import { useEditor } from "./editor-context";
 import type { AnyLayer, GroupLayer, ShapeLayer } from "@/lib/ca/types";
@@ -17,8 +18,10 @@ export function CanvasPreview() {
   const [userScale, setUserScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [snapState, setSnapState] = useState<{ x: null | 'left' | 'center' | 'right'; y: null | 'top' | 'center' | 'bottom' }>({ x: null, y: null });
+  const [snapState, setSnapState] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const SNAP_THRESHOLD = 12;
+  const [snapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
+  const [snapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const panDragRef = useRef<{
     startClientX: number;
     startClientY: number;
@@ -567,31 +570,64 @@ export function CanvasPreview() {
       let y = d.startY + dy;
       const w = docRef.current?.meta.width ?? 0;
       const h = docRef.current?.meta.height ?? 0;
-      if (w > 0 && h > 0) {
+      if (w > 0 && h > 0 && (snapEdgesEnabled || snapLayersEnabled)) {
         const th = SNAP_THRESHOLD;
-        const snapXTargets = [0, (w - d.w) / 2, w - d.w];
-        const snapYTargets = [0, (h - d.h) / 2, h - d.h];
-        const nearest = (val: number, targets: number[]) => {
-          let best = val;
-          let bestDist = th + 1;
-          for (const t of targets) {
-            const dist = Math.abs(val - t);
-            if (dist <= th && dist < bestDist) { best = t; bestDist = dist; }
+        const xPairs: Array<[number, number]> = [];
+        const yPairs: Array<[number, number]> = [];
+        if (snapEdgesEnabled) {
+          xPairs.push([0, 0], [(w - d.w) / 2, w / 2], [w - d.w, w]);
+          yPairs.push([0, 0], [(h - d.h) / 2, h / 2], [h - d.h, h]);
+        }
+        if (snapLayersEnabled) {
+          const others = (renderedLayers || []).filter((ol) => ol.id !== d.id);
+          for (const ol of others) {
+            const L = ol as any;
+            const lx = L.position?.x ?? 0;
+            const ly = L.position?.y ?? 0;
+            const lw = L.size?.w ?? 0;
+            const lh = L.size?.h ?? 0;
+            const left = lx;
+            const right = lx + lw;
+            const cx = lx + lw / 2;
+            const top = ly;
+            const bottom = ly + lh;
+            const cy = ly + lh / 2;
+            xPairs.push(
+              [left, left],
+              [right, right],
+              [right - d.w, right],
+              [left - d.w, left],
+              [cx - d.w / 2, cx],
+            );
+            yPairs.push(
+              [top, top],
+              [bottom, bottom],
+              [bottom - d.h, bottom],
+              [top - d.h, top],
+              [cy - d.h / 2, cy],
+            );
           }
-          return best;
+        }
+        const nearestPair = (val: number, pairs: Array<[number, number]>) => {
+          let best = val;
+          let guide: number | null = null;
+          let bestDist = th + 1;
+          for (const [t, g] of pairs) {
+            const dist = Math.abs(val - t);
+            if (dist <= th && dist < bestDist) { best = t; bestDist = dist; guide = g; }
+          }
+          return { value: best, guide };
         };
-        const nx = nearest(x, snapXTargets);
-        const ny = nearest(y, snapYTargets);
-        const xIdx = snapXTargets.findIndex(t => Math.abs(nx - t) <= th);
-        const yIdx = snapYTargets.findIndex(t => Math.abs(ny - t) <= th);
-        x = nx; y = ny;
-        setSnapState({
-          x: xIdx === 0 ? 'left' : xIdx === 1 ? 'center' : xIdx === 2 ? 'right' : null,
-          y: yIdx === 0 ? 'top' : yIdx === 1 ? 'center' : yIdx === 2 ? 'bottom' : null,
-        });
+        const nx = nearestPair(x, xPairs);
+        const ny = nearestPair(y, yPairs);
+        x = nx.value; y = ny.value;
+        setSnapState({ x: nx.guide, y: ny.guide });
+      } else {
+        setSnapState({ x: null, y: null });
       }
       updateLayerTransient(d.id, { position: { x, y } as any });
     };
+
     const onUp = (ev: MouseEvent) => {
       const d = draggingRef.current;
       if (d) {
@@ -601,20 +637,43 @@ export function CanvasPreview() {
         let y = d.startY + dy;
         const w = docRef.current?.meta.width ?? 0;
         const h = docRef.current?.meta.height ?? 0;
-        if (w > 0 && h > 0) {
-          const snapXTargets = [0, (w - d.w) / 2, w - d.w];
-          const snapYTargets = [0, (h - d.h) / 2, h - d.h];
-          const nearest = (val: number, targets: number[]) => {
+        if (w > 0 && h > 0 && (snapEdgesEnabled || snapLayersEnabled)) {
+          const th = SNAP_THRESHOLD;
+          const xPairs: Array<[number, number]> = [];
+          const yPairs: Array<[number, number]> = [];
+          if (snapEdgesEnabled) {
+            xPairs.push([0, 0], [(w - d.w) / 2, w / 2], [w - d.w, w]);
+            yPairs.push([0, 0], [(h - d.h) / 2, h / 2], [h - d.h, h]);
+          }
+          if (snapLayersEnabled) {
+            const others = (renderedLayers || []).filter((ol) => ol.id !== d.id);
+            for (const ol of others) {
+              const L = ol as any;
+              const lx = L.position?.x ?? 0;
+              const ly = L.position?.y ?? 0;
+              const lw = L.size?.w ?? 0;
+              const lh = L.size?.h ?? 0;
+              const left = lx;
+              const right = lx + lw;
+              const cx = lx + lw / 2;
+              const top = ly;
+              const bottom = ly + lh;
+              const cy = ly + lh / 2;
+              xPairs.push([left, left],[right, right],[right - d.w, right],[left - d.w, left],[cx - d.w / 2, cx]);
+              yPairs.push([top, top],[bottom, bottom],[bottom - d.h, bottom],[top - d.h, top],[cy - d.h / 2, cy]);
+            }
+          }
+          const nearest = (val: number, pairs: Array<[number, number]>) => {
             let best = val;
-            let bestDist = SNAP_THRESHOLD + 1;
-            for (const t of targets) {
+            let bestDist = th + 1;
+            for (const [t] of pairs) {
               const dist = Math.abs(val - t);
-              if (dist <= SNAP_THRESHOLD && dist < bestDist) { best = t; bestDist = dist; }
+              if (dist <= th && dist < bestDist) { best = t; bestDist = dist; }
             }
             return best;
           };
-          x = nearest(x, snapXTargets);
-          y = nearest(y, snapYTargets);
+          x = nearest(x, xPairs);
+          y = nearest(y, yPairs);
         }
         updateLayer(d.id, { position: { x, y } as any });
       }
@@ -1019,26 +1078,18 @@ export function CanvasPreview() {
         {(() => {
           const w = doc?.meta.width ?? 0;
           const h = doc?.meta.height ?? 0;
+          if (!w || !h) return null;
           const sx = snapState.x;
           const sy = snapState.y;
-          if (!w || !h) return null;
-          if (!sx && !sy) return null;
-          const lineColor = 'rgba(59,130,246,0.9)'; // blue, looks about right
+          if (sx == null && sy == null) return null;
+          const lineColor = 'rgba(59,130,246,0.9)';
           const lineShadow = '0 0 0 1px rgba(59,130,246,0.25)';
           const guides: React.ReactNode[] = [];
-          if (sx === 'left') {
-            guides.push(<div key="v-left" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, zIndex: 1000, pointerEvents: 'none' }} />);
-          } else if (sx === 'center') {
-            guides.push(<div key="v-center" style={{ position: 'absolute', left: w / 2, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateX(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
-          } else if (sx === 'right') {
-            guides.push(<div key="v-right" style={{ position: 'absolute', left: w, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateX(-2px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          if (typeof sx === 'number') {
+            guides.push(<div key="v" style={{ position: 'absolute', left: sx, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateX(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
           }
-          if (sy === 'top') {
-            guides.push(<div key="h-top" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, zIndex: 1000, pointerEvents: 'none' }} />);
-          } else if (sy === 'center') {
-            guides.push(<div key="h-center" style={{ position: 'absolute', top: h / 2, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateY(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
-          } else if (sy === 'bottom') {
-            guides.push(<div key="h-bottom" style={{ position: 'absolute', top: h, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateY(-2px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          if (typeof sy === 'number') {
+            guides.push(<div key="h" style={{ position: 'absolute', top: sy, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateY(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
           }
           return <>{guides}</>;
         })()}
