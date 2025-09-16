@@ -17,13 +17,23 @@ export function CanvasPreview() {
   const [userScale, setUserScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [snapState, setSnapState] = useState<{ x: null | 'left' | 'center' | 'right'; y: null | 'top' | 'center' | 'bottom' }>({ x: null, y: null });
+  const SNAP_THRESHOLD = 12;
   const panDragRef = useRef<{
     startClientX: number;
     startClientY: number;
     startPanX: number;
     startPanY: number;
   } | null>(null);
-  const draggingRef = useRef<{ id: string; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
+  const draggingRef = useRef<{
+    id: string;
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+    w: number;
+    h: number;
+  } | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -543,6 +553,8 @@ export function CanvasPreview() {
       startClientY: e.clientY,
       startX: l.position.x,
       startY: l.position.y,
+      w: l.size.w,
+      h: l.size.h,
     };
     document.body.style.userSelect = "none";
 
@@ -551,17 +563,64 @@ export function CanvasPreview() {
       if (!d) return;
       const dx = (ev.clientX - d.startClientX) / scale;
       const dy = (ev.clientY - d.startClientY) / scale;
-      updateLayerTransient(d.id, { position: { x: d.startX + dx, y: d.startY + dy } as any });
+      let x = d.startX + dx;
+      let y = d.startY + dy;
+      const w = docRef.current?.meta.width ?? 0;
+      const h = docRef.current?.meta.height ?? 0;
+      if (w > 0 && h > 0) {
+        const th = SNAP_THRESHOLD;
+        const snapXTargets = [0, (w - d.w) / 2, w - d.w];
+        const snapYTargets = [0, (h - d.h) / 2, h - d.h];
+        const nearest = (val: number, targets: number[]) => {
+          let best = val;
+          let bestDist = th + 1;
+          for (const t of targets) {
+            const dist = Math.abs(val - t);
+            if (dist <= th && dist < bestDist) { best = t; bestDist = dist; }
+          }
+          return best;
+        };
+        const nx = nearest(x, snapXTargets);
+        const ny = nearest(y, snapYTargets);
+        const xIdx = snapXTargets.findIndex(t => Math.abs(nx - t) <= th);
+        const yIdx = snapYTargets.findIndex(t => Math.abs(ny - t) <= th);
+        x = nx; y = ny;
+        setSnapState({
+          x: xIdx === 0 ? 'left' : xIdx === 1 ? 'center' : xIdx === 2 ? 'right' : null,
+          y: yIdx === 0 ? 'top' : yIdx === 1 ? 'center' : yIdx === 2 ? 'bottom' : null,
+        });
+      }
+      updateLayerTransient(d.id, { position: { x, y } as any });
     };
     const onUp = (ev: MouseEvent) => {
       const d = draggingRef.current;
       if (d) {
         const dx = (ev.clientX - d.startClientX) / scale;
         const dy = (ev.clientY - d.startClientY) / scale;
-        updateLayer(d.id, { position: { x: d.startX + dx, y: d.startY + dy } as any });
+        let x = d.startX + dx;
+        let y = d.startY + dy;
+        const w = docRef.current?.meta.width ?? 0;
+        const h = docRef.current?.meta.height ?? 0;
+        if (w > 0 && h > 0) {
+          const snapXTargets = [0, (w - d.w) / 2, w - d.w];
+          const snapYTargets = [0, (h - d.h) / 2, h - d.h];
+          const nearest = (val: number, targets: number[]) => {
+            let best = val;
+            let bestDist = SNAP_THRESHOLD + 1;
+            for (const t of targets) {
+              const dist = Math.abs(val - t);
+              if (dist <= SNAP_THRESHOLD && dist < bestDist) { best = t; bestDist = dist; }
+            }
+            return best;
+          };
+          x = nearest(x, snapXTargets);
+          y = nearest(y, snapYTargets);
+        }
+        updateLayer(d.id, { position: { x, y } as any });
       }
       draggingRef.current = null;
       document.body.style.userSelect = "";
+      setSnapState({ x: null, y: null });
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -956,6 +1015,32 @@ export function CanvasPreview() {
         {(() => {
           const sel = findById(renderedLayers, doc?.selectedId ?? null);
           return sel ? renderSelectionOverlay(sel) : null;
+        })()}
+        {(() => {
+          const w = doc?.meta.width ?? 0;
+          const h = doc?.meta.height ?? 0;
+          const sx = snapState.x;
+          const sy = snapState.y;
+          if (!w || !h) return null;
+          if (!sx && !sy) return null;
+          const lineColor = 'rgba(59,130,246,0.9)'; // blue, looks about right
+          const lineShadow = '0 0 0 1px rgba(59,130,246,0.25)';
+          const guides: React.ReactNode[] = [];
+          if (sx === 'left') {
+            guides.push(<div key="v-left" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, zIndex: 1000, pointerEvents: 'none' }} />);
+          } else if (sx === 'center') {
+            guides.push(<div key="v-center" style={{ position: 'absolute', left: w / 2, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateX(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          } else if (sx === 'right') {
+            guides.push(<div key="v-right" style={{ position: 'absolute', left: w, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateX(-2px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          }
+          if (sy === 'top') {
+            guides.push(<div key="h-top" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, zIndex: 1000, pointerEvents: 'none' }} />);
+          } else if (sy === 'center') {
+            guides.push(<div key="h-center" style={{ position: 'absolute', top: h / 2, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateY(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          } else if (sy === 'bottom') {
+            guides.push(<div key="h-bottom" style={{ position: 'absolute', top: h, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateY(-2px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          }
+          return <>{guides}</>;
         })()}
       </div>
 
