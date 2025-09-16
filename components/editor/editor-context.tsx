@@ -43,6 +43,10 @@ export type EditorContextValue = {
   setActiveState: (state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => void;
   updateStateOverride: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
   updateStateOverrideTransient: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
+  isAnimationPlaying: boolean;
+  setIsAnimationPlaying: React.Dispatch<React.SetStateAction<boolean>>;
+  animatedLayers: AnyLayer[];
+  setAnimatedLayers: React.Dispatch<React.SetStateAction<AnyLayer[]>>;
 };
 
 const EditorContext = createContext<EditorContextValue | undefined>(undefined);
@@ -67,6 +71,9 @@ export function EditorProvider({
     data: AnyLayer[];
     assets?: Record<string, { filename: string; dataURL: string }>;
   } | null>(null);
+  
+  const [isAnimationPlaying, setIsAnimationPlaying] = useState(false);
+  const [animatedLayers, setAnimatedLayers] = useState<AnyLayer[]>([]);
 
   const pushHistory = useCallback((prev: ProjectDocument) => {
     pastRef.current.push(JSON.parse(JSON.stringify(prev)) as ProjectDocument);
@@ -591,7 +598,11 @@ export function EditorProvider({
     setActiveState,
     updateStateOverride,
     updateStateOverrideTransient,
-  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState, setActiveState, updateStateOverride, updateStateOverrideTransient]);
+    isAnimationPlaying,
+    setIsAnimationPlaying,
+    animatedLayers,
+    setAnimatedLayers,
+  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState, setActiveState, updateStateOverride, updateStateOverrideTransient, isAnimationPlaying, animatedLayers]);
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }

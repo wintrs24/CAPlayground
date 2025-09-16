@@ -14,7 +14,7 @@ import type { AnyLayer } from "@/lib/ca/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export function Inspector() {
-  const { doc, updateLayer, replaceImageForLayer } = useEditor();
+  const { doc, updateLayer, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const fmt2 = (n: number | undefined) => (typeof n === 'number' && Number.isFinite(n) ? round2(n).toFixed(2) : "");
@@ -31,6 +31,11 @@ export function Inspector() {
     return undefined;
   };
   const selectedBase = doc ? findById(doc.layers, doc.selectedId) : undefined;
+  
+  const selectedAnimated = useMemo(() => {
+    if (!isAnimationPlaying || !animatedLayers.length || !doc?.selectedId) return null;
+    return findById(animatedLayers, doc.selectedId);
+  }, [isAnimationPlaying, animatedLayers, doc?.selectedId]);
 
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const selKey = selectedBase ? selectedBase.id : "__none__";
@@ -55,6 +60,9 @@ export function Inspector() {
   };
   const selected = (() => {
     if (!doc || !selectedBase) return selectedBase;
+
+    if (selectedAnimated) return selectedAnimated;
+    
     const state = doc.activeState;
     if (!state || state === 'Base State') return selectedBase;
     const eff: AnyLayer = JSON.parse(JSON.stringify(selectedBase));
@@ -74,6 +82,27 @@ export function Inspector() {
   })();
 
   const animEnabled: boolean = !!(selectedBase as any)?.animations?.enabled;
+  
+  const {
+    disablePosX,
+    disablePosY,
+    disableRotX,
+    disableRotY,
+    disableRotZ,
+  } = useMemo(() => {
+    const a: any = (selectedBase as any)?.animations || {};
+    const enabled = !!a.enabled;
+    const kp: string = a.keyPath || '';
+    const hasValues = Array.isArray(a.values) && a.values.length > 0;
+    const on = (cond: boolean) => enabled && hasValues && cond;
+    return {
+      disablePosX: on(kp === 'position' || kp === 'position.x'),
+      disablePosY: on(kp === 'position' || kp === 'position.y'),
+      disableRotX: on(kp === 'transform.rotation.x'),
+      disableRotY: on(kp === 'transform.rotation.y'),
+      disableRotZ: on(kp === 'transform.rotation.z'),
+    };
+  }, [selectedBase]);
 
   if (!selected) {
     return (
@@ -100,10 +129,18 @@ export function Inspector() {
         <AccordionItem value="geom">
           <AccordionTrigger className="py-2 text-xs">Geometry</AccordionTrigger>
           <AccordionContent className="pb-2">
+            {(disablePosX || disablePosY || disableRotX || disableRotY || disableRotZ) && (
+              <Alert className="mb-3">
+                <AlertDescription className="text-xs">
+                  Position and rotation fields are disabled because this layer has keyframe animations enabled. The values shown update live during playback.
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="grid grid-cols-2 gap-1.5">
         <div className="space-y-1">
           <Label htmlFor="pos-x">X</Label>
           <Input id="pos-x" type="number" step="0.01" value={getBuf('pos-x', fmt2(selected.position.x))}
+            disabled={disablePosX}
             onChange={(e) => {
               setBuf('pos-x', e.target.value);
             }}
@@ -117,6 +154,7 @@ export function Inspector() {
         <div className="space-y-1">
           <Label htmlFor="pos-y">Y</Label>
           <Input id="pos-y" type="number" step="0.01" value={getBuf('pos-y', fmt2(selected.position.y))}
+            disabled={disablePosY}
             onChange={(e) => {
               setBuf('pos-y', e.target.value);
             }}
@@ -159,6 +197,7 @@ export function Inspector() {
                 type="number"
                 step="1"
                 value={getBuf('rotationX', fmt0((selected as any).rotationX))}
+                disabled={disableRotX}
                 onChange={(e) => setBuf('rotationX', e.target.value)}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
@@ -175,6 +214,7 @@ export function Inspector() {
                 type="number"
                 step="1"
                 value={getBuf('rotationY', fmt0((selected as any).rotationY))}
+                disabled={disableRotY}
                 onChange={(e) => setBuf('rotationY', e.target.value)}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
@@ -191,6 +231,7 @@ export function Inspector() {
                 type="number"
                 step="1"
                 value={getBuf('rotation', fmt0(selected.rotation))}
+                disabled={disableRotZ}
                 onChange={(e) => setBuf('rotation', e.target.value)}
                 onBlur={(e) => {
                   const v = e.target.value.trim();

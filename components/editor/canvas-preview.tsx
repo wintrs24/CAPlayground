@@ -10,7 +10,7 @@ import type { AnyLayer, GroupLayer, ShapeLayer } from "@/lib/ca/types";
 
 export function CanvasPreview() {
   const ref = useRef<HTMLDivElement | null>(null);
-  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile } = useEditor();
+  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile, isAnimationPlaying, setIsAnimationPlaying, animatedLayers, setAnimatedLayers } = useEditor();
   const docRef = useRef<typeof doc>(doc);
   useEffect(() => { docRef.current = doc; }, [doc]);
   const [size, setSize] = useState({ w: 600, h: 400 });
@@ -265,12 +265,11 @@ export function CanvasPreview() {
     else if (keyPath === 'opacity') (l as any).opacity = v as any;
   };
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const [timeSec, setTimeSec] = useState(0);
   const lastTsRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isPlaying) { lastTsRef.current = null; return; }
+    if (!isAnimationPlaying) { lastTsRef.current = null; return; }
     let raf: number | null = null;
     const step = (ts: number) => {
       const last = lastTsRef.current;
@@ -283,7 +282,7 @@ export function CanvasPreview() {
     };
     raf = requestAnimationFrame(step);
     return () => { if (raf) cancelAnimationFrame(raf); };
-  }, [isPlaying]);
+  }, [isAnimationPlaying]);
 
   const evalLayerAnimation = (l: AnyLayer, t: number) => {
     const anim: any = (l as any).animations;
@@ -358,7 +357,8 @@ export function CanvasPreview() {
     };
     walk(frame);
     setRenderedLayers(frame);
-  }, [timeSec, appliedLayers]);
+    setAnimatedLayers(frame);
+  }, [timeSec, appliedLayers, setAnimatedLayers]);
 
   const hasAnyEnabledAnimation = useMemo(() => {
     const check = (arr: AnyLayer[]): boolean => {
@@ -375,8 +375,8 @@ export function CanvasPreview() {
   }, [doc?.layers]);
 
   useEffect(() => {
-    if (!hasAnyEnabledAnimation && isPlaying) setIsPlaying(false);
-  }, [hasAnyEnabledAnimation, isPlaying]);
+    if (!hasAnyEnabledAnimation && isAnimationPlaying) setIsAnimationPlaying(false);
+  }, [hasAnyEnabledAnimation, isAnimationPlaying]);
 
   useEffect(() => {
     const prevState = prevStateRef.current;
@@ -1024,9 +1024,9 @@ export function CanvasPreview() {
             type="button"
             size="sm"
             variant="secondary"
-            onClick={() => setIsPlaying((p) => !p)}
+            onClick={() => setIsAnimationPlaying((p: boolean) => !p)}
           >
-            {isPlaying ? 'Pause' : 'Play'}
+            {isAnimationPlaying ? 'Pause' : 'Play'}
           </Button>
           <Button
             type="button"
