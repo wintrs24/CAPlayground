@@ -14,7 +14,7 @@ import type { AnyLayer } from "@/lib/ca/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export function Inspector() {
-  const { doc, updateLayer, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
+  const { doc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const fmt2 = (n: number | undefined) => (typeof n === 'number' && Number.isFinite(n) ? round2(n).toFixed(2) : "");
@@ -143,7 +143,14 @@ export function Inspector() {
             disabled={disablePosX}
             onChange={(e) => {
               setBuf('pos-x', e.target.value);
+              const v = e.target.value.trim();
+              if (v === "") return;
+              const num = round2(Number(v));
+              if (Number.isFinite(num)) {
+                updateLayerTransient(selected.id, { position: { ...selected.position, x: num } as any });
+              }
             }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
             onBlur={(e) => {
               const v = e.target.value.trim();
               const num = v === "" ? 0 : round2(Number(v));
@@ -157,7 +164,14 @@ export function Inspector() {
             disabled={disablePosY}
             onChange={(e) => {
               setBuf('pos-y', e.target.value);
+              const v = e.target.value.trim();
+              if (v === "") return;
+              const num = round2(Number(v));
+              if (Number.isFinite(num)) {
+                updateLayerTransient(selected.id, { position: { ...selected.position, y: num } as any });
+              }
             }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
             onBlur={(e) => {
               const v = e.target.value.trim();
               const num = v === "" ? 0 : round2(Number(v));
@@ -168,7 +182,16 @@ export function Inspector() {
         <div className="space-y-1">
           <Label htmlFor="w">Width</Label>
           <Input id="w" type="number" step="0.01" value={getBuf('w', fmt2(selected.size.w))}
-            onChange={(e) => setBuf('w', e.target.value)}
+            onChange={(e) => {
+              setBuf('w', e.target.value);
+              const v = e.target.value.trim();
+              if (v === "") return;
+              const num = round2(Number(v));
+              if (Number.isFinite(num)) {
+                updateLayerTransient(selected.id, { size: { ...selected.size, w: num } as any });
+              }
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
             onBlur={(e) => {
               const v = e.target.value.trim();
               const num = v === "" ? 50 : round2(Number(v));
@@ -179,7 +202,16 @@ export function Inspector() {
         <div className="space-y-1">
           <Label htmlFor="h">Height</Label>
           <Input id="h" type="number" step="0.01" value={getBuf('h', fmt2(selected.size.h))}
-            onChange={(e) => setBuf('h', e.target.value)}
+            onChange={(e) => {
+              setBuf('h', e.target.value);
+              const v = e.target.value.trim();
+              if (v === "") return;
+              const num = round2(Number(v));
+              if (Number.isFinite(num)) {
+                updateLayerTransient(selected.id, { size: { ...selected.size, h: num } as any });
+              }
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
             onBlur={(e) => {
               const v = e.target.value.trim();
               const num = v === "" ? 50 : round2(Number(v));
@@ -198,7 +230,14 @@ export function Inspector() {
                 step="1"
                 value={getBuf('rotationX', fmt0((selected as any).rotationX))}
                 disabled={disableRotX}
-                onChange={(e) => setBuf('rotationX', e.target.value)}
+                onChange={(e) => {
+                  setBuf('rotationX', e.target.value);
+                  const v = e.target.value.trim();
+                  if (v === "") return;
+                  const num = Math.round(Number(v));
+                  if (Number.isFinite(num)) updateLayerTransient(selected.id, { rotationX: num as any } as any);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
                   const num = v === "" ? 0 : Math.round(Number(v));
@@ -215,7 +254,14 @@ export function Inspector() {
                 step="1"
                 value={getBuf('rotationY', fmt0((selected as any).rotationY))}
                 disabled={disableRotY}
-                onChange={(e) => setBuf('rotationY', e.target.value)}
+                onChange={(e) => {
+                  setBuf('rotationY', e.target.value);
+                  const v = e.target.value.trim();
+                  if (v === "") return;
+                  const num = Math.round(Number(v));
+                  if (Number.isFinite(num)) updateLayerTransient(selected.id, { rotationY: num as any } as any);
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
                   const num = v === "" ? 0 : Math.round(Number(v));
@@ -232,7 +278,14 @@ export function Inspector() {
                 step="1"
                 value={getBuf('rotation', fmt0(selected.rotation))}
                 disabled={disableRotZ}
-                onChange={(e) => setBuf('rotation', e.target.value)}
+                onChange={(e) => {
+                  setBuf('rotation', e.target.value);
+                  const v = e.target.value.trim();
+                  if (v === "") return;
+                  const num = Math.round(Number(v));
+                  if (Number.isFinite(num)) updateLayerTransient(selected.id, { rotation: num as any });
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
                   const num = v === "" ? 0 : Math.round(Number(v));
@@ -284,7 +337,14 @@ export function Inspector() {
               type="number"
               step="1"
               value={getBuf('cornerRadius', fmt0((selected as any).cornerRadius ?? (selected as any).radius))}
-              onChange={(e) => setBuf('cornerRadius', e.target.value)}
+              onChange={(e) => {
+                setBuf('cornerRadius', e.target.value);
+                const v = e.target.value.trim();
+                if (v === "") return;
+                const num = Math.round(Number(v));
+                if (Number.isFinite(num)) updateLayerTransient(selected.id, { cornerRadius: num as any } as any);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
               onBlur={(e) => {
                 const v = e.target.value.trim();
                 const num = v === "" ? 0 : Math.round(Number(v));
