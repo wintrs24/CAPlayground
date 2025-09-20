@@ -30,12 +30,14 @@ export function Inspector() {
     }
     return undefined;
   };
-  const selectedBase = doc ? findById(doc.layers, doc.selectedId) : undefined;
+  const key = doc?.activeCA ?? 'floating';
+  const current = doc?.docs?.[key];
+  const selectedBase = current ? findById(current.layers, current.selectedId) : undefined;
   
   const selectedAnimated = useMemo(() => {
-    if (!isAnimationPlaying || !animatedLayers.length || !doc?.selectedId) return null;
-    return findById(animatedLayers, doc.selectedId);
-  }, [isAnimationPlaying, animatedLayers, doc?.selectedId]);
+    if (!isAnimationPlaying || !animatedLayers.length || !current?.selectedId) return null;
+    return findById(animatedLayers, current.selectedId);
+  }, [isAnimationPlaying, animatedLayers, current?.selectedId]);
 
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const selKey = selectedBase ? selectedBase.id : "__none__";
@@ -59,14 +61,14 @@ export function Inspector() {
     });
   };
   const selected = (() => {
-    if (!doc || !selectedBase) return selectedBase;
+    if (!current || !selectedBase) return selectedBase;
 
     if (selectedAnimated) return selectedAnimated;
     
-    const state = doc.activeState;
+    const state = current.activeState;
     if (!state || state === 'Base State') return selectedBase;
     const eff: AnyLayer = JSON.parse(JSON.stringify(selectedBase));
-    const ovs = (doc.stateOverrides || {})[state] || [];
+    const ovs = (current.stateOverrides || {})[state] || [];
     const me = ovs.filter(o => o.targetId === eff.id);
     for (const o of me) {
       const kp = (o.keyPath || '').toLowerCase();
@@ -117,7 +119,7 @@ export function Inspector() {
     <Card className="p-3 h-full flex flex-col overflow-hidden">
       <div className="font-medium mb-2 shrink-0">Inspector</div>
       <div className="min-h-0 overflow-y-auto pr-1">
-      {doc?.activeState && doc.activeState !== 'Base State' && (
+      {current?.activeState && current.activeState !== 'Base State' && (
         <Alert className="text-xs">
           <AlertDescription>
             Note: Rotation and Bound state transitions don't work when tested. If you know a fix or it just works for you, please report in the CAPlayground Discord server.

@@ -235,15 +235,20 @@ export function CanvasPreview() {
     return rootCopy;
   };
 
+  const currentKey = doc?.activeCA ?? 'floating';
+  const current = doc?.docs?.[currentKey];
+  const otherKey = currentKey === 'floating' ? 'background' : 'floating';
+  const other = doc?.docs?.[otherKey];
+
   const appliedLayers = useMemo(() => {
-    if (!doc) return [] as AnyLayer[];
-    return applyOverrides(doc.layers, doc.stateOverrides, doc.activeState);
-  }, [doc?.layers, doc?.stateOverrides, doc?.activeState]);
+    if (!current) return [] as AnyLayer[];
+    return applyOverrides(current.layers, current.stateOverrides, current.activeState);
+  }, [current?.layers, current?.stateOverrides, current?.activeState]);
 
   const [renderedLayers, setRenderedLayers] = useState<AnyLayer[]>(appliedLayers);
   useEffect(() => { setRenderedLayers(appliedLayers); }, []);
 
-  const prevStateRef = useRef<string | undefined>(doc?.activeState);
+  const prevStateRef = useRef<string | undefined>(current?.activeState);
   const animRef = useRef<number | null>(null);
 
   const indexById = (arr: AnyLayer[]) => {
@@ -384,8 +389,8 @@ export function CanvasPreview() {
       }
       return false;
     };
-    return check(doc?.layers || []);
-  }, [doc?.layers]);
+    return check(current?.layers || []);
+  }, [current?.layers]);
 
   useEffect(() => {
     if (!hasAnyEnabledAnimation && isAnimationPlaying) setIsAnimationPlaying(false);
@@ -393,14 +398,14 @@ export function CanvasPreview() {
 
   useEffect(() => {
     const prevState = prevStateRef.current;
-    const nextState = doc?.activeState;
+    const nextState = current?.activeState;
     if (!doc) return;
     if (prevState === nextState) {
       setRenderedLayers(appliedLayers);
       return;
     }
 
-    const provided = (doc.stateTransitions || []).filter(t =>
+    const provided = (current?.stateTransitions || []).filter(t =>
       (t.fromState === prevState || t.fromState === '*') &&
       (t.toState === nextState || t.toState === '*')
     );
@@ -411,7 +416,7 @@ export function CanvasPreview() {
         if (!gens.length) gens.push({ elements: [] });
         gens[0].elements.push({ targetId, keyPath, animation: { duration } });
       };
-      const ovs = doc.stateOverrides || {};
+      const ovs = current?.stateOverrides || {};
       const toList = ovs[nextState || ''] || [];
       const fromList = ovs[prevState || ''] || [];
       const keys = [
@@ -508,7 +513,7 @@ export function CanvasPreview() {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       animRef.current = null;
     };
-  }, [doc?.activeState, appliedLayers, doc?.stateTransitions]);
+  }, [current?.activeState, appliedLayers, current?.stateTransitions]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -976,6 +981,8 @@ export function CanvasPreview() {
     );
   };
 
+  // showBoth removed: no overlay rendering of the non-active CA
+
   return (
     <Card
       ref={ref}
@@ -1070,9 +1077,10 @@ export function CanvasPreview() {
           selectLayer(null);
         }}
       >
+        {/* overlay removed */}
         {renderedLayers.map((l) => renderLayer(l))}
         {(() => {
-          const sel = findById(renderedLayers, doc?.selectedId ?? null);
+          const sel = findById(renderedLayers, current?.selectedId ?? null);
           return sel ? renderSelectionOverlay(sel) : null;
         })()}
         {(() => {

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import { packCA } from "@/lib/ca/ca-file";
@@ -26,6 +26,7 @@ import { useEffect, useState, JSX } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import JSZip from "jszip";
 import { Slider } from "../ui/slider";
+ 
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
 
@@ -39,7 +40,7 @@ type MenuBarProps = {
 
 export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLeft, toggleRight }: MenuBarProps) {
   const router = useRouter();
-  const { doc, undo, redo, setDoc } = useEditor();
+  const { doc, undo, redo, setDoc, activeCA, setActiveCA } = useEditor();
   const [projects, setProjects] = useLocalStorage<ProjectMeta[]>("caplayground-projects", []);
   const { toast } = useToast();
 
@@ -94,13 +95,15 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     try {
       if (!doc) return;
       const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
+      const curKey = doc.activeCA;
+      const cur = doc.docs[curKey];
       const rewriteLayer = (layer: AnyLayer): AnyLayer => {
         if (layer.type === 'group') {
           const g = layer as GroupLayer;
           return { ...g, children: (g.children || []).map(rewriteLayer) } as AnyLayer;
         }
         if (layer.type === 'image') {
-          const asset = (doc.assets || {})[(layer as any).id];
+          const asset = (cur.assets || {})[(layer as any).id];
           if (asset) {
             return { ...layer, src: `assets/${asset.filename}` } as AnyLayer;
           }
@@ -115,7 +118,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
         size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
         backgroundColor: doc.meta.background,
-        children: ((doc.layers as AnyLayer[]) || []).map(rewriteLayer),
+        children: ((cur.layers as AnyLayer[]) || []).map(rewriteLayer),
       };
 
       const assets: Record<string, { path: string; data: Blob | ArrayBuffer | string }> = {};
@@ -134,8 +137,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         }
       };
 
-      if (doc.assets) {
-        for (const [layerId, info] of Object.entries(doc.assets)) {
+      if (cur.assets) {
+        for (const [layerId, info] of Object.entries(cur.assets)) {
           try {
             const blob = info.dataURL.startsWith('data:') ? dataURLToBlob(info.dataURL) : new Blob();
             assets[info.filename] = { path: `assets/${info.filename}`, data: blob };
@@ -153,9 +156,9 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         },
         root,
         assets,
-        states: (doc as any).states,
-        stateOverrides: (doc as any).stateOverrides,
-        stateTransitions: (doc as any).stateTransitions,
+        states: (cur as any).states,
+        stateOverrides: (cur as any).stateOverrides,
+        stateTransitions: (cur as any).stateTransitions,
       });
 
       const url = URL.createObjectURL(blob);
@@ -177,31 +180,6 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       if (!doc) return;
       
       const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
-      const rewriteLayer = (layer: AnyLayer): AnyLayer => {
-        if (layer.type === 'group') {
-          const g = layer as GroupLayer;
-          return { ...g, children: (g.children || []).map(rewriteLayer) } as AnyLayer;
-        }
-        if (layer.type === 'image') {
-          const asset = (doc.assets || {})[(layer as any).id];
-          if (asset) {
-            return { ...layer, src: `assets/${asset.filename}` } as AnyLayer;
-          }
-        }
-        return { ...layer } as AnyLayer;
-      };
-
-      const root: GroupLayer = {
-        id: doc.meta.id,
-        name: doc.meta.name || 'Project',
-        type: 'group',
-        position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
-        size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
-        backgroundColor: doc.meta.background,
-        children: ((doc.layers as AnyLayer[]) || []).map(rewriteLayer),
-      };
-
-      const assets: Record<string, { path: string; data: Blob | ArrayBuffer | string }> = {};
       const dataURLToBlob = (dataURL: string): Blob => {
         const [meta, data] = dataURL.split(',');
         const isBase64 = /;base64$/i.test(meta);
@@ -216,30 +194,6 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           return new Blob([decodeURIComponent(data)], { type: mime });
         }
       };
-
-      if (doc.assets) {
-        for (const [layerId, info] of Object.entries(doc.assets)) {
-          try {
-            const blob = info.dataURL.startsWith('data:') ? dataURLToBlob(info.dataURL) : new Blob();
-            assets[info.filename] = { path: `assets/${info.filename}`, data: blob };
-          } catch {}
-        }
-      }
-
-      const caBlob = await packCA({
-        project: {
-          id: doc.meta.id,
-          name: doc.meta.name,
-          width: doc.meta.width,
-          height: doc.meta.height,
-          background: doc.meta.background,
-        },
-        root,
-        assets,
-        states: (doc as any).states,
-        stateOverrides: (doc as any).stateOverrides,
-        stateTransitions: (doc as any).stateTransitions,
-      });
 
       const templateResponse = await fetch('/api/templates/tendies', {
         method: 'GET',
@@ -270,20 +224,73 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           outputZip.file(relativePath, content);
         }
       }
+      const caKeys = ['background', 'floating'] as const;
+      for (const key of caKeys) {
+        const caDoc = doc.docs[key];
+        const rewriteLayer = (layer: AnyLayer): AnyLayer => {
+          if (layer.type === 'group') {
+            const g = layer as GroupLayer;
+            return { ...g, children: (g.children || []).map(rewriteLayer) } as AnyLayer;
+          }
+          if (layer.type === 'image') {
+            const asset = (caDoc.assets || {})[(layer as any).id];
+            if (asset) {
+              return { ...layer, src: `assets/${asset.filename}` } as AnyLayer;
+            }
+          }
+          return { ...layer } as AnyLayer;
+        };
 
-             // Extract CA file contents and place them inside the CA folder
-       const caZip = new JSZip();
-       await caZip.loadAsync(await caBlob.arrayBuffer());
-       
-       const caFolderPath = `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Floating-390w-844h@3x~iphone.ca`;
-       
-       for (const [relativePath, file] of Object.entries(caZip.files)) {
-         if (!file.dir) {
-           const content = await file.async('uint8array');
-           const fullPath = `${caFolderPath}/${relativePath}`;
-           outputZip.file(fullPath, content);
-         }
-       }
+        const root: GroupLayer = {
+          id: doc.meta.id,
+          name: doc.meta.name || 'Project',
+          type: 'group',
+          position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
+          size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
+          backgroundColor: doc.meta.background,
+          children: ((caDoc.layers as AnyLayer[]) || []).map(rewriteLayer),
+        };
+
+        const assets: Record<string, { path: string; data: Blob | ArrayBuffer | string }> = {};
+        if (caDoc.assets) {
+          for (const [_, info] of Object.entries(caDoc.assets)) {
+            try {
+              const blob = info.dataURL.startsWith('data:') ? dataURLToBlob(info.dataURL) : new Blob();
+              assets[info.filename] = { path: `assets/${info.filename}`, data: blob };
+            } catch {}
+          }
+        }
+
+        const caBlob = await packCA({
+          project: {
+            id: doc.meta.id,
+            name: doc.meta.name,
+            width: doc.meta.width,
+            height: doc.meta.height,
+            background: doc.meta.background,
+          },
+          root,
+          assets,
+          states: (caDoc as any).states,
+          stateOverrides: (caDoc as any).stateOverrides,
+          stateTransitions: (caDoc as any).stateTransitions,
+        });
+
+        const caZip = new JSZip();
+        await caZip.loadAsync(await caBlob.arrayBuffer());
+
+        const caFolderPath = key === 'floating'
+          ? `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Floating-390w-844h@3x~iphone.ca`
+          : `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Background-390w-844h@3x~iphone.ca`;
+
+        for (const [relativePath, file] of Object.entries(caZip.files)) {
+          if (!file.dir) {
+            const content = await file.async('uint8array');
+            const fullPath = `${caFolderPath}/${relativePath}`;
+            outputZip.file(fullPath, content);
+          }
+        }
+      }
 
       const finalZipBlob = await outputZip.generateAsync({ type: 'blob' });
 
@@ -370,6 +377,63 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         </DropdownMenu>
       </div>
       <div className="flex items-center gap-2">
+        {/* switch between ca files */}
+        <div className="hidden md:flex flex-1 items-center justify-center">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-8 px-3 rounded-full gap-2"
+                aria-label={`Active CA: ${activeCA === 'floating' ? 'Floating' : 'Background'}`}
+                aria-expanded={false}
+                role="button"
+              >
+                <span className="text-sm">{activeCA === 'floating' ? 'Floating' : 'Background'}</span>
+                <ArrowUpDown className="h-4 w-4 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-80 p-2">
+              <DropdownMenuLabel>
+                <div className="text-sm font-medium">Choose Active CA</div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <div className="grid gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => { setActiveCA('background'); }}
+                  className={`w-full justify-start text-left py-6 ${activeCA==='background' ? 'border-primary/50' : ''}`}
+                  role="menuitemradio"
+                  aria-checked={activeCA==='background'}
+                >
+                  <div className="flex items-center gap-3">
+                    <LayersIcon className="h-4 w-4" />
+                    <div className="flex-1 text-left">
+                      <div>Background</div>
+                      <div className="text-xs text-muted-foreground">Appears behind the clock.</div>
+                    </div>
+                    {activeCA==='background' && <Check className="h-4 w-4" />}
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { setActiveCA('floating'); }}
+                  className={`w-full justify-start text-left py-6 ${activeCA==='floating' ? 'border-primary/50' : ''}`}
+                  role="menuitemradio"
+                  aria-checked={activeCA==='floating'}
+                >
+                  <div className="flex items-center gap-3">
+                    <LayersIcon className="h-4 w-4" />
+                    <div className="flex-1 text-left">
+                      <div>Floating</div>
+                      <div className="text-xs text-muted-foreground">Appears over the clock.</div>
+                    </div>
+                    {activeCA==='floating' && <Check className="h-4 w-4" />}
+                  </div>
+                </Button>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
         <div className="flex items-center gap-1 border rounded-md p-0.5">
           <Button
             variant="ghost"
