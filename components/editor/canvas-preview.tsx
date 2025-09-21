@@ -315,7 +315,12 @@ export function CanvasPreview() {
       ? providedDur
       : Math.max(1, intervals);
     const autorev = Number(anim.autoreverses ?? 0) === 1;
-    let localT = t;
+    const infinite = Number(anim.infinite ?? 1) === 1;
+    const providedRepeat = Number(anim.repeatDurationSeconds);
+    const repeatDuration = Number.isFinite(providedRepeat) && providedRepeat > 0
+      ? providedRepeat
+      : baseDuration;
+    let localT = infinite ? t : Math.min(t, repeatDuration);
     if (autorev) {
       const cycle = baseDuration * 2;
       const m = localT % cycle;

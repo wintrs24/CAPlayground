@@ -587,7 +587,7 @@ export function Inspector() {
                   onCheckedChange={(checked) => {
                     const enabled = !!checked;
                     const current = (selectedBase as any)?.animations || {};
-                    updateLayer(selectedBase!.id, { animations: { ...current, enabled, keyPath: (current.keyPath ?? 'position'), autoreverses: (current.autoreverses ?? 0), values: (current.values ?? []) } } as any);
+                    updateLayer(selectedBase!.id, { animations: { ...current, enabled, keyPath: (current.keyPath ?? 'position'), autoreverses: (current.autoreverses ?? 0), values: (current.values ?? []), infinite: (current.infinite ?? 1) } } as any);
                   }}
                 />
               </div>
@@ -668,6 +668,43 @@ export function Inspector() {
                     disabled={!animEnabled}
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label>Loop infinitely</Label>
+                  <div className="flex items-center gap-2 h-8">
+                    <Switch
+                      checked={(((selectedBase as any)?.animations?.infinite ?? 1) as number) === 1}
+                      onCheckedChange={(checked) => {
+                        const current = (selectedBase as any)?.animations || {};
+                        updateLayer(selectedBase!.id, { animations: { ...current, infinite: checked ? 1 : 0 } } as any);
+                      }}
+                      disabled={!animEnabled}
+                    />
+                    <span className="text-xs text-muted-foreground">When off, specify total repeat time.</span>
+                  </div>
+                </div>
+                {(((selectedBase as any)?.animations?.infinite ?? 1) as number) !== 1 && (
+                  <div className="space-y-1 col-span-2">
+                    <Label htmlFor="anim-repeat">Repeat for (s)</Label>
+                    <Input
+                      id="anim-repeat"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      className="h-8"
+                      value={getBuf('anim-repeat', (() => { const d = Number((selectedBase as any)?.animations?.repeatDurationSeconds); return Number.isFinite(d) && d > 0 ? String(d) : ''; })())}
+                      onChange={(e) => setBuf('anim-repeat', e.target.value)}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        const current = (selectedBase as any)?.animations || {};
+                        const n = v === '' ? Number((selectedBase as any)?.animations?.durationSeconds) || 1 : Number(v);
+                        const total = Number.isFinite(n) && n > 0 ? n : (Number((selectedBase as any)?.animations?.durationSeconds) || 1);
+                        updateLayer(selectedBase!.id, { animations: { ...current, repeatDurationSeconds: total } } as any);
+                        clearBuf('anim-repeat');
+                      }}
+                      disabled={!animEnabled}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

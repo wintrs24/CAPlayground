@@ -432,8 +432,15 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
       : Math.max(1, (anim.values?.length || 1) - 1);
     a.setAttribute('duration', String(duration));
     a.setAttribute('removedOnCompletion', '0');
-    a.setAttribute('repeatCount', 'inf');
-    a.setAttribute('repeatDuration', 'inf');
+    const infinite = Number((anim as any).infinite ?? 1) === 1;
+    const providedRepeat = Number((anim as any).repeatDurationSeconds);
+    const repeatDuration = Number.isFinite(providedRepeat) && providedRepeat > 0 ? providedRepeat : duration;
+    if (infinite) {
+      a.setAttribute('repeatCount', 'inf');
+      a.setAttribute('repeatDuration', 'inf');
+    } else {
+      a.setAttribute('repeatDuration', String(repeatDuration));
+    }
     a.setAttribute('calculationMode', 'linear');
     const valuesEl = doc.createElementNS(CAML_NS, 'values');
     if (keyPath === 'position') {

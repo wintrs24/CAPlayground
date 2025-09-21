@@ -35,6 +35,8 @@ export type LayerBase = {
     autoreverses?: 0 | 1;
     values?: Array<Vec2 | number>;
     durationSeconds?: number;
+    infinite?: 0 | 1;
+    repeatDurationSeconds?: number;
   };
 };
 
