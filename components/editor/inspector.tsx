@@ -11,10 +11,10 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 
 export function Inspector() {
-  const { doc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
+  const { doc, setDoc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const fmt2 = (n: number | undefined) => (typeof n === 'number' && Number.isFinite(n) ? round2(n).toFixed(2) : "");
@@ -32,7 +32,8 @@ export function Inspector() {
   };
   const key = doc?.activeCA ?? 'floating';
   const current = doc?.docs?.[key];
-  const selectedBase = current ? findById(current.layers, current.selectedId) : undefined;
+  const isRootSelected = current?.selectedId === '__root__';
+  const selectedBase = current ? (isRootSelected ? undefined : findById(current.layers, current.selectedId)) : undefined;
   
   const selectedAnimated = useMemo(() => {
     if (!isAnimationPlaying || !animatedLayers.length || !current?.selectedId) return null;
@@ -105,6 +106,52 @@ export function Inspector() {
       disableRotZ: on(kp === 'transform.rotation.z'),
     };
   }, [selectedBase]);
+
+  if (isRootSelected) {
+    const widthVal = doc?.meta.width ?? 0;
+    const heightVal = doc?.meta.height ?? 0;
+    const gf = (doc?.meta as any)?.geometryFlipped ?? 0;
+    return (
+      <Card className="p-3 h-full">
+        <div className="font-medium mb-2">Inspector</div>
+        <Accordion type="multiple" defaultValue={["geom"]} className="space-y-1">
+          <AccordionItem value="geom">
+            <AccordionTrigger className="py-2 text-xs">Geometry (Root)</AccordionTrigger>
+            <AccordionContent className="pb-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="space-y-1">
+                  <Label htmlFor="root-w">Width</Label>
+                  <Input id="root-w" type="number" step="1" value={String(widthVal)}
+                    onChange={(e)=>{
+                      const n = Number(e.target.value);
+                      if (!Number.isFinite(n)) return;
+                      setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, width: Math.max(0, Math.round(n)) }}) : prev);
+                    }} />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="root-h">Height</Label>
+                  <Input id="root-h" type="number" step="1" value={String(heightVal)}
+                    onChange={(e)=>{
+                      const n = Number(e.target.value);
+                      if (!Number.isFinite(n)) return;
+                      setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, height: Math.max(0, Math.round(n)) }}) : prev);
+                    }} />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label>Flip Geometry</Label>
+                  <div className="flex items-center gap-2 h-8">
+                    <Switch checked={gf === 1}
+                      onCheckedChange={(checked)=> setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, geometryFlipped: checked ? 1 : 0 }}) : prev)} />
+                    <span className="text-xs text-muted-foreground">When on, origin becomes top-left and Y increases down.</span>
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </Card>
+    );
+  }
 
   if (!selected) {
     return (
@@ -296,6 +343,34 @@ export function Inspector() {
                 }}
               />
             </div>
+          </div>
+        </div>
+        <div className="space-y-1 col-span-2">
+          <Label>Anchor Point</Label>
+          <div className="grid grid-cols-3 gap-1">
+            {([1,0.5,0] as number[]).map((ay, rowIdx) => (
+              <Fragment key={`row-${rowIdx}`}>
+                {([0,0.5,1] as number[]).map((ax, colIdx) => {
+                  const selAx = (selected as any).anchorPoint?.x ?? 0.5;
+                  const selAy = (selected as any).anchorPoint?.y ?? 0.5;
+                  const isActive = Math.abs(selAx - ax) < 1e-6 && Math.abs(selAy - ay) < 1e-6;
+                  return (
+                    <Button key={`ap-${rowIdx}-${colIdx}`} type="button" variant={isActive ? 'default' : 'outline'} size="sm"
+                      onClick={()=> updateLayer(selected.id, { anchorPoint: { x: ax, y: ay } as any })}>
+                      {ax},{ay}
+                    </Button>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1 col-span-2">
+          <Label>Flip Geometry</Label>
+          <div className="flex items-center gap-2 h-8">
+            <Switch checked={(((selected as any).geometryFlipped ?? 0) === 1)}
+              onCheckedChange={(checked)=> updateLayer(selected.id, { geometryFlipped: (checked ? 1 : 0) as any })} />
+            <span className="text-xs text-muted-foreground">Affects this layer’s sublayers’ coordinate system.</span>
           </div>
         </div>
             </div>

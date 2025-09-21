@@ -207,6 +207,7 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
     name: 'Imported Project',
     width: Math.max(0, root.size.w),
     height: Math.max(0, root.size.h),
+    geometryFlipped: ((root as any).geometryFlipped ?? 0) as 0 | 1,
   };
 
   return { project, root, assets, states, stateOverrides, stateTransitions };

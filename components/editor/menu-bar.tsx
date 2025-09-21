@@ -118,6 +118,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
         size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
         backgroundColor: doc.meta.background,
+        geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
         children: ((cur.layers as AnyLayer[]) || []).map(rewriteLayer),
       };
 
@@ -153,6 +154,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           width: doc.meta.width,
           height: doc.meta.height,
           background: doc.meta.background,
+          geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
         },
         root,
         assets,
@@ -248,6 +250,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
           size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
           backgroundColor: doc.meta.background,
+          geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
           children: ((caDoc.layers as AnyLayer[]) || []).map(rewriteLayer),
         };
 
@@ -268,6 +271,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             width: doc.meta.width,
             height: doc.meta.height,
             background: doc.meta.background,
+            geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
           },
           root,
           assets,

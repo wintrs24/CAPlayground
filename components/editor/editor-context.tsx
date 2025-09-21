@@ -15,7 +15,7 @@ type CADoc = {
 };
 
 export type ProjectDocument = {
-  meta: Pick<CAProject, "id" | "name" | "width" | "height" | "background">;
+  meta: Pick<CAProject, "id" | "name" | "width" | "height" | "background" | "geometryFlipped">;
   activeCA: 'background' | 'floating';
   docs: {
     background: CADoc;
@@ -139,6 +139,7 @@ export function EditorProvider({
             width: anyDoc.meta?.width ?? initialMeta.width,
             height: anyDoc.meta?.height ?? initialMeta.height,
             background: anyDoc.meta?.background ?? initialMeta.background ?? "#e5e7eb",
+            geometryFlipped: (anyDoc.meta?.geometryFlipped ?? 0) as 0 | 1,
           },
           activeCA: 'floating',
           docs: {
@@ -188,6 +189,11 @@ export function EditorProvider({
             },
           },
         } as ProjectDocument;
+        // ensure geometryFlipped in meta
+        (next as any).meta = {
+          ...next.meta,
+          geometryFlipped: ((next.meta as any).geometryFlipped ?? 0) as 0 | 1,
+        };
         setDoc(next);
       }
     } else {
@@ -198,6 +204,7 @@ export function EditorProvider({
           width: initialMeta.width,
           height: initialMeta.height,
           background: initialMeta.background ?? "#e5e7eb",
+          geometryFlipped: 0,
         },
         activeCA: 'floating',
         docs: {

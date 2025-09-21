@@ -140,6 +140,8 @@ function parseCALayer(el: Element): AnyLayer {
   const name = attr(el, 'name') || 'Layer';
   const bounds = parseNumberList(attr(el, 'bounds')); // x y w h
   const position = parseNumberList(attr(el, 'position')); // x y
+  const anchorPt = parseNumberList(attr(el, 'anchorPoint')); // ax ay in 0..1
+  const geometryFlippedAttr = attr(el, 'geometryFlipped');
   const opacity = attr(el, 'opacity') ? Number(attr(el, 'opacity')) : undefined;
   const backgroundColor = attr(el, 'backgroundColor');
   const cornerRadius = attr(el, 'cornerRadius') ? Number(attr(el, 'cornerRadius')) : undefined;
@@ -171,6 +173,8 @@ function parseCALayer(el: Element): AnyLayer {
     cornerRadius,
     borderColor,
     borderWidth,
+    anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
+    geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
   } as const;
 
   const sublayersEl = el.getElementsByTagNameNS(CAML_NS, 'sublayers')[0];
@@ -287,15 +291,7 @@ export function serializeCAML(
       const vEl = doc.createElementNS(CAML_NS, 'value');
       if (typeof ov.value === 'number') {
         let outVal = ov.value;
-        const target = layerIndex[ov.targetId];
-        if (target && (ov.keyPath === 'position.x' || ov.keyPath === 'position.y')) {
-          const docHeight = project?.height ?? 844;
-          if (ov.keyPath === 'position.x') {
-            outVal = Math.round((ov.value as number) + (target.size.w / 2));
-          } else if (ov.keyPath === 'position.y') {
-            outVal = Math.round(docHeight - ((ov.value as number) + (target.size.h / 2)));
-          }
-        } else if (ov.keyPath === 'transform.rotation.z') {
+        if (ov.keyPath === 'transform.rotation.z') {
           outVal = (ov.value as number) * Math.PI / 180;
         }
         const isInt = Number.isInteger(outVal);
@@ -371,10 +367,16 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   setAttr(el, 'id', layer.id);
   setAttr(el, 'name', layer.name);
   setAttr(el, 'bounds', `0 0 ${Math.max(0, layer.size.w)} ${Math.max(0, layer.size.h)}`);
-  const docHeight = project?.height ?? 844;
-  setAttr(el, 'position',
-    `${Math.round(layer.position.x + layer.size.w / 2)} ${Math.round(docHeight - (layer.position.y + layer.size.h / 2))}` //maths 🤓 (x = x+layer_width/2, y = project_height-(y+layer_height/2))
-  );
+  setAttr(el, 'position', `${Math.round(layer.position.x)} ${Math.round(layer.position.y)}`);
+  const ax = (layer as any).anchorPoint?.x;
+  const ay = (layer as any).anchorPoint?.y;
+  if (typeof ax === 'number' && typeof ay === 'number') {
+    if (!(Math.abs(ax - 0.5) < 1e-6 && Math.abs(ay - 0.5) < 1e-6)) {
+      setAttr(el, 'anchorPoint', `${ax} ${ay}`);
+    }
+  }
+  const gf = (layer as any).geometryFlipped;
+  if (gf === 0 || gf === 1) setAttr(el, 'geometryFlipped', String(gf));
   setAttr(el, 'opacity', layer.opacity ?? undefined);
   if (layer.type === 'shape') {
     setAttr(el, 'backgroundColor', (layer as any).fill || '#ffffffff'); //fixed shape fill 🤯
@@ -434,20 +436,19 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     a.setAttribute('repeatDuration', 'inf');
     a.setAttribute('calculationMode', 'linear');
     const valuesEl = doc.createElementNS(CAML_NS, 'values');
-    const docHeight = project?.height ?? 844;
     if (keyPath === 'position') {
       for (const ptRaw of anim.values as Array<any>) {
         const pt = ptRaw || {};
         const p = doc.createElementNS(CAML_NS, 'CGPoint');
-        const cx = Math.round((Number(pt?.x ?? 0)) + (layer.size.w / 2));
-        const cy = Math.round(docHeight - ((Number(pt?.y ?? 0)) + (layer.size.h / 2)));
+        const cx = Math.round(Number(pt?.x ?? 0));
+        const cy = Math.round(Number(pt?.y ?? 0));
         p.setAttribute('value', `${cx} ${cy}`);
         valuesEl.appendChild(p);
       }
     } else if (keyPath === 'position.x') {
       for (const v of anim.values as Array<any>) {
         const n = Number(v);
-        const cx = Math.round((Number.isFinite(n) ? n : 0) + (layer.size.w / 2));
+        const cx = Math.round(Number.isFinite(n) ? n : 0);
         const numEl = doc.createElementNS(CAML_NS, 'NSNumber');
         numEl.setAttribute('value', String(cx));
         valuesEl.appendChild(numEl);
@@ -455,7 +456,7 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     } else if (keyPath === 'position.y') {
       for (const v of anim.values as Array<any>) {
         const n = Number(v);
-        const cy = Math.round(docHeight - ((Number.isFinite(n) ? n : 0) + (layer.size.h / 2)));
+        const cy = Math.round(Number.isFinite(n) ? n : 0);
         const numEl = doc.createElementNS(CAML_NS, 'NSNumber');
         numEl.setAttribute('value', String(cy));
         valuesEl.appendChild(numEl);
