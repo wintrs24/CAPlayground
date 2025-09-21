@@ -19,7 +19,7 @@ export default function EditorPage() {
   const projectId = params?.id;
   const [meta, setMeta] = useState<{ id: string; name: string; width: number; height: number; background?: string } | null>(null);
   const [leftWidth, setLeftWidth] = useState(320);
-  const [rightWidth, setRightWidth] = useState(340);
+  const [rightWidth, setRightWidth] = useState(400);
   const [statesHeight, setStatesHeight] = useState(350);
   const leftPaneRef = useRef<HTMLDivElement | null>(null);
   const [showLeft, setShowLeft] = useState(true);
