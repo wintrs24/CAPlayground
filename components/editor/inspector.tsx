@@ -112,7 +112,7 @@ export function Inspector() {
     const heightVal = doc?.meta.height ?? 0;
     const gf = (doc?.meta as any)?.geometryFlipped ?? 0;
     return (
-      <Card className="p-3 h-full">
+      <Card className="p-3 h-full" data-tour-id="inspector">
         <div className="font-medium mb-2">Inspector</div>
         <Accordion type="multiple" defaultValue={["geom"]} className="space-y-1">
           <AccordionItem value="geom">
@@ -155,7 +155,7 @@ export function Inspector() {
 
   if (!selected) {
     return (
-      <Card className="p-3 h-full">
+      <Card className="p-3 h-full" data-tour-id="inspector">
         <div className="font-medium mb-2">Inspector</div>
         <div className="text-sm text-muted-foreground">Select a layer to edit its properties.</div>
       </Card>
@@ -163,7 +163,7 @@ export function Inspector() {
   }
 
   return (
-    <Card className="p-3 h-full flex flex-col overflow-hidden">
+    <Card className="p-3 h-full flex flex-col overflow-hidden" data-tour-id="inspector">
       <div className="font-medium mb-2 shrink-0">Inspector</div>
       <div className="min-h-0 overflow-y-auto pr-1">
       {current?.activeState && current.activeState !== 'Base State' && (

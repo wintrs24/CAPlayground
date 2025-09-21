@@ -1018,6 +1018,7 @@ export function CanvasPreview() {
     <Card
       ref={ref}
       className={`relative w-full h-full overflow-hidden p-0 ${isPanning ? 'cursor-grabbing' : ''}`}
+      data-tour-id="canvas"
       onDragOver={(e) => {
         e.preventDefault();
       }}

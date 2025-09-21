@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import { packCA } from "@/lib/ca/ca-file";
@@ -55,6 +55,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -478,14 +479,25 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         </div>
         {/* Settings dropdown */}
         <div className="border rounded-md p-0.5">
-          <DropdownMenu>
+          <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 px-2 gap-2">
+              <Button variant="ghost" className="h-8 px-2 gap-2" data-tour-id="settings-button">
                 <Gear className="h-4 w-4" /> Settings
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-100 p-2">
-              <DropdownMenuLabel>Settings</DropdownMenuLabel>
+              <div className="flex items-center justify-between gap-2 px-1 pb-1">
+                <DropdownMenuLabel className="p-0 m-0">Settings</DropdownMenuLabel>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 -mr-1"
+                  aria-label="Close settings"
+                  onClick={() => setSettingsOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Snapping</DropdownMenuLabel>
               <div className="px-2 py-1.5 space-y-1">
@@ -516,6 +528,15 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 <div className="flex items-center justify-between"><span>Toggle Left Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + L</span></div>
                 <div className="flex items-center justify-between"><span>Toggle Right Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + I</span></div>
               </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="cursor-pointer" onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new Event('caplay:start-onboarding' as any));
+                }
+                setSettingsOpen(false);
+              }}>
+                Show onboarding
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

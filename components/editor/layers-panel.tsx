@@ -64,7 +64,7 @@ export function LayersPanel() {
   };
 
   return (
-    <Card className="p-3 h-full flex flex-col">
+    <Card className="p-3 h-full flex flex-col" data-tour-id="layers-panel">
       <div className="flex items-center justify-between mb-2">
         <div className="font-medium">Layers</div>
         <DropdownMenu>

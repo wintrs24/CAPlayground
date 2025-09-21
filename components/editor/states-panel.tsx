@@ -11,7 +11,7 @@ export function StatesPanel() {
   const active = current?.activeState || 'Base State';
 
   return (
-    <Card className="p-3 h-full flex flex-col">
+    <Card className="p-3 h-full flex flex-col" data-tour-id="states-panel">
       <div className="flex items-center justify-between mb-2">
         <div className="font-medium">States</div>
       </div>

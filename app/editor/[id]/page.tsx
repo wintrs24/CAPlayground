@@ -11,6 +11,7 @@ import { LayersPanel } from "@/components/editor/layers-panel";
 import { StatesPanel } from "@/components/editor/states-panel";
 import { Inspector } from "@/components/editor/inspector";
 import { CanvasPreview } from "@/components/editor/canvas-preview";
+import EditorOnboarding from "@/components/editor/onboarding";
 
 export default function EditorPage() {
   const params = useParams<{ id: string }>();
@@ -155,6 +156,8 @@ export default function EditorPage() {
             )}
           </div>
         </div>
+        {/* Onboarding overlay (portal) */}
+        <EditorOnboarding showLeft={showLeft} showRight={showRight} />
       </div>
     </EditorProvider>
   );
