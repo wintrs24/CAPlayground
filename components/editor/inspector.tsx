@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Inspector() {
   const { doc, setDoc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
@@ -582,14 +583,34 @@ export function Inspector() {
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label>Enable animation</Label>
-                <Switch
-                  checked={!!(selectedBase as any)?.animations?.enabled}
-                  onCheckedChange={(checked) => {
-                    const enabled = !!checked;
-                    const current = (selectedBase as any)?.animations || {};
-                    updateLayer(selectedBase!.id, { animations: { ...current, enabled, keyPath: (current.keyPath ?? 'position'), autoreverses: (current.autoreverses ?? 0), values: (current.values ?? []), infinite: (current.infinite ?? 1) } } as any);
-                  }}
-                />
+                {current?.activeState && current.activeState !== 'Base State' ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <Switch
+                          checked={!!(selectedBase as any)?.animations?.enabled}
+                          onCheckedChange={(checked) => {
+                            const enabled = !!checked;
+                            const currentAnim = (selectedBase as any)?.animations || {};
+                            updateLayer(selectedBase!.id, { animations: { ...currentAnim, enabled, keyPath: (currentAnim.keyPath ?? 'position'), autoreverses: (currentAnim.autoreverses ?? 0), values: (currentAnim.values ?? []), infinite: (currentAnim.infinite ?? 1) } } as any);
+                          }}
+                        />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={6}>
+                      You must be on the Base State to create animations.
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Switch
+                    checked={!!(selectedBase as any)?.animations?.enabled}
+                    onCheckedChange={(checked) => {
+                      const enabled = !!checked;
+                      const currentAnim = (selectedBase as any)?.animations || {};
+                      updateLayer(selectedBase!.id, { animations: { ...currentAnim, enabled, keyPath: (currentAnim.keyPath ?? 'position'), autoreverses: (currentAnim.autoreverses ?? 0), values: (currentAnim.values ?? []), infinite: (currentAnim.infinite ?? 1) } } as any);
+                    }}
+                  />
+                )}
               </div>
               <div className={`grid grid-cols-2 gap-2 ${animEnabled ? '' : 'opacity-50'}`}>
                 <div className="space-y-1">
