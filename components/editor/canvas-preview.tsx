@@ -809,6 +809,10 @@ export function CanvasPreview() {
         startH: number;
         startClientX: number;
         startClientY: number;
+        startLeft: number;
+        startTop: number;
+        canvasH: number;
+        yUp: boolean;
         lastX: number;
         lastY: number;
         lastW: number;
@@ -823,6 +827,8 @@ export function CanvasPreview() {
         centerX: number;
         centerY: number;
         startAngle: number;
+        canvasH: number;
+        yUp: boolean;
         lastRot: number;
       }
     | null
@@ -833,6 +839,9 @@ export function CanvasPreview() {
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
+    const canvasH = docRef.current?.meta.height ?? 0;
+    const yUp = (getRootFlip() === 0);
+    const startLT = computeCssLT(l, canvasH, yUp);
     resizeDragRef.current = {
       id: l.id,
       handle,
@@ -842,6 +851,10 @@ export function CanvasPreview() {
       startH: l.size.h,
       startClientX: e.clientX,
       startClientY: e.clientY,
+      startLeft: startLT.left,
+      startTop: startLT.top,
+      canvasH,
+      yUp,
       lastX: l.position.x,
       lastY: l.position.y,
       lastW: l.size.w,
@@ -854,19 +867,19 @@ export function CanvasPreview() {
       const currentWorld = clientToWorld(ev.clientX, ev.clientY);
       const dx = currentWorld.x - startWorld.x;
       const dy = currentWorld.y - startWorld.y;
-      let x = d.startX;
-      let y = d.startY;
+      let left = d.startLeft;
+      let top = d.startTop;
       let w = d.startW;
       let h = d.startH;
       switch (d.handle) {
         case "e": w = Math.max(1, d.startW + dx); break;
-        case "w": w = Math.max(1, d.startW - dx); x = d.startX + dx; break;
+        case "w": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; break;
         case "s": h = Math.max(1, d.startH + dy); break;
-        case "n": h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
+        case "n": h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
         case "se": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH + dy); break;
-        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
-        case "sw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH + dy); break;
-        case "nw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
+        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
+        case "sw": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; h = Math.max(1, d.startH + dy); break;
+        case "nw": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
       }
       if (ev.shiftKey && d.startW > 0 && d.startH > 0) {
         const aspect = d.startW / d.startH;
@@ -882,17 +895,22 @@ export function CanvasPreview() {
           if (dw >= dh) h = Math.max(1, w / aspect);
           else w = Math.max(1, h * aspect);
         }
+        // Reposition the active handle so the opposite edge stays fixed in CSS space
         switch (d.handle) {
-          case "e": x = d.startX; break;
-          case "w": x = d.startX + (d.startW - w); break;
-          case "s": y = d.startY; break;
-          case "n": y = d.startY + (d.startH - h); break;
-          case "se": x = d.startX; y = d.startY; break;
-          case "ne": x = d.startX; y = d.startY + (d.startH - h); break;
-          case "sw": x = d.startX + (d.startW - w); y = d.startY; break;
-          case "nw": x = d.startX + (d.startW - w); y = d.startY + (d.startH - h); break;
+          case "e": left = d.startLeft; break;
+          case "w": left = d.startLeft + (d.startW - w); break;
+          case "s": top = d.startTop; break;
+          case "n": top = d.startTop + (d.startH - h); break;
+          case "se": left = d.startLeft; top = d.startTop; break;
+          case "ne": left = d.startLeft; top = d.startTop + (d.startH - h); break;
+          case "sw": left = d.startLeft + (d.startW - w); top = d.startTop; break;
+          case "nw": left = d.startLeft + (d.startW - w); top = d.startTop + (d.startH - h); break;
         }
       }
+      // Convert CSS-space back to position (center/anchor aware)
+      const a = getAnchor((renderedLayers.find(r => r.id === d.id) as AnyLayer) || (l as AnyLayer));
+      const x = left + a.x * w;
+      const y = d.yUp ? ((d.canvasH - top) - (1 - a.y) * h) : (top + a.y * h);
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
       d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
@@ -914,16 +932,23 @@ export function CanvasPreview() {
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
-    const centerX = l.position.x + l.size.w / 2;
-    const centerY = l.position.y + l.size.h / 2;
+    const canvasH = docRef.current?.meta.height ?? 0;
+    const yUp = (getRootFlip() === 0);
+    const lt = computeCssLT(l, canvasH, yUp);
+    const a = getAnchor(l);
+    const centerX = lt.left + a.x * l.size.w;
+    const centerY = lt.top + a.y * l.size.h;
     const world = clientToWorld(e.clientX, e.clientY);
     const angle0 = Math.atan2(world.y - centerY, world.x - centerX) * 180 / Math.PI;
-    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0), lastRot: l.rotation ?? 0 };
+    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0), canvasH, yUp, lastRot: l.rotation ?? 0 };
     const onMove = (ev: MouseEvent) => {
       const d = rotationDragRef.current;
       if (!d) return;
       const wpt = clientToWorld(ev.clientX, ev.clientY);
-      const angle = Math.atan2(wpt.y - d.centerY, wpt.x - d.centerX) * 180 / Math.PI;
+      let angle = Math.atan2(wpt.y - d.centerY, wpt.x - d.centerX) * 180 / Math.PI;
+      if (ev.shiftKey) {
+        angle = Math.round(angle / 15) * 15;
+      }
       const rot = angle - d.startAngle;
       d.lastRot = rot;
       updateLayerTransient(d.id, { rotation: rot as any });
