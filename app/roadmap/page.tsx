@@ -11,7 +11,7 @@ export default function RoadmapPage() {
         <section className="container mx-auto px-12 md:px-30 py-16 md:py-24">
         <header className="mb-10 space-y-2">
           <h1 className="font-heading text-4xl md:text-5xl font-bold">Project Roadmap</h1>
-          <p className="text-muted-foreground">What's cooking in CAPlayground? (Last Updated: 24th August, 2025)</p>
+          <p className="text-muted-foreground">What's cooking in CAPlayground? (Last Updated: 23rd September, 2025)</p>
         </header>
 
         {/* Status Badges
@@ -33,7 +33,7 @@ export default function RoadmapPage() {
           <RoadmapItem index={4} title="Core Animation Layer Properties" status={<Badge>Done: 5th August, 2025</Badge>}>
             Adjusting position, bounds, opacity, rotation, and more of layers.
           </RoadmapItem>
-          <RoadmapItem index={5} title="Creating Animations, Viewing and Editing States" status={<Badge>Done: 15th August, 2025</Badge>}>
+          <RoadmapItem index={5} title="Creating Animations, Viewing and Editing States" status={<Badge>Done: 22th August, 2025</Badge>}>
             Creating state transitions and keyframe animations.
           </RoadmapItem>
           <RoadmapItem index={6} title="CAPlayground App" status={<Badge variant="outline">Starting Soon</Badge>}>
