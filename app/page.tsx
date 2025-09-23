@@ -3,6 +3,7 @@ import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Send, Map as MapIcon } from "lucide-react"
+import Image from "next/image"
 
 export default function HomePage() {
   return (
@@ -13,7 +14,7 @@ export default function HomePage() {
 
         {/* Hero */}
         <main className="">
-          <section className="relative overflow-hidden min-h-[calc(100vh-4rem)] flex items-center">
+          <section className="relative overflow-hidden min-h-[calc(100vh-4rem)] flex items-start">
 
             <div className="relative container mx-auto px-4 py-24 md:py-32">
               <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in-0 slide-in-from-bottom-6 duration-2000 ease-out">
@@ -49,6 +50,28 @@ export default function HomePage() {
                       </span>
                     </Button>
                   </Link>
+                </div>
+
+                {/* hero image */}
+                <div className="pt-10">
+                  <div className="mx-auto w-full max-w-5xl rounded-xl border-8 border-zinc-200/80 dark:border-white/30 shadow-lg overflow-hidden">
+                    <Image
+                      src="/hero-light.png"
+                      alt="CAPlayground hero preview (light)"
+                      width={1440}
+                      height={900}
+                      priority
+                      className="w-full h-auto select-none pointer-events-none block dark:hidden"
+                    />
+                    <Image
+                      src="/hero-dark.png"
+                      alt="CAPlayground hero preview (dark)"
+                      width={1440}
+                      height={900}
+                      priority
+                      className="w-full h-auto select-none pointer-events-none hidden dark:block"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
