@@ -2,10 +2,23 @@ import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Send, Map as MapIcon } from "lucide-react"
+import { Send, Map as MapIcon, Github, Star } from "lucide-react"
 import Image from "next/image"
 
-export default function HomePage() {
+export default async function HomePage() {
+  let stars: number | null = null
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/CAPlayground/CAPlayground",
+      { next: { revalidate: 3600 }, headers: { Accept: "application/vnd.github+json" } }
+    )
+    if (res.ok) {
+      const data = await res.json()
+      stars = typeof data?.stargazers_count === "number" ? data.stargazers_count : null
+    }
+  } catch (e) {
+    stars = null
+  }
   return (
     <div className="min-h-screen flex flex-col">
       <div className="relative">
@@ -15,63 +28,109 @@ export default function HomePage() {
         {/* Hero */}
         <main className="">
           <section className="relative overflow-hidden min-h-[calc(100vh-4rem)] flex items-start">
-
-            <div className="relative container mx-auto px-4 py-24 md:py-32">
-              <div className="max-w-4xl mx-auto text-center space-y-8 animate-in fade-in-0 slide-in-from-bottom-6 duration-2000 ease-out">
-                {/* notification */}
-                <Link href="/projects">
-                  <div className="inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-accent/10 backdrop-blur-sm border border-accent/20 mb-4 transition-all duration-200 hover:bg-accent/20 hover:border-accent/30 hover:shadow-sm cursor-pointer">
-                    <MapIcon className="h-4 w-4 text-accent mr-2" aria-hidden="true" />
-                    <span className="text-accent font-sans font-medium text-sm">Animations and State Transitions can be added to your project!</span>
-                  </div>
-                </Link>
-                
-                {/* title */}
-                <h1 className="font-heading text-5xl md:text-7xl lg:text-7xl font-bold text-foreground leading-tight">
-                  <span className="block">The Open Source</span>
-                  <span className="block text-accent mt-1">CoreAnimation Editor</span>
-                </h1>
-
-                {/* description */}
-                <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                  Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer with CAPlayground.
-                </p>
-
-                {/* button */}
-                <div className="pt-8">
+            <div className="relative container mx-auto px-3 min-[600px]:px-4 lg:px-6 py-24 min-[600px]:py-32">
+              <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-center animate-in fade-in-0 slide-in-from-bottom-6 duration-2000 ease-out">
+                {/* Left: content */}
+                <div className="space-y-8 text-center lg:text-left">
+                  {/* notification */}
                   <Link href="/projects">
-                    <Button
-                      size="lg"
-                      className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-lg px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                    >
-                      <span className="inline-flex items-center gap-2">
+                    <div className="inline-flex items-center justify-center lg:justify-start px-6 py-2.5 rounded-full bg-accent/10 backdrop-blur-sm border border-accent/20 transition-all duration-200 hover:bg-accent/20 hover:border-accent/30 hover:shadow-sm cursor-pointer w-auto">
+                      <MapIcon className="h-4 w-4 text-accent mr-2" aria-hidden="true" />
+                      <span className="text-accent font-sans font-medium text-sm">Roadmap nearly complete, just 1 month!</span>
+                    </div>
+                  </Link>
+
+                  {/* title */}
+                  <h1 className="font-heading text-4xl min-[600px]:text-6xl lg:text-6xl font-bold text-foreground leading-tight mt-6 min-[600px]:mt-8">
+                    <span className="block">The Open Source</span>
+                    <span className="block text-accent mt-1">CoreAnimation Editor</span>
+                  </h1>
+
+                  {/* description */}
+                  <p className="text-xl min-[600px]:text-2xl text-muted-foreground max-w-3xl leading-relaxed mx-auto lg:mx-0">
+                    Create beautiful animated wallpapers for iOS and iPadOS on any desktop computer with CAPlayground.
+                  </p>
+
+                  <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-3 max-[600px]:hidden">
+                    <Link href="/projects">
+                      <Button
+                        size="lg"
+                        className="px-6 bg-accent hover:bg-accent/90 text-white font-semibold"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          Try Beta
+                          <Send className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                      </Button>
+                    </Link>
+
+                    <Link href="https://github.com/CAPlayground/CAPlayground" target="_blank" rel="noopener noreferrer">
+                      <Button size="lg" variant="outline" className="px-6">
+                        <span className="inline-flex items-center gap-2">
+                          <Github className="h-5 w-5" aria-hidden="true" />
+                          <span>View GitHub{stars !== null ? ` ${new Intl.NumberFormat().format(stars)}` : ""}</span>
+                          {stars !== null && <Star className="h-4 w-4 fill-current" aria-hidden="true" />}
+                        </span>
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* hero video */}
+                <div className="pt-10 lg:pt-0 hidden lg:block">
+                  <div className="w-full max-w-5xl min-[600px]:max-w-none rounded-xl border-8 border-zinc-200/80 dark:border-white/30 shadow-lg overflow-hidden">
+                    <video
+                      src="/wallpaper-demo.mp4"
+                      className="w-full h-auto select-none pointer-events-none"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      aria-label="CAPlayground wallpaper demo"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* app screenshots */}
+              <div className="pt-6 min-[600px]:pt-8">
+                <div className="max-w-7xl mx-auto rounded-xl border-8 border-zinc-200/80 dark:border-white/30 shadow-lg overflow-hidden">
+                  <Image
+                    src="/app-light.png"
+                    alt="CAPlayground app preview (light)"
+                    width={1920}
+                    height={1080}
+                    priority
+                    className="w-full h-auto select-none pointer-events-none block dark:hidden"
+                  />
+                  <Image
+                    src="/app-dark.png"
+                    alt="CAPlayground app preview (dark)"
+                    width={1920}
+                    height={1080}
+                    priority
+                    className="w-full h-auto select-none pointer-events-none hidden dark:block"
+                  />
+                </div>
+                {/* mobile buttons */}
+                <div className="mt-4 hidden max-[600px]:flex flex-col items-stretch gap-3">
+                  <Link href="/projects" className="w-full">
+                    <Button size="lg" className="w-full h-12 text-base px-6 bg-accent hover:bg-accent/90 text-white font-semibold">
+                      <span className="inline-flex items-center justify-center gap-2">
                         Try Beta
                         <Send className="h-5 w-5" aria-hidden="true" />
                       </span>
                     </Button>
                   </Link>
-                </div>
-
-                {/* hero image */}
-                <div className="pt-10">
-                  <div className="mx-auto w-full max-w-5xl rounded-xl border-8 border-zinc-200/80 dark:border-white/30 shadow-lg overflow-hidden">
-                    <Image
-                      src="/hero-light.png"
-                      alt="CAPlayground hero preview (light)"
-                      width={1440}
-                      height={900}
-                      priority
-                      className="w-full h-auto select-none pointer-events-none block dark:hidden"
-                    />
-                    <Image
-                      src="/hero-dark.png"
-                      alt="CAPlayground hero preview (dark)"
-                      width={1440}
-                      height={900}
-                      priority
-                      className="w-full h-auto select-none pointer-events-none hidden dark:block"
-                    />
-                  </div>
+                  <Link href="https://github.com/CAPlayground/CAPlayground" target="_blank" rel="noopener noreferrer" className="w-full">
+                    <Button size="lg" variant="outline" className="w-full h-12 text-base px-6">
+                      <span className="inline-flex items-center justify-center gap-2">
+                        <Github className="h-5 w-5" aria-hidden="true" />
+                        <span>View GitHub{stars !== null ? ` ${new Intl.NumberFormat().format(stars)}` : ""}</span>
+                        {stars !== null && <Star className="h-4 w-4 fill-current" aria-hidden="true" />}
+                      </span>
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>
