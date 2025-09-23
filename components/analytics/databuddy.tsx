@@ -2,11 +2,16 @@
 
 import { Databuddy } from "@databuddy/sdk"
 
-export function DatabuddyClient() {
+function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <Databuddy
-      clientId="OkGs3cck0KW3jtcYV_N8j"
-      enableBatching={true}
-    />
+    <>
+      {children}
+      <Databuddy
+        clientId="OkGs3cck0KW3jtcYV_N8j"
+        enableBatching={true}
+      />
+    </>
   )
 }
+
+export default AppLayout

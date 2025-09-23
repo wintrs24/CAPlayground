@@ -4,7 +4,7 @@ import { Playfair_Display, Source_Sans_3 } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Favicon } from "@/components/favicon"
-import { DatabuddyClient } from "@/components/analytics/databuddy"
+import DatabuddyClient from "@/components/analytics/databuddy"
 
 const playfair = Playfair_Display({
   subsets: ["latin"],
@@ -61,9 +61,9 @@ export default function RootLayout({
       <body className="font-sans antialiased min-h-screen bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <Favicon />
-          {children}
-          {/* Analytics: Databuddy */}
-          <DatabuddyClient />
+          <DatabuddyClient>
+            {children}
+          </DatabuddyClient>
         </ThemeProvider>
       </body>
     </html>
