@@ -60,11 +60,6 @@ Read [CONTRIBUTING.md](.github/CONTRIBUTING.md)
 
 [MIT License](LICENSE)
 
-## Main Developers
-
-![enkei headpat](http://owobotcdn.com/img/509fc21f-e812-495e-8cd8-adc8391efe35.gif)
-![squair headpat](http://owobotcdn.com/img/3b60bb38-4a9b-410a-bd7b-ffa571309876.gif)
-
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=caplayground/caplayground&type=Date)](https://www.star-history.com/#caplayground/caplayground&Date)
