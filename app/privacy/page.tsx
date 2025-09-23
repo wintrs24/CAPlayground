@@ -34,7 +34,7 @@ export default function PrivacyPage() {
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Privacy Policy</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Last Updated: 4th September 2025</p>
+          <p className="mt-2 text-sm text-muted-foreground">Last Updated: 23rd September 2025</p>
         </div>
 
         {/* Paper container */}
@@ -73,19 +73,36 @@ export default function PrivacyPage() {
             <li>Communicate important updates related to your account or the Service.</li>
           </ul>
 
-          <h2 className="mt-12 text-3xl md:text-4xl font-semibold">3. Aggregate-only Analytics</h2>
+          <h2 className="mt-12 text-3xl md:text-4xl font-semibold">3. Analytics</h2>
           <p className="mt-6 leading-7">
-            We record aggregate counts of certain in-product events to help us understand usage (for example, when a project is
-            created). These analytics events do not include user identifiers, IP addresses, or device fingerprints, and we do not
-            set analytics cookies for this purpose. The events are stored as simple counters with timestamps and are used to
-            improve the Service.
+            We use privacy conscious analytics to understand usage and improve CAPlayground. This includes:
+          </p>
+          <ul className="mt-4 list-disc pl-6 space-y-3">
+            <li>
+              <strong>Page Views</strong>: Page URL, title, referrer, timestamp, and a session ID.
+            </li>
+            <li>
+              <strong>Sessions</strong>: Session duration, start/end time, number of pages visited, and basic bounce detection.
+            </li>
+            <li>
+              <strong>Performance</strong>: Page load time, DOM content loaded, first paint/first contentful paint, and resource
+              timing metrics.
+            </li>
+            <li>
+              <strong>Aggregate Counters</strong>: We also keep aggregate-only counts for certain product events (projects
+              created). These counters are stored without user identifiers and used for product planning. The contents in your projects are not collected.
+            </li>
+          </ul>
+          <p className="mt-4 text-muted-foreground">
+            We do not use analytics for advertising, and we do not intentionally collect sensitive identifiers (such as precise
+            location or device fingerprinting data) for analytics.
           </p>
 
           <h2 className="mt-12 text-3xl md:text-4xl font-semibold">4. Third Parties</h2>
           <p className="mt-6 leading-7">
             We use Supabase for authentication and backend infrastructure. Supabase may process data necessary to provide those
-            services and may maintain operational logs (e.g., auth events). Refer to Supabase documentation/policies for more
-            details.
+            services and may maintain operational logs (e.g., auth events). We also use Databuddy for privacy conscious
+            analytics as described above. Refer to those providers’ documentation/policies for more details.
           </p>
 
           <h2 className="mt-12 text-3xl md:text-4xl font-semibold">5. Data Retention</h2>

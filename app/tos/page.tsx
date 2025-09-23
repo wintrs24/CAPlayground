@@ -33,7 +33,7 @@ export default function TermsPage() {
       <div className="mx-auto max-w-3xl">
         <div className="mb-6 sm:mb-8">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Terms of Service</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Last Updated: 4th September 2025</p>
+          <p className="mt-2 text-sm text-muted-foreground">Last Updated: 23rd September 2025</p>
         </div>
         {/* Paper container */}
         <div className="rounded-2xl bg-card text-card-foreground shadow-lg ring-1 ring-black/5 border border-border p-6 sm:p-10 text-base sm:text-lg">
@@ -117,6 +117,11 @@ export default function TermsPage() {
           <li>
             <strong>Aggregate-only Analytics</strong>: We record aggregate counts of certain in-product events (e.g., when a project
             is created) to understand usage. These counters do not include user identifiers and are not used for advertising.
+          </li>
+          <li>
+            <strong>Analytics (Databuddy)</strong>: We use a privacy conscious analytics tool to measure page views (URL, title,
+            referrer, timestamp, session ID), sessions (duration, start/end times, page count, basic bounce), and performance
+            metrics (page load, DOM content loaded, first paint/first contentful paint, resource timing).
           </li>
           </ul>
 
