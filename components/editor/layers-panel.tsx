@@ -11,8 +11,10 @@ import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 export function LayersPanel() {
   const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, deleteLayer, duplicateLayer } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const layers = doc?.layers ?? [];
-  const selectedId = doc?.selectedId ?? null;
+  const key = doc?.activeCA ?? 'floating';
+  const current = doc?.docs?.[key];
+  const layers = current?.layers ?? [];
+  const selectedId = current?.selectedId ?? null;
 
   const renderItem = (l: AnyLayer, depth: number) => {
     const row = (
@@ -62,7 +64,7 @@ export function LayersPanel() {
   };
 
   return (
-    <Card className="p-3 h-full flex flex-col">
+    <Card className="p-3 h-full flex flex-col" data-tour-id="layers-panel">
       <div className="flex items-center justify-between mb-2">
         <div className="font-medium">Layers</div>
         <DropdownMenu>
@@ -93,7 +95,12 @@ export function LayersPanel() {
       </div>
 
       <div className="text-sm rounded border bg-muted/30 divide-y flex flex-col overflow-hidden">
-        <div className="px-2 py-2 font-medium select-none">Root Layer</div>
+        <div
+          className={`px-2 py-2 font-medium select-none cursor-pointer ${selectedId === '__root__' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+          onClick={() => selectLayer('__root__' as any)}
+        >
+          Root Layer
+        </div>
         <div className="flex-1 overflow-auto">
           {layers.length === 0 && (
             <div className="px-2 py-2 text-muted-foreground">No layers yet</div>

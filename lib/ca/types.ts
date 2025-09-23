@@ -7,6 +7,8 @@ export type CAProject = {
   width: number;
   height: number;
   background?: string;
+  // Flip Geometry for the root layer (0 = bottom-left origin, 1 = top-left origin)
+  geometryFlipped?: 0 | 1;
 };
 
 export type LayerBase = {
@@ -16,17 +18,25 @@ export type LayerBase = {
   size: Size;
   opacity?: number;
   rotation?: number;
+  rotationX?: number;
+  rotationY?: number;
   backgroundColor?: string;
   borderColor?: string;
   borderWidth?: number;
   cornerRadius?: number;
   visible?: boolean;
+  // Anchor point in unit coordinates (0..1). Default is { x: 0.5, y: 0.5 }.
+  anchorPoint?: { x: number; y: number };
+  // Flip Geometry for this layer and its sublayers (0 = bottom-left origin, 1 = top-left origin)
+  geometryFlipped?: 0 | 1;
   animations?: {
     enabled?: boolean;
-    keyPath?: 'position' | 'position.x' | 'position.y';
+    keyPath?: 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
     autoreverses?: 0 | 1;
     values?: Array<Vec2 | number>;
     durationSeconds?: number;
+    infinite?: 0 | 1;
+    repeatDurationSeconds?: number;
   };
 };
 

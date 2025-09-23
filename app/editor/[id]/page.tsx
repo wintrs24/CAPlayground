@@ -11,6 +11,7 @@ import { LayersPanel } from "@/components/editor/layers-panel";
 import { StatesPanel } from "@/components/editor/states-panel";
 import { Inspector } from "@/components/editor/inspector";
 import { CanvasPreview } from "@/components/editor/canvas-preview";
+import EditorOnboarding from "@/components/editor/onboarding";
 
 export default function EditorPage() {
   const params = useParams<{ id: string }>();
@@ -18,7 +19,7 @@ export default function EditorPage() {
   const projectId = params?.id;
   const [meta, setMeta] = useState<{ id: string; name: string; width: number; height: number; background?: string } | null>(null);
   const [leftWidth, setLeftWidth] = useState(320);
-  const [rightWidth, setRightWidth] = useState(340);
+  const [rightWidth, setRightWidth] = useState(400);
   const [statesHeight, setStatesHeight] = useState(350);
   const leftPaneRef = useRef<HTMLDivElement | null>(null);
   const [showLeft, setShowLeft] = useState(true);
@@ -155,6 +156,8 @@ export default function EditorPage() {
             )}
           </div>
         </div>
+        {/* Onboarding overlay (portal) */}
+        <EditorOnboarding showLeft={showLeft} showRight={showRight} />
       </div>
     </EditorProvider>
   );

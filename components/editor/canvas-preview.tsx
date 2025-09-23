@@ -4,26 +4,39 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Minus, Plus, Crosshair } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
 import { useEditor } from "./editor-context";
 import type { AnyLayer, GroupLayer, ShapeLayer } from "@/lib/ca/types";
 
 export function CanvasPreview() {
   const ref = useRef<HTMLDivElement | null>(null);
-  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile } = useEditor();
+  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile, isAnimationPlaying, setIsAnimationPlaying, animatedLayers, setAnimatedLayers } = useEditor();
   const docRef = useRef<typeof doc>(doc);
   useEffect(() => { docRef.current = doc; }, [doc]);
   const [size, setSize] = useState({ w: 600, h: 400 });
   const [userScale, setUserScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [snapState, setSnapState] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const [SNAP_THRESHOLD] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
+  const [snapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
+  const [snapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const panDragRef = useRef<{
     startClientX: number;
     startClientY: number;
     startPanX: number;
     startPanY: number;
   } | null>(null);
-  const draggingRef = useRef<{ id: string; startClientX: number; startClientY: number; startX: number; startY: number } | null>(null);
+  const draggingRef = useRef<{
+    id: string;
+    startClientX: number;
+    startClientY: number;
+    startX: number;
+    startY: number;
+    w: number;
+    h: number;
+  } | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -207,8 +220,12 @@ export function CanvasPreview() {
         (target as any).size = { ...(target as any).size, w: v };
       } else if (kp === 'bounds.size.height' && typeof v === 'number') {
         (target as any).size = { ...(target as any).size, h: v };
-      } else if (kp === 'transform.rotation.z' && typeof v === 'number') {
+      } else if ((kp === 'transform.rotation' || kp === 'transform.rotation.z') && typeof v === 'number') {
         (target as any).rotation = v;
+      } else if (kp === 'transform.rotation.x' && typeof v === 'number') {
+        (target as any).rotationX = v as number;
+      } else if (kp === 'transform.rotation.y' && typeof v === 'number') {
+        (target as any).rotationY = v as number;
       } else if ((kp === 'opacity' || kp === 'cornerRadius' || kp === 'borderWidth' || kp === 'fontSize') && typeof v === 'number') {
         (target as any)[kp] = v as any;
       } else if ((kp === 'backgroundColor' || kp === 'borderColor' || kp === 'color') && typeof v === 'string') {
@@ -218,15 +235,20 @@ export function CanvasPreview() {
     return rootCopy;
   };
 
+  const currentKey = doc?.activeCA ?? 'floating';
+  const current = doc?.docs?.[currentKey];
+  const otherKey = currentKey === 'floating' ? 'background' : 'floating';
+  const other = doc?.docs?.[otherKey];
+
   const appliedLayers = useMemo(() => {
-    if (!doc) return [] as AnyLayer[];
-    return applyOverrides(doc.layers, doc.stateOverrides, doc.activeState);
-  }, [doc?.layers, doc?.stateOverrides, doc?.activeState]);
+    if (!current) return [] as AnyLayer[];
+    return applyOverrides(current.layers, current.stateOverrides, current.activeState);
+  }, [current?.layers, current?.stateOverrides, current?.activeState]);
 
   const [renderedLayers, setRenderedLayers] = useState<AnyLayer[]>(appliedLayers);
   useEffect(() => { setRenderedLayers(appliedLayers); }, []);
 
-  const prevStateRef = useRef<string | undefined>(doc?.activeState);
+  const prevStateRef = useRef<string | undefined>(current?.activeState);
   const animRef = useRef<number | null>(null);
 
   const indexById = (arr: AnyLayer[]) => {
@@ -256,15 +278,16 @@ export function CanvasPreview() {
     else if (keyPath === 'bounds.size.width') (l as any).size = { ...(l as any).size, w: v };
     else if (keyPath === 'bounds.size.height') (l as any).size = { ...(l as any).size, h: v };
     else if (keyPath === 'transform.rotation.z') (l as any).rotation = v as any;
+    else if (keyPath === 'transform.rotation.x') (l as any).rotationX = v as any;
+    else if (keyPath === 'transform.rotation.y') (l as any).rotationY = v as any;
     else if (keyPath === 'opacity') (l as any).opacity = v as any;
   };
 
-  const [isPlaying, setIsPlaying] = useState(false);
   const [timeSec, setTimeSec] = useState(0);
   const lastTsRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!isPlaying) { lastTsRef.current = null; return; }
+    if (!isAnimationPlaying) { lastTsRef.current = null; return; }
     let raf: number | null = null;
     const step = (ts: number) => {
       const last = lastTsRef.current;
@@ -277,7 +300,7 @@ export function CanvasPreview() {
     };
     raf = requestAnimationFrame(step);
     return () => { if (raf) cancelAnimationFrame(raf); };
-  }, [isPlaying]);
+  }, [isAnimationPlaying]);
 
   const evalLayerAnimation = (l: AnyLayer, t: number) => {
     const anim: any = (l as any).animations;
@@ -292,7 +315,12 @@ export function CanvasPreview() {
       ? providedDur
       : Math.max(1, intervals);
     const autorev = Number(anim.autoreverses ?? 0) === 1;
-    let localT = t;
+    const infinite = Number(anim.infinite ?? 1) === 1;
+    const providedRepeat = Number(anim.repeatDurationSeconds);
+    const repeatDuration = Number.isFinite(providedRepeat) && providedRepeat > 0
+      ? providedRepeat
+      : baseDuration;
+    let localT = infinite ? t : Math.min(t, repeatDuration);
     if (autorev) {
       const cycle = baseDuration * 2;
       const m = localT % cycle;
@@ -322,6 +350,21 @@ export function CanvasPreview() {
       const b = Number(values[seg + 1] ?? a);
       const ny = lerp(a, b, f);
       (l as any).position = { ...(l as any).position, y: ny };
+    } else if (keyPath === 'transform.rotation.z') {
+      const a = Number(values[seg] ?? (l as any).rotation ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const nz = lerp(a, b, f);
+      (l as any).rotation = nz;
+    } else if (keyPath === 'transform.rotation.x') {
+      const a = Number(values[seg] ?? (l as any).rotationX ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const nx = lerp(a, b, f);
+      (l as any).rotationX = nx;
+    } else if (keyPath === 'transform.rotation.y') {
+      const a = Number(values[seg] ?? (l as any).rotationY ?? 0);
+      const b = Number(values[seg + 1] ?? a);
+      const ny = lerp(a, b, f);
+      (l as any).rotationY = ny;
     }
   };
 
@@ -337,7 +380,8 @@ export function CanvasPreview() {
     };
     walk(frame);
     setRenderedLayers(frame);
-  }, [timeSec, appliedLayers]);
+    setAnimatedLayers(frame);
+  }, [timeSec, appliedLayers, setAnimatedLayers]);
 
   const hasAnyEnabledAnimation = useMemo(() => {
     const check = (arr: AnyLayer[]): boolean => {
@@ -350,23 +394,23 @@ export function CanvasPreview() {
       }
       return false;
     };
-    return check(doc?.layers || []);
-  }, [doc?.layers]);
+    return check(current?.layers || []);
+  }, [current?.layers]);
 
   useEffect(() => {
-    if (!hasAnyEnabledAnimation && isPlaying) setIsPlaying(false);
-  }, [hasAnyEnabledAnimation, isPlaying]);
+    if (!hasAnyEnabledAnimation && isAnimationPlaying) setIsAnimationPlaying(false);
+  }, [hasAnyEnabledAnimation, isAnimationPlaying]);
 
   useEffect(() => {
     const prevState = prevStateRef.current;
-    const nextState = doc?.activeState;
+    const nextState = current?.activeState;
     if (!doc) return;
     if (prevState === nextState) {
       setRenderedLayers(appliedLayers);
       return;
     }
 
-    const provided = (doc.stateTransitions || []).filter(t =>
+    const provided = (current?.stateTransitions || []).filter(t =>
       (t.fromState === prevState || t.fromState === '*') &&
       (t.toState === nextState || t.toState === '*')
     );
@@ -377,7 +421,7 @@ export function CanvasPreview() {
         if (!gens.length) gens.push({ elements: [] });
         gens[0].elements.push({ targetId, keyPath, animation: { duration } });
       };
-      const ovs = doc.stateOverrides || {};
+      const ovs = current?.stateOverrides || {};
       const toList = ovs[nextState || ''] || [];
       const fromList = ovs[prevState || ''] || [];
       const keys = [
@@ -474,7 +518,7 @@ export function CanvasPreview() {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       animRef.current = null;
     };
-  }, [doc?.activeState, appliedLayers, doc?.stateTransitions]);
+  }, [current?.activeState, appliedLayers, current?.stateTransitions]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -511,17 +555,38 @@ export function CanvasPreview() {
     return () => window.removeEventListener('keydown', handler);
   }, [baseOffsetX, baseOffsetY, fitScale, pan.x, pan.y, scale, userScale]);
 
-  const startDrag = (l: AnyLayer, e: ReactMouseEvent) => {
+  // Anchor/flip helpers used by drag and render
+  const getAnchor = (l: AnyLayer) => ({ x: (l as any).anchorPoint?.x ?? 0.5, y: (l as any).anchorPoint?.y ?? 0.5 });
+  const getRootFlip = () => (doc?.meta.geometryFlipped ?? 0) as 0 | 1;
+  const computeCssLT = (l: AnyLayer, containerH: number, useYUp: boolean) => {
+    const a = getAnchor(l);
+    const left = (l.position.x) - a.x * l.size.w;
+    const top = useYUp ? (containerH - (l.position.y + (1 - a.y) * l.size.h)) : (l.position.y - a.y * l.size.h);
+    return { left, top };
+  };
+  const cssToPosition = (cssLeft: number, cssTop: number, l: AnyLayer, containerH: number, useYUp: boolean) => {
+    const a = getAnchor(l);
+    const x = cssLeft + a.x * l.size.w;
+    const y = useYUp ? ((containerH - cssTop) - (1 - a.y) * l.size.h) : (cssTop + a.y * l.size.h);
+    return { x, y };
+  };
+
+  const startDrag = (l: AnyLayer, e: ReactMouseEvent, containerH?: number, useYUp?: boolean) => {
     if (e.shiftKey || e.button === 1) return;
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
+    const canvasH = containerH ?? (docRef.current?.meta.height ?? 0);
+    const yUp = useYUp ?? (getRootFlip() === 0);
+    const startLT = computeCssLT(l, canvasH, yUp);
     draggingRef.current = {
       id: l.id,
       startClientX: e.clientX,
       startClientY: e.clientY,
-      startX: l.position.x,
-      startY: l.position.y,
+      startX: startLT.left,
+      startY: startLT.top,
+      w: l.size.w,
+      h: l.size.h,
     };
     document.body.style.userSelect = "none";
 
@@ -530,17 +595,120 @@ export function CanvasPreview() {
       if (!d) return;
       const dx = (ev.clientX - d.startClientX) / scale;
       const dy = (ev.clientY - d.startClientY) / scale;
-      updateLayerTransient(d.id, { position: { x: d.startX + dx, y: d.startY + dy } as any });
+      let cssLeft = d.startX + dx;
+      let cssTop = d.startY + dy;
+      const w = docRef.current?.meta.width ?? 0;
+      const h = docRef.current?.meta.height ?? 0;
+      if (w > 0 && h > 0 && (snapEdgesEnabled || snapLayersEnabled)) {
+        const th = SNAP_THRESHOLD;
+        const xPairs: Array<[number, number]> = [];
+        const yPairs: Array<[number, number]> = [];
+        if (snapEdgesEnabled) {
+          xPairs.push([0, 0], [(w - d.w) / 2, w / 2], [w - d.w, w]);
+          yPairs.push([0, 0], [(h - d.h) / 2, h / 2], [h - d.h, h]);
+        }
+        if (snapLayersEnabled) {
+          const others = (renderedLayers || []).filter((ol) => ol.id !== d.id);
+          for (const ol of others) {
+            const L = ol as any;
+            const lw = L.size?.w ?? 0;
+            const lh = L.size?.h ?? 0;
+            const lt = computeCssLT(L, h, yUp);
+            const left = lt.left;
+            const right = lt.left + lw;
+            const cx = left + lw / 2;
+            const top = lt.top;
+            const bottom = lt.top + lh;
+            const cy = top + lh / 2;
+            xPairs.push(
+              [left, left],
+              [right, right],
+              [right - d.w, right],
+              [left - d.w, left],
+              [cx - d.w / 2, cx],
+            );
+            yPairs.push(
+              [top, top],
+              [bottom, bottom],
+              [bottom - d.h, bottom],
+              [top - d.h, top],
+              [cy - d.h / 2, cy],
+            );
+          }
+        }
+        const nearestPair = (val: number, pairs: Array<[number, number]>) => {
+          let best = val;
+          let guide: number | null = null;
+          let bestDist = th + 1;
+          for (const [t, g] of pairs) {
+            const dist = Math.abs(val - t);
+            if (dist <= th && dist < bestDist) { best = t; bestDist = dist; guide = g; }
+          }
+          return { value: best, guide };
+        };
+        const nx = nearestPair(cssLeft, xPairs);
+        const ny = nearestPair(cssTop, yPairs);
+        cssLeft = nx.value; cssTop = ny.value;
+        setSnapState({ x: nx.guide, y: ny.guide });
+      } else {
+        setSnapState({ x: null, y: null });
+      }
+      const pos = cssToPosition(cssLeft, cssTop, (renderedLayers.find(r=>r.id===d.id) as AnyLayer) || (l as AnyLayer), h, yUp);
+      updateLayerTransient(d.id, { position: { x: pos.x, y: pos.y } as any });
     };
+
     const onUp = (ev: MouseEvent) => {
       const d = draggingRef.current;
       if (d) {
         const dx = (ev.clientX - d.startClientX) / scale;
         const dy = (ev.clientY - d.startClientY) / scale;
-        updateLayer(d.id, { position: { x: d.startX + dx, y: d.startY + dy } as any });
+        let cssLeft = d.startX + dx;
+        let cssTop = d.startY + dy;
+        const w = docRef.current?.meta.width ?? 0;
+        const h = docRef.current?.meta.height ?? 0;
+        if (w > 0 && h > 0 && (snapEdgesEnabled || snapLayersEnabled)) {
+          const th = SNAP_THRESHOLD;
+          const xPairs: Array<[number, number]> = [];
+          const yPairs: Array<[number, number]> = [];
+          if (snapEdgesEnabled) {
+            xPairs.push([0, 0], [(w - d.w) / 2, w / 2], [w - d.w, w]);
+            yPairs.push([0, 0], [(h - d.h) / 2, h / 2], [h - d.h, h]);
+          }
+          if (snapLayersEnabled) {
+            const others = (renderedLayers || []).filter((ol) => ol.id !== d.id);
+            for (const ol of others) {
+              const L = ol as any;
+              const lw = L.size?.w ?? 0;
+              const lh = L.size?.h ?? 0;
+              const lt = computeCssLT(L, h, yUp);
+              const left = lt.left;
+              const right = lt.left + lw;
+              const cx = left + lw / 2;
+              const top = lt.top;
+              const bottom = lt.top + lh;
+              const cy = top + lh / 2;
+              xPairs.push([left, left],[right, right],[right - d.w, right],[left - d.w, left],[cx - d.w / 2, cx]);
+              yPairs.push([top, top],[bottom, bottom],[bottom - d.h, bottom],[top - d.h, top],[cy - d.h / 2, cy]);
+            }
+          }
+          const nearest = (val: number, pairs: Array<[number, number]>) => {
+            let best = val;
+            let bestDist = th + 1;
+            for (const [t] of pairs) {
+              const dist = Math.abs(val - t);
+              if (dist <= th && dist < bestDist) { best = t; bestDist = dist; }
+            }
+            return best;
+          };
+          cssLeft = nearest(cssLeft, xPairs);
+          cssTop = nearest(cssTop, yPairs);
+        }
+        const pos = cssToPosition(cssLeft, cssTop, (renderedLayers.find(r=>r.id===d.id) as AnyLayer) || (l as AnyLayer), h, yUp);
+        updateLayer(d.id, { position: { x: pos.x, y: pos.y } as any });
       }
       draggingRef.current = null;
       document.body.style.userSelect = "";
+      setSnapState({ x: null, y: null });
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -548,13 +716,21 @@ export function CanvasPreview() {
     window.addEventListener("mouseup", onUp);
   };
 
-  const renderLayer = (l: AnyLayer): ReactNode => {    const common: React.CSSProperties = {
+  // moved helpers above
+
+  const renderLayer = (l: AnyLayer, containerH: number = (doc?.meta.height ?? 0), useYUp: boolean = getRootFlip() === 0): ReactNode => {
+    const { left, top } = computeCssLT(l, containerH, useYUp);
+    const a = getAnchor(l);
+    const common: React.CSSProperties = {
       position: "absolute",
-      left: l.position.x,
-      top: l.position.y,
+      left,
+      top,
       width: l.size.w,
       height: l.size.h,
-      transform: `rotate(${l.rotation ?? 0}deg)`,
+      transform: `perspective(800px) rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${l.rotation ?? 0}deg)`,
+      transformOrigin: `${a.x * 100}% ${a.y * 100}%`,
+      backfaceVisibility: "visible",
+      transformStyle: "preserve-3d",
       display: l.visible === false ? "none" : undefined,
       cursor: "move",
     };
@@ -564,7 +740,7 @@ export function CanvasPreview() {
         <div
           key={l.id}
           style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: l.align ?? "left" }}
-          onMouseDown={(e) => startDrag(l, e)}
+          onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
         >
           {l.text}
         </div>
@@ -583,7 +759,7 @@ export function CanvasPreview() {
             maxHeight: "none",
           }}
           draggable={false}
-          onMouseDown={(e) => startDrag(l, e)}
+          onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
         />
       );
     }
@@ -593,14 +769,15 @@ export function CanvasPreview() {
       const legacy = s.radius;
       const borderRadius = s.shape === "circle" ? 9999 : ((corner ?? legacy ?? 0));
       return (
-        <div key={l.id} style={{ ...common, background: s.fill, borderRadius }} onMouseDown={(e) => startDrag(l, e)} />
+        <div key={l.id} style={{ ...common, background: s.fill, borderRadius }} onMouseDown={(e) => startDrag(l, e, containerH, useYUp)} />
       );
     }
     // group
     const g = l as GroupLayer;
+    const nextUseYUp = useYUp; // stacking future support
     return (
-      <div key={g.id} style={{ ...common, background: g.backgroundColor }} onMouseDown={(e) => startDrag(g, e)}>
-        {g.children.map((c) => renderLayer(c))}
+      <div key={g.id} style={{ ...common, background: g.backgroundColor }} onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}>
+        {g.children.map((c) => renderLayer(c, g.size.h, nextUseYUp))}
       </div>
     );
   };
@@ -637,6 +814,10 @@ export function CanvasPreview() {
         startH: number;
         startClientX: number;
         startClientY: number;
+        startLeft: number;
+        startTop: number;
+        canvasH: number;
+        yUp: boolean;
         lastX: number;
         lastY: number;
         lastW: number;
@@ -651,6 +832,8 @@ export function CanvasPreview() {
         centerX: number;
         centerY: number;
         startAngle: number;
+        canvasH: number;
+        yUp: boolean;
         lastRot: number;
       }
     | null
@@ -661,6 +844,9 @@ export function CanvasPreview() {
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
+    const canvasH = docRef.current?.meta.height ?? 0;
+    const yUp = (getRootFlip() === 0);
+    const startLT = computeCssLT(l, canvasH, yUp);
     resizeDragRef.current = {
       id: l.id,
       handle,
@@ -670,6 +856,10 @@ export function CanvasPreview() {
       startH: l.size.h,
       startClientX: e.clientX,
       startClientY: e.clientY,
+      startLeft: startLT.left,
+      startTop: startLT.top,
+      canvasH,
+      yUp,
       lastX: l.position.x,
       lastY: l.position.y,
       lastW: l.size.w,
@@ -682,19 +872,19 @@ export function CanvasPreview() {
       const currentWorld = clientToWorld(ev.clientX, ev.clientY);
       const dx = currentWorld.x - startWorld.x;
       const dy = currentWorld.y - startWorld.y;
-      let x = d.startX;
-      let y = d.startY;
+      let left = d.startLeft;
+      let top = d.startTop;
       let w = d.startW;
       let h = d.startH;
       switch (d.handle) {
         case "e": w = Math.max(1, d.startW + dx); break;
-        case "w": w = Math.max(1, d.startW - dx); x = d.startX + dx; break;
+        case "w": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; break;
         case "s": h = Math.max(1, d.startH + dy); break;
-        case "n": h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
+        case "n": h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
         case "se": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH + dy); break;
-        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
-        case "sw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH + dy); break;
-        case "nw": w = Math.max(1, d.startW - dx); x = d.startX + dx; h = Math.max(1, d.startH - dy); y = d.startY + dy; break;
+        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
+        case "sw": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; h = Math.max(1, d.startH + dy); break;
+        case "nw": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
       }
       if (ev.shiftKey && d.startW > 0 && d.startH > 0) {
         const aspect = d.startW / d.startH;
@@ -710,17 +900,22 @@ export function CanvasPreview() {
           if (dw >= dh) h = Math.max(1, w / aspect);
           else w = Math.max(1, h * aspect);
         }
+        // Reposition the active handle so the opposite edge stays fixed in CSS space
         switch (d.handle) {
-          case "e": x = d.startX; break;
-          case "w": x = d.startX + (d.startW - w); break;
-          case "s": y = d.startY; break;
-          case "n": y = d.startY + (d.startH - h); break;
-          case "se": x = d.startX; y = d.startY; break;
-          case "ne": x = d.startX; y = d.startY + (d.startH - h); break;
-          case "sw": x = d.startX + (d.startW - w); y = d.startY; break;
-          case "nw": x = d.startX + (d.startW - w); y = d.startY + (d.startH - h); break;
+          case "e": left = d.startLeft; break;
+          case "w": left = d.startLeft + (d.startW - w); break;
+          case "s": top = d.startTop; break;
+          case "n": top = d.startTop + (d.startH - h); break;
+          case "se": left = d.startLeft; top = d.startTop; break;
+          case "ne": left = d.startLeft; top = d.startTop + (d.startH - h); break;
+          case "sw": left = d.startLeft + (d.startW - w); top = d.startTop; break;
+          case "nw": left = d.startLeft + (d.startW - w); top = d.startTop + (d.startH - h); break;
         }
       }
+      // Convert CSS-space back to position (center/anchor aware)
+      const a = getAnchor((renderedLayers.find(r => r.id === d.id) as AnyLayer) || (l as AnyLayer));
+      const x = left + a.x * w;
+      const y = d.yUp ? ((d.canvasH - top) - (1 - a.y) * h) : (top + a.y * h);
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
       d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
@@ -742,16 +937,23 @@ export function CanvasPreview() {
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
-    const centerX = l.position.x + l.size.w / 2;
-    const centerY = l.position.y + l.size.h / 2;
+    const canvasH = docRef.current?.meta.height ?? 0;
+    const yUp = (getRootFlip() === 0);
+    const lt = computeCssLT(l, canvasH, yUp);
+    const a = getAnchor(l);
+    const centerX = lt.left + a.x * l.size.w;
+    const centerY = lt.top + a.y * l.size.h;
     const world = clientToWorld(e.clientX, e.clientY);
     const angle0 = Math.atan2(world.y - centerY, world.x - centerX) * 180 / Math.PI;
-    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0), lastRot: l.rotation ?? 0 };
+    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0), canvasH, yUp, lastRot: l.rotation ?? 0 };
     const onMove = (ev: MouseEvent) => {
       const d = rotationDragRef.current;
       if (!d) return;
       const wpt = clientToWorld(ev.clientX, ev.clientY);
-      const angle = Math.atan2(wpt.y - d.centerY, wpt.x - d.centerX) * 180 / Math.PI;
+      let angle = Math.atan2(wpt.y - d.centerY, wpt.x - d.centerX) * 180 / Math.PI;
+      if (ev.shiftKey) {
+        angle = Math.round(angle / 15) * 15;
+      }
       const rot = angle - d.startAngle;
       d.lastRot = rot;
       updateLayerTransient(d.id, { rotation: rot as any });
@@ -770,71 +972,83 @@ export function CanvasPreview() {
   };
 
   const renderSelectionOverlay = (l: AnyLayer) => {
-    const boxStyle: React.CSSProperties = {
-      position: "absolute",
-      left: l.position.x,
-      top: l.position.y,
-      width: l.size.w,
-      height: l.size.h,
-      transform: `rotate(${l.rotation ?? 0}deg)`,
-      outline: "1px solid rgba(59,130,246,0.9)",
-      boxShadow: "0 0 0 2px rgba(59,130,246,0.2) inset",
-      pointerEvents: "none",
-    };
-    const handleStyleBase: React.CSSProperties = {
-      position: "absolute",
-      width: 8,
-      height: 8,
-      background: "#ffffff",
-      border: "1px solid #3b82f6",
-      borderRadius: 2,
-      boxShadow: "0 0 0 1px rgba(0,0,0,0.05)",
-      transform: "translate(-50%, -50%)",
-      pointerEvents: "auto",
-      cursor: "nwse-resize",
-    };
-    const handles: Array<{ key: string; x: string | number; y: string | number; cursor: React.CSSProperties["cursor"]; h: any }>
-      = [
-        { key: "nw", x: 0, y: 0, cursor: "nwse-resize", h: (e: any) => beginResize(l, "nw", e) },
-        { key: "n", x: "50%", y: 0, cursor: "ns-resize", h: (e: any) => beginResize(l, "n", e) },
-        { key: "ne", x: "100%", y: 0, cursor: "nesw-resize", h: (e: any) => beginResize(l, "ne", e) },
-        { key: "e", x: "100%", y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "e", e) },
-        { key: "se", x: "100%", y: "100%", cursor: "nwse-resize", h: (e: any) => beginResize(l, "se", e) },
-        { key: "s", x: "50%", y: "100%", cursor: "ns-resize", h: (e: any) => beginResize(l, "s", e) },
-        { key: "sw", x: 0, y: "100%", cursor: "nesw-resize", h: (e: any) => beginResize(l, "sw", e) },
-        { key: "w", x: 0, y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "w", e) },
-      ];
-    const rotationHandleStyle: React.CSSProperties = {
-      position: "absolute",
-      left: "50%",
-      top: -20,
-      width: 10,
-      height: 10,
-      background: "#fff",
-      border: "1px solid #3b82f6",
-      borderRadius: 9999,
-      transform: "translate(-50%, -50%)",
-      cursor: "grab",
-      pointerEvents: "auto",
-    };
-    return (
+  const boxStyle: React.CSSProperties = {
+    position: "absolute",
+    left: computeCssLT(l, (doc?.meta.height ?? 0), getRootFlip() === 0).left,
+    top: computeCssLT(l, (doc?.meta.height ?? 0), getRootFlip() === 0).top,
+    width: l.size.w,
+    height: l.size.h,
+    transform: `perspective(800px) rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${l.rotation ?? 0}deg)`,
+    transformOrigin: `${((l as any).anchorPoint?.x ?? 0.5) * 100}% ${((l as any).anchorPoint?.y ?? 0.5) * 100}%`,
+    backfaceVisibility: "hidden",
+    transformStyle: "preserve-3d",
+    outline: "1px solid rgba(59,130,246,0.9)",
+    boxShadow: "0 0 0 2px rgba(59,130,246,0.2) inset",
+    pointerEvents: "none",
+  };
+  const handleStyleBase: React.CSSProperties = {
+    position: "absolute",
+    width: 8,
+    height: 8,
+    background: "#ffffff",
+    border: "1px solid #3b82f6",
+    borderRadius: 2,
+    boxShadow: "0 0 0 1px rgba(0,0,0,0.05)",
+    transform: "translate(-50%, -50%)",
+    pointerEvents: "auto",
+    cursor: "nwse-resize",
+  };
+  const handles: Array<{ key: string; x: string | number; y: string | number; cursor: React.CSSProperties["cursor"]; h: any }>
+    = [
+      { key: "nw", x: 0, y: 0, cursor: "nwse-resize", h: (e: any) => beginResize(l, "nw", e) },
+      { key: "n", x: "50%", y: 0, cursor: "ns-resize", h: (e: any) => beginResize(l, "n", e) },
+      { key: "ne", x: "100%", y: 0, cursor: "nesw-resize", h: (e: any) => beginResize(l, "ne", e) },
+      { key: "e", x: "100%", y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "e", e) },
+      { key: "se", x: "100%", y: "100%", cursor: "nwse-resize", h: (e: any) => beginResize(l, "se", e) },
+      { key: "s", x: "50%", y: "100%", cursor: "ns-resize", h: (e: any) => beginResize(l, "s", e) },
+      { key: "sw", x: 0, y: "100%", cursor: "nesw-resize", h: (e: any) => beginResize(l, "sw", e) },
+      { key: "w", x: 0, y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "w", e) },
+    ];
+  const rotationHandleStyle: React.CSSProperties = {
+    position: "absolute",
+    left: "50%",
+    top: -20,
+    width: 10,
+    height: 10,
+    background: "#fff",
+    border: "1px solid #3b82f6",
+    borderRadius: 9999,
+    transform: "translate(-50%, -50%)",
+    cursor: "grab",
+    pointerEvents: "auto",
+  };
+  // showBoth removed: no overlay rendering of the non-active CA
+  return (
+    <>
       <div style={boxStyle}>
+        {/* Resize handles */}
         {handles.map((h) => (
           <div
             key={h.key}
             style={{ ...handleStyleBase, left: h.x, top: h.y, cursor: h.cursor }}
-            onMouseDown={(e) => h.h(e)}
+            onMouseDown={h.h}
           />
         ))}
-        <div style={rotationHandleStyle} onMouseDown={(e) => beginRotate(l, e)} />
+        {/* Rotation handle */}
+        <div
+          style={rotationHandleStyle}
+          onMouseDown={(e) => beginRotate(l, e)}
+        />
       </div>
-    );
-  };
+    </>
+  );
+};
 
   return (
     <Card
       ref={ref}
       className={`relative w-full h-full overflow-hidden p-0 ${isPanning ? 'cursor-grabbing' : ''}`}
+      data-tour-id="canvas"
       onDragOver={(e) => {
         e.preventDefault();
       }}
@@ -925,10 +1139,29 @@ export function CanvasPreview() {
           selectLayer(null);
         }}
       >
+        {/* overlay removed */}
         {renderedLayers.map((l) => renderLayer(l))}
         {(() => {
-          const sel = findById(renderedLayers, doc?.selectedId ?? null);
+          const sel = findById(renderedLayers, current?.selectedId ?? null);
           return sel ? renderSelectionOverlay(sel) : null;
+        })()}
+        {(() => {
+          const w = doc?.meta.width ?? 0;
+          const h = doc?.meta.height ?? 0;
+          if (!w || !h) return null;
+          const sx = snapState.x;
+          const sy = snapState.y;
+          if (sx == null && sy == null) return null;
+          const lineColor = 'rgba(59,130,246,0.9)';
+          const lineShadow = '0 0 0 1px rgba(59,130,246,0.25)';
+          const guides: React.ReactNode[] = [];
+          if (typeof sx === 'number') {
+            guides.push(<div key="v" style={{ position: 'absolute', left: sx, top: 0, bottom: 0, width: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateX(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          }
+          if (typeof sy === 'number') {
+            guides.push(<div key="h" style={{ position: 'absolute', top: sy, left: 0, right: 0, height: 2, background: lineColor, boxShadow: lineShadow, transform: 'translateY(-1px)', zIndex: 1000, pointerEvents: 'none' }} />);
+          }
+          return <>{guides}</>;
         })()}
       </div>
 
@@ -997,9 +1230,9 @@ export function CanvasPreview() {
             type="button"
             size="sm"
             variant="secondary"
-            onClick={() => setIsPlaying((p) => !p)}
+            onClick={() => setIsAnimationPlaying((p: boolean) => !p)}
           >
-            {isPlaying ? 'Pause' : 'Play'}
+            {isAnimationPlaying ? 'Pause' : 'Play'}
           </Button>
           <Button
             type="button"

@@ -5,11 +5,13 @@ import { useEditor } from "./editor-context";
 
 export function StatesPanel() {
   const { doc, setActiveState } = useEditor();
-  const states = doc?.states ?? [];
-  const active = doc?.activeState || 'Base State';
+  const key = doc?.activeCA ?? 'floating';
+  const current = doc?.docs?.[key];
+  const states = current?.states ?? [];
+  const active = current?.activeState || 'Base State';
 
   return (
-    <Card className="p-3 h-full flex flex-col">
+    <Card className="p-3 h-full flex flex-col" data-tour-id="states-panel">
       <div className="flex items-center justify-between mb-2">
         <div className="font-medium">States</div>
       </div>
