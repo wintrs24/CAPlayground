@@ -498,7 +498,7 @@ export default function ProjectsPage() {
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
                   onKeyDown={handleKeyPress}
-                  placeholder="My Animation"
+                  placeholder="New Wallpaper"
                   autoFocus
                 />
               </div>
