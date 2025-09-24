@@ -44,6 +44,7 @@ export type EditorContextValue = {
   copySelectedLayer: () => void;
   pasteFromClipboard: (payload?: any) => void;
   duplicateLayer: (id?: string) => void;
+  moveLayer: (sourceId: string, beforeId: string | null) => void;
   persist: () => void;
   undo: () => void;
   redo: () => void;
@@ -424,6 +425,76 @@ export function EditorProvider({
     });
   }, []);
 
+  const removeFromTree = useCallback((layers: AnyLayer[], id: string): { removed: AnyLayer | null; layers: AnyLayer[] } => {
+    let removed: AnyLayer | null = null;
+    const next: AnyLayer[] = [];
+    for (const l of layers) {
+      if (l.id === id) {
+        removed = l;
+        continue;
+      }
+      if (l.type === 'group') {
+        const g = l as GroupLayer;
+        const res = removeFromTree(g.children, id);
+        if (res.removed) removed = res.removed;
+        next.push({ ...g, children: res.layers } as AnyLayer);
+      } else {
+        next.push(l);
+      }
+    }
+    return { removed, layers: next };
+  }, []);
+
+  const insertBeforeInTree = useCallback((layers: AnyLayer[], targetId: string, node: AnyLayer): { inserted: boolean; layers: AnyLayer[] } => {
+    let inserted = false;
+    const next: AnyLayer[] = [];
+    for (let i = 0; i < layers.length; i++) {
+      const l = layers[i];
+      if (!inserted && l.id === targetId) {
+        next.push(node);
+        next.push(l);
+        inserted = true;
+      } else if (l.type === 'group') {
+        const g = l as GroupLayer;
+        const res = insertBeforeInTree(g.children, targetId, node);
+        if (res.inserted) {
+          inserted = true;
+          next.push({ ...g, children: res.layers } as AnyLayer);
+        } else {
+          next.push(l);
+        }
+      } else {
+        next.push(l);
+      }
+    }
+    return { inserted, layers: next };
+  }, []);
+
+  const moveLayer = useCallback((sourceId: string, beforeId: string | null) => {
+    if (!sourceId || sourceId === beforeId) return;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const key = prev.activeCA;
+      const cur = prev.docs[key];
+      const removedRes = removeFromTree(cur.layers, sourceId);
+      const node = removedRes.removed;
+      if (!node) return prev;
+      let nextLayers: AnyLayer[] = removedRes.layers;
+      if (beforeId) {
+        const ins = insertBeforeInTree(nextLayers, beforeId, node);
+        nextLayers = ins.layers;
+        if (!ins.inserted) {
+          nextLayers = [...nextLayers, node];
+        }
+      } else {
+        nextLayers = [...nextLayers, node];
+      }
+      pushHistory(prev);
+      const nextCur = { ...cur, layers: nextLayers } as CADoc;
+      return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as ProjectDocument;
+    });
+  }, [removeFromTree, insertBeforeInTree, pushHistory]);
+
   const deleteInTree = useCallback((layers: AnyLayer[], id: string): AnyLayer[] => {
     const next: AnyLayer[] = [];
     for (const l of layers) {
@@ -721,6 +792,7 @@ export function EditorProvider({
     copySelectedLayer,
     pasteFromClipboard,
     duplicateLayer,
+    moveLayer,
     persist,
     undo,
     redo,

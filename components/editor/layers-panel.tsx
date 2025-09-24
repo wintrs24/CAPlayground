@@ -5,24 +5,47 @@ import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, Trash2, Copy } from "lucide-react";
 import { useEditor } from "./editor-context";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 
 export function LayersPanel() {
-  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, deleteLayer, duplicateLayer } = useEditor();
+  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, deleteLayer, duplicateLayer, moveLayer } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const key = doc?.activeCA ?? 'floating';
   const current = doc?.docs?.[key];
   const layers = current?.layers ?? [];
   const selectedId = current?.selectedId ?? null;
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const renderItem = (l: AnyLayer, depth: number) => {
     const row = (
       <div
         key={l.id}
-        className={`px-2 py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+        className={`px-2 py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'} ${dragOverId === l.id ? 'ring-1 ring-accent/60' : ''}`}
         onClick={() => selectLayer(l.id)}
         style={{ paddingLeft: 8 + depth * 12 }}
+        draggable
+        onDragStart={(e) => {
+          e.stopPropagation();
+          e.dataTransfer.setData('text/cap-layer-id', l.id);
+          try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setDragOverId(l.id);
+        }}
+        onDragLeave={() => {
+          setDragOverId((prev) => (prev === l.id ? null : prev));
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const src = e.dataTransfer.getData('text/cap-layer-id');
+          setDragOverId(null);
+          if (!src || src === l.id) return;
+          moveLayer(src, l.id);
+        }}
       >
         <div className="truncate">
           {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type})</span>
@@ -101,7 +124,16 @@ export function LayersPanel() {
         >
           Root Layer
         </div>
-        <div className="flex-1 overflow-auto">
+        <div
+          className="flex-1 overflow-auto"
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+          onDrop={(e) => {
+            const src = e.dataTransfer.getData('text/cap-layer-id');
+            setDragOverId(null);
+            if (!src) return;
+            moveLayer(src, null);
+          }}
+        >
           {layers.length === 0 && (
             <div className="px-2 py-2 text-muted-foreground">No layers yet</div>
           )}
