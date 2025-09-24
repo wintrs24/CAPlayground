@@ -52,17 +52,22 @@ export default async function HomePage() {
                   </p>
 
                   <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-3 max-[600px]:hidden">
-                    <Link href="/projects">
-                      <Button
-                        size="lg"
-                        className="px-6 bg-accent hover:bg-accent/90 text-white font-semibold"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          Try Beta
-                          <Send className="h-5 w-5" aria-hidden="true" />
-                        </span>
-                      </Button>
-                    </Link>
+                    <div className="relative flex flex-col items-center lg:items-start">
+                      <Link href="/projects">
+                        <Button
+                          size="lg"
+                          className="px-6 bg-accent hover:bg-accent/90 text-white font-semibold"
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            Get Started
+                            <Send className="h-5 w-5" aria-hidden="true" />
+                          </span>
+                        </Button>
+                      </Link>
+                      <span className="absolute left-0 top-full mt-1 text-[11px] leading-none text-muted-foreground opacity-70 select-none pointer-events-none">
+                        No sign in required!
+                      </span>
+                    </div>
 
                     <Link href="https://github.com/CAPlayground/CAPlayground" target="_blank" rel="noopener noreferrer">
                       <Button size="lg" variant="outline" className="px-6">
@@ -117,7 +122,7 @@ export default async function HomePage() {
                   <Link href="/projects" className="w-full">
                     <Button size="lg" className="w-full h-12 text-base px-6 bg-accent hover:bg-accent/90 text-white font-semibold">
                       <span className="inline-flex items-center justify-center gap-2">
-                        Try Beta
+                        Get Started
                         <Send className="h-5 w-5" aria-hidden="true" />
                       </span>
                     </Button>
