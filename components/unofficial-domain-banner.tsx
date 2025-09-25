@@ -7,6 +7,7 @@ import { TriangleAlert } from "lucide-react";
 function isOfficialHost(hostname: string): boolean {
   if (hostname === "127.0.0.1" || hostname === "[::1]") return true;
   const baseDomains = [
+    "localhost",
     "caplayground.pages.dev",
     "caplayground.enkei64.xyz",
     "caplayground.netlify.app",
