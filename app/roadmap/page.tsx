@@ -12,7 +12,7 @@ export default function RoadmapPage() {
         <section className="container mx-auto px-12 md:px-30 py-16 md:py-24">
         <header className="mb-10 space-y-2">
           <h1 className="font-heading text-4xl md:text-5xl font-bold">Project Roadmap</h1>
-          <p className="text-muted-foreground">What's cooking in CAPlayground? (Last Updated: 23rd September, 2025)</p>
+          <p className="text-muted-foreground">What's cooking in CAPlayground? (Last Updated: 25th September, 2025)</p>
         </header>
 
         {/* Status Badges
@@ -34,13 +34,13 @@ export default function RoadmapPage() {
           <RoadmapItem index={4} title="Core Animation Layer Properties" status={<Badge>Done: 5th August, 2025</Badge>}>
             Adjusting position, bounds, opacity, rotation, and more of layers.
           </RoadmapItem>
-          <RoadmapItem index={5} title="Creating Animations, Viewing and Editing States" status={<Badge>Done: 22th August, 2025</Badge>}>
+          <RoadmapItem index={5} title="Creating Animations, Viewing and Editing States" status={<Badge>Done: 22nd September, 2025</Badge>}>
             Creating state transitions and keyframe animations.
           </RoadmapItem>
-          <RoadmapItem index={6} title="CAPlayground App" status={<Badge variant="outline">Starting Soon</Badge>}>
+          <RoadmapItem index={6} title="CAPlayground App" status={<Badge variant="secondary" className="align-middle mx-1">In Progress</Badge>}>
             CAPlayground app to work inside an app.
           </RoadmapItem>
-          <RoadmapItem index={7} title="Continue with Improvements" status={<Badge variant="outline">Not Started</Badge>}>
+          <RoadmapItem index={7} title="Continue with Improvements" status={<Badge variant="outline">For the future</Badge>}>
             Continue with improvements and features to perfect CAPlayground. This includes more inspector functionality, animations, and layer types.
           </RoadmapItem>
         </div>
