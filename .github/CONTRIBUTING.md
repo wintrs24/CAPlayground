@@ -34,7 +34,7 @@ Thanks for your interest in contributing! This guide helps you get set up and su
 - TypeScript required; keep strict types where practical
 - Prefer small, focused PRs (I don't always have that much time)
 - Keep UI state colocated; shared editor state goes in `EditorProvider` (`components/editor/editor-context.tsx`)
-- Styling -ailwind CSS (utility-first). Use existing tokens/classes when possible
+- Styling - tailwind CSS (utility-first). Use existing tokens/classes when possible
 - Accessibility - label controls (`<Label htmlFor=...>`), `aria-*` on interactive elements
 - Dark mode - verify both light/dark themes (uses `next-themes`)
 - Persistence - editor auto-saves to `localStorage` via `useLocalStorage`
@@ -44,8 +44,8 @@ Thanks for your interest in contributing! This guide helps you get set up and su
 - [ ] Linked issue (if applicable)
 - [ ] Clear description of changes and rationale
 - [ ] Screenshots/GIFs for visual changes
-- [ ] Verified build: `pnpm build`
-- [ ] Verified run: `pnpm dev` and exercised the changed areas
+- [ ] Verified build: `npm build`
+- [ ] Verified run: `npm dev` and exercised the changed areas
 - [ ] No console errors; no type errors
 
 ## How to Submit a PR
