@@ -64,7 +64,7 @@ export default function ProjectsPage() {
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "7" | "30" | "year">("all");
   const [sortBy, setSortBy] = useState<"recent" | "name-asc" | "name-desc">("recent");
-  const PAGE_SIZE = 9;
+  const PAGE_SIZE = 8;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -152,6 +152,36 @@ export default function ProjectsPage() {
       }
     })();
   }, []);
+
+  const renderHighlighted = (text: string, q: string) => {
+    const query = (q || "").trim();
+    if (!query) return text;
+    const esc = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    try {
+      const re = new RegExp(esc, "ig");
+      const parts: Array<{ str: string; match: boolean }> = [];
+      let lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text)) !== null) {
+        if (m.index > lastIndex) parts.push({ str: text.slice(lastIndex, m.index), match: false });
+        parts.push({ str: m[0], match: true });
+        lastIndex = re.lastIndex;
+      }
+      if (lastIndex < text.length) parts.push({ str: text.slice(lastIndex), match: false });
+      return (
+        <>
+          {parts.map((p, i) => p.match
+            ? <span key={i} className="bg-yellow-200/60 dark:bg-yellow-300/20 rounded px-0.5">
+                {p.str}
+              </span>
+            : <span key={i}>{p.str}</span>
+          )}
+        </>
+      );
+    } catch {
+      return text;
+    }
+  };
 
   const recordProjectCreated = () => {
     try {
@@ -550,8 +580,8 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="container mx-auto px-2 sm:px-4 py-8">
+      <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between pt-6">
           <div className="flex-1">
             <div className="mb-2">
@@ -708,7 +738,7 @@ export default function ProjectsPage() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredProjects.slice(0, visibleCount).map((project) => {
                 const isSelected = selectedIds.includes(project.id);
                 const pv = previews[project.id];
@@ -748,7 +778,7 @@ export default function ProjectsPage() {
                           }}
                         >
                           <h3 className="font-medium block truncate" title={project.name}>
-                            {project.name}
+                            {renderHighlighted(project.name, query)}
                           </h3>
                           <p className="text-xs text-muted-foreground mt-1">
                             Created: {new Date(project.createdAt).toLocaleDateString()}
