@@ -13,6 +13,7 @@ import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SquareSlash } from "lucide-react";
 
 export function Inspector() {
   const { doc, setDoc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
@@ -158,7 +159,12 @@ export function Inspector() {
     return (
       <Card className="p-3 h-full" data-tour-id="inspector">
         <div className="font-medium mb-2">Inspector</div>
-        <div className="text-sm text-muted-foreground">Select a layer to edit its properties.</div>
+        <div className="h-[calc(100%-1.75rem)] flex items-center justify-center">
+          <div className="flex flex-col items-center text-center text-muted-foreground">
+            <SquareSlash className="h-20 w-20 mb-3" />
+            <div className="text-m">Select a layer to edit its properties.</div>
+          </div>
+        </div>
       </Card>
     );
   }
