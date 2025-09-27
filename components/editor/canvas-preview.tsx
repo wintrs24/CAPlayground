@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Crosshair } from "lucide-react";
+import { Minus, Plus, Crosshair, Square, Crop } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
@@ -22,6 +22,8 @@ export function CanvasPreview() {
   const [SNAP_THRESHOLD] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [snapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
+  const [showEdgeGuide, setShowEdgeGuide] = useLocalStorage<boolean>("caplay_preview_edge_guide", false);
+  const [clipToCanvas, setClipToCanvas] = useLocalStorage<boolean>("caplay_preview_clip", false);
   const panDragRef = useRef<{
     startClientX: number;
     startClientY: number;
@@ -1130,7 +1132,7 @@ export function CanvasPreview() {
           transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
           transformOrigin: "top left",
           borderRadius: 0,
-          overflow: "visible",
+          overflow: clipToCanvas ? "hidden" : "visible",
           boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08)",
         }}
         onMouseDown={(e) => {
@@ -1141,6 +1143,19 @@ export function CanvasPreview() {
       >
         {/* overlay removed */}
         {renderedLayers.map((l) => renderLayer(l))}
+        {/* Edge guide overlay */}
+        {showEdgeGuide && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              border: '3px dotted #ffffff',
+              borderRadius: 0,
+              mixBlendMode: 'difference',
+            }}
+          />
+        )}
         {(() => {
           const sel = findById(renderedLayers, current?.selectedId ?? null);
           return sel ? renderSelectionOverlay(sel) : null;
@@ -1163,6 +1178,34 @@ export function CanvasPreview() {
           }
           return <>{guides}</>;
         })()}
+      </div>
+
+      {/* Preview toggles (bottom-right) */}
+      <div className="absolute bottom-2 right-2 z-10 flex items-center gap-2 bg-white/80 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1 shadow-sm">
+        <Button
+          type="button"
+          size="icon"
+          variant={showEdgeGuide ? "secondary" : "outline"}
+          aria-pressed={showEdgeGuide}
+          aria-label="Toggle edge guide"
+          title="Edge guide"
+          onClick={() => setShowEdgeGuide((v: boolean) => !v)}
+          className="h-8 w-8"
+        >
+          <Square className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant={clipToCanvas ? "secondary" : "outline"}
+          aria-pressed={clipToCanvas}
+          aria-label="Toggle clip to canvas"
+          title="Clip to canvas"
+          onClick={() => setClipToCanvas((v: boolean) => !v)}
+          className="h-8 w-8"
+        >
+          <Crop className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* Zoom controls */}
