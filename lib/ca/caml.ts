@@ -142,7 +142,11 @@ function parseCALayer(el: Element): AnyLayer {
   const position = parseNumberList(attr(el, 'position')); // x y
   const anchorPt = parseNumberList(attr(el, 'anchorPoint')); // ax ay in 0..1
   const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const rotZAttr = attr(el, 'transform.rotation.z');
+  const rotXAttr = attr(el, 'transform.rotation.x');
+  const rotYAttr = attr(el, 'transform.rotation.y');
   const opacity = attr(el, 'opacity') ? Number(attr(el, 'opacity')) : undefined;
+  const transformAttr = attr(el, 'transform');
   const backgroundColor = attr(el, 'backgroundColor');
   const cornerRadius = attr(el, 'cornerRadius') ? Number(attr(el, 'cornerRadius')) : undefined;
   const borderColor = attr(el, 'borderColor') || undefined;
@@ -163,6 +167,37 @@ function parseCALayer(el: Element): AnyLayer {
     }
   }
 
+  let tRotZ: number | undefined;
+  let tRotX: number | undefined;
+  let tRotY: number | undefined;
+  if (transformAttr && /rotate\(/i.test(transformAttr)) {
+    try {
+      const rx = /rotate\(([^)]+)\)/gi;
+      let m: RegExpExecArray | null;
+      while ((m = rx.exec(transformAttr)) !== null) {
+        const inside = m[1].trim();
+        const parts = inside.split(/\s*,\s*/);
+        const angleStr = parts[0].trim();
+        const angle = parseFloat(angleStr.replace(/deg/i, '').trim());
+        const deg = Number.isFinite(angle) ? angle : 0;
+        if (parts.length >= 4) {
+          const ax = parseFloat(parts[1]);
+          const ay = parseFloat(parts[2]);
+          const az = parseFloat(parts[3]);
+          if (Math.abs(ax - 1) < 1e-6 && Math.abs(ay) < 1e-6 && Math.abs(az) < 1e-6) {
+            tRotX = deg;
+          } else if (Math.abs(ay - 1) < 1e-6 && Math.abs(ax) < 1e-6 && Math.abs(az) < 1e-6) {
+            tRotY = deg;
+          } else if (Math.abs(az - 1) < 1e-6 && Math.abs(ax) < 1e-6 && Math.abs(ay) < 1e-6) {
+            tRotZ = deg;
+          }
+        } else {
+          tRotZ = deg;
+        }
+      }
+    } catch {}
+  }
+
   const base = {
     id,
     name,
@@ -173,6 +208,9 @@ function parseCALayer(el: Element): AnyLayer {
     cornerRadius,
     borderColor,
     borderWidth,
+    rotation: (rotZAttr ? ((Number(rotZAttr) * 180) / Math.PI) : undefined) ?? tRotZ,
+    rotationX: (rotXAttr ? ((Number(rotXAttr) * 180) / Math.PI) : undefined) ?? tRotX,
+    rotationY: (rotYAttr ? ((Number(rotYAttr) * 180) / Math.PI) : undefined) ?? tRotY,
     anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
     geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
   } as const;
@@ -390,6 +428,23 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   const gf = (layer as any).geometryFlipped;
   if (gf === 0 || gf === 1) setAttr(el, 'geometryFlipped', String(gf));
   setAttr(el, 'opacity', layer.opacity ?? undefined);
+  const rotZ = (layer as any).rotation;
+  const rotX = (layer as any).rotationX;
+  const rotY = (layer as any).rotationY;
+  if (typeof rotZ === 'number' && Number.isFinite(rotZ)) {
+    setAttr(el, 'transform.rotation.z', (rotZ * Math.PI) / 180);
+  }
+  if (typeof rotX === 'number' && Number.isFinite(rotX)) {
+    setAttr(el, 'transform.rotation.x', (rotX * Math.PI) / 180);
+  }
+  if (typeof rotY === 'number' && Number.isFinite(rotY)) {
+    setAttr(el, 'transform.rotation.y', (rotY * Math.PI) / 180);
+  }
+  const parts: string[] = [];
+  if (typeof rotZ === 'number' && Number.isFinite(rotZ)) parts.push(`rotate(${rotZ}deg)`);
+  if (typeof rotY === 'number' && Number.isFinite(rotY)) parts.push(`rotate(${rotY}deg, 0, 1, 0)`);
+  if (typeof rotX === 'number' && Number.isFinite(rotX)) parts.push(`rotate(${rotX}deg, 1, 0, 0)`);
+  if (parts.length) setAttr(el, 'transform', parts.join(' '));
   if (layer.type === 'shape') {
     setAttr(el, 'backgroundColor', (layer as any).fill || '#ffffffff'); //fixed shape fill 🤯
   }
