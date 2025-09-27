@@ -21,7 +21,6 @@ export function Navigation() {
   const { theme, setTheme } = useTheme()
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [mounted, setMounted] = useState(false)
-  const [showPolicyBanner, setShowPolicyBanner] = useState(false)
 
   useEffect(() => {
     const handleResize = () => {
@@ -73,36 +72,9 @@ export function Navigation() {
     }
   }, [isMenuOpen])
 
-  useEffect(() => {
-    try {
-      const key = "caplayground-policy-banner-2025-09-04"
-      const dismissed = localStorage.getItem(key) === "1"
-      if (!dismissed) setShowPolicyBanner(true)
-    } catch {}
-  }, [])
 
   return (
     <nav className="z-50 w-full">
-      {showPolicyBanner && (
-        <div className="w-full bg-muted text-foreground/90">
-          <div className="max-w-[1385px] mx-auto px-4 min-[1045px]:px-6 py-2 flex items-center justify-between gap-3 text-sm">
-            <div className="flex items-center gap-2">
-              <span>We updated our Privacy Policy (aggregate-only analytics for project counts).</span>
-              <Link href="/privacy" className="underline">Read more</Link>
-            </div>
-            <button
-              aria-label="Dismiss policy update notice"
-              className="p-1 rounded hover:bg-background/50 transition-colors"
-              onClick={() => {
-                try { localStorage.setItem("caplayground-policy-banner-2025-09-04", "1") } catch {}
-                setShowPolicyBanner(false)
-              }}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
       <div className="w-full max-w-[1385px] mx-auto px-4 min-[1045px]:px-6 mt-4">
         <div className="w-full rounded-2xl border border-border bg-background/80 backdrop-blur-md shadow-md">
           <div className="grid [grid-template-columns:auto_1fr_auto] h-14 items-center px-4 min-[1045px]:px-6">
