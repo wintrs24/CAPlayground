@@ -23,7 +23,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload } from "lucide-react";
+import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload, ArrowRight } from "lucide-react";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import type React from "react";
 import type { AnyLayer, CAProject } from "@/lib/ca/types";
@@ -693,7 +693,7 @@ export default function ProjectsPage() {
                       }
                     }}
                   >
-                    <CardContent className="px-4 py-3">
+                    <CardContent className="px-4 py-0">
                       {/* Selection checkmark */}
                       {isSelectMode && (
                         <div className="absolute top-2 right-2 h-6 w-6 rounded-full border flex items-center justify-center bg-background/70">
@@ -722,10 +722,8 @@ export default function ProjectsPage() {
                             Created: {new Date(project.createdAt).toLocaleDateString()}
                           </p>
                         </div>
-                      </div>
-
-                      {/* Under-card actions */}
-                      <div className="mt-2 flex items-center gap-2">
+                        {/* rename/delete */}
+                        <div className="ml-2 flex items-center gap-1">
                         <Button
                           size="icon"
                           variant="ghost"
@@ -745,6 +743,16 @@ export default function ProjectsPage() {
                           onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
                         >
                           <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      {/* Open Project */}
+                      <div className="mt-2">
+                        <Button
+                          className="w-full justify-center"
+                          onClick={(e) => { e.stopPropagation(); router.push(`/editor/${project.id}`); }}
+                        >
+                          Open Project <ArrowRight className="h-4 w-4 ml-2" />
                         </Button>
                       </div>
                     </CardContent>
