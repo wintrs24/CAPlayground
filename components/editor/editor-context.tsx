@@ -127,7 +127,6 @@ export function EditorProvider({
   useEffect(() => {
     if (doc !== null) return;
     const fixedStates = ["Locked", "Unlock", "Sleep"] as const;
-    // Load from IndexedDB files if present; otherwise initialize new empty project structure
     (async () => {
       try {
         const proj = await getProject(projectId);
@@ -140,13 +139,11 @@ export function EditorProvider({
           geometryFlipped: 0 as 0 | 1,
         };
 
-        // Attempt to read Floating and Background CAML files for layers and assets from DB
         let folder = `${(proj?.name || initialMeta.name)}.ca`;
         let [floatingFiles, backgroundFiles] = await Promise.all([
           listFiles(projectId, `${folder}/Floating.ca/`),
           listFiles(projectId, `${folder}/Background.ca/`),
         ]);
-        // Fallback: if nothing found (project renamed but files under old folder), auto-detect folder
         if ((floatingFiles.length + backgroundFiles.length) === 0) {
           const all = await listFiles(projectId);
           const anyMain = all.find(f => /\.ca\/(Floating|Background)\.ca\/main\.caml$/.test(f.path));
@@ -181,7 +178,6 @@ export function EditorProvider({
               }
             } catch {}
           }
-          // Load assets dataURLs back from blobs
           for (const f of files) {
             if (f.path.includes('/assets/')) {
               const filename = f.path.split('/assets/')[1];
@@ -193,9 +189,6 @@ export function EditorProvider({
                   r.onload = () => resolve(String(r.result));
                   r.readAsDataURL(blob);
                 });
-                // map by layer-id unknown; keep filename keyed by filename (editor uses by layer id). We'll keep empty; real mapping restored during editing on replacement/add.
-                // No-op mapping since we don't know which layer id maps to which asset here.
-                // The editor will store assets by layerId upon edits.
               } catch {}
             }
           }
@@ -240,7 +233,6 @@ export function EditorProvider({
   }, [doc, projectId, initialMeta.id, initialMeta.name, initialMeta.width, initialMeta.height, initialMeta.background]);
 
   const persist = useCallback(() => {
-    // Trigger writing to IndexedDB immediately
     if (!doc) return;
     writeToIndexedDB(doc).catch(() => {});
   }, [doc]);
@@ -261,7 +253,6 @@ export function EditorProvider({
       for (const key of caKeys) {
         const caFolder = key === 'floating' ? 'Floating.ca' : 'Background.ca';
         const caDoc = snapshot.docs[key];
-        // Build root and caml from current doc
         const root: GroupLayer = {
           id: snapshot.meta.id,
           name: snapshot.meta.name,
@@ -273,7 +264,6 @@ export function EditorProvider({
           children: (caDoc.layers as AnyLayer[]) || [],
         } as GroupLayer;
 
-        // Serialize CAML
         const caml = serializeCAML(
           root,
           {
@@ -289,13 +279,11 @@ export function EditorProvider({
           (caDoc as any).stateTransitions,
         );
         await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, caml);
-        // index.xml and assetManifest.caml
         const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
         await putTextFile(projectId, `${folder}/${caFolder}/index.xml`, indexXml);
         const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`;
         await putTextFile(projectId, `${folder}/${caFolder}/assetManifest.caml`, assetManifest);
 
-        // Assets: write copies into assets folder
         const assets = caDoc.assets || {};
         for (const [layerId, info] of Object.entries(assets)) {
           try {
@@ -306,7 +294,6 @@ export function EditorProvider({
         }
       }
     } catch (e) {
-      // ignore errors during background persistence
     }
   }, [projectId]);
 

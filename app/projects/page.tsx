@@ -232,14 +232,23 @@ export default function ProjectsPage() {
     const ox = (wrapSize.w - w * s) / 2;
     const oy = (wrapSize.h - h * s) / 2;
 
-    const renderLayer = (l: AnyLayer): React.ReactNode => {
+    const getAnchor = (l: AnyLayer) => ({ x: (l as any).anchorPoint?.x ?? 0.5, y: (l as any).anchorPoint?.y ?? 0.5 });
+    const computeCssLT = (l: AnyLayer, containerH: number, useYUp: boolean) => {
+      const a = getAnchor(l);
+      const left = (l.position.x) - a.x * l.size.w;
+      const top = useYUp ? (containerH - (l.position.y + (1 - a.y) * l.size.h)) : (l.position.y - a.y * l.size.h);
+      return { left, top, a };
+    };
+    const renderLayer = (l: AnyLayer, containerH: number = h, useYUp: boolean = true): React.ReactNode => {
+      const { left, top, a } = computeCssLT(l, containerH, useYUp);
       const common: React.CSSProperties = {
         position: 'absolute',
-        left: l.position.x,
-        top: l.position.y,
+        left,
+        top,
         width: l.size.w,
         height: l.size.h,
         transform: `rotate(${(l as any).rotation ?? 0}deg)`,
+        transformOrigin: `${a.x * 100}% ${a.y * 100}%`,
         opacity: (l as any).opacity ?? 1,
         display: (l as any).visible === false ? 'none' as any : undefined,
         overflow: 'hidden',
@@ -250,7 +259,7 @@ export default function ProjectsPage() {
       }
       if (l.type === 'image') {
         const im = l as any;
-        return <img key={l.id} src={im.src} alt={im.name} draggable={false} style={{ ...common, objectFit: 'fill' as const }} />;
+        return <img key={l.id} src={im.src} alt={im.name} draggable={false} style={{ ...common, objectFit: 'fill' as const, maxWidth: 'none', maxHeight: 'none' }} />;
       }
       if (l.type === 'shape') {
         const s = l as any;
@@ -266,7 +275,7 @@ export default function ProjectsPage() {
         const g = l as any;
         return (
           <div key={g.id} style={{ ...common, background: g.backgroundColor }}>
-            {Array.isArray(g.children) ? g.children.map((c: AnyLayer) => renderLayer(c)) : null}
+            {Array.isArray(g.children) ? g.children.map((c: AnyLayer) => renderLayer(c, g.size.h, useYUp)) : null}
           </div>
         );
       }
@@ -287,7 +296,7 @@ export default function ProjectsPage() {
             boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)'
           }}
         >
-          {(doc.layers || []).map((l) => renderLayer(l))}
+          {(doc.layers || []).map((l) => renderLayer(l, h, true))}
         </div>
       </div>
     );
