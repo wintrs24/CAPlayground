@@ -98,14 +98,25 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       const proj = await getProject(doc.meta.id);
       const nameSafe = ((proj?.name || doc.meta.name) || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
       const folder = `${(proj?.name || doc.meta.name) || 'Project'}.ca`;
-      const files = await listFiles(doc.meta.id, `${folder}/`);
+      const allFiles = await listFiles(doc.meta.id, `${folder}/`);
       const outputZip = new JSZip();
-      for (const f of files) {
+      const backgroundPrefix = `${folder}/Background.ca/`;
+      const floatingPrefix = `${folder}/Floating.ca/`;
+      for (const f of allFiles) {
+        let rel: string | null = null;
+        if (f.path.startsWith(backgroundPrefix)) {
+          rel = `Background.ca/${f.path.substring(backgroundPrefix.length)}`;
+        } else if (f.path.startsWith(floatingPrefix)) {
+          rel = `Floating.ca/${f.path.substring(floatingPrefix.length)}`;
+        } else {
+          rel = null;
+        }
+        if (!rel) continue;
         if (f.type === 'text') {
-          outputZip.file(f.path, String(f.data));
+          outputZip.file(rel, String(f.data));
         } else {
           const buf = f.data as ArrayBuffer;
-          outputZip.file(f.path, buf);
+          outputZip.file(rel, buf);
         }
       }
       const finalZipBlob = await outputZip.generateAsync({ type: 'blob' });
