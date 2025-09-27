@@ -12,6 +12,7 @@ function isOfficialHost(hostname: string): boolean {
     "caplayground.enkei64.xyz",
     "caplayground.netlify.app",
     "caplayground.squair.xyz",
+    "caplayground.kittycat.boo"
   ];
   return baseDomains.some((base) => hostname === base || hostname.endsWith(`.${base}`));
 }
