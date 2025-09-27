@@ -106,11 +106,12 @@ export function LayersPanel() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-              await addImageLayerFromFile(file);
+            const files = Array.from(e.target.files || []);
+            for (const file of files) {
+              try { await addImageLayerFromFile(file); } catch {}
             }
             if (fileInputRef.current) fileInputRef.current.value = "";
           }}
