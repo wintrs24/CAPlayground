@@ -1185,24 +1185,24 @@ export function CanvasPreview() {
         <Button
           type="button"
           size="icon"
-          variant={showEdgeGuide ? "secondary" : "outline"}
+          variant={showEdgeGuide ? "default" : "outline"}
           aria-pressed={showEdgeGuide}
           aria-label="Toggle edge guide"
           title="Edge guide"
           onClick={() => setShowEdgeGuide((v: boolean) => !v)}
-          className="h-8 w-8"
+          className={`h-8 w-8 ${showEdgeGuide ? '' : 'hover:text-primary hover:border-primary/50 hover:bg-primary/10'}`}
         >
           <Square className="h-4 w-4" />
         </Button>
         <Button
           type="button"
           size="icon"
-          variant={clipToCanvas ? "secondary" : "outline"}
+          variant={clipToCanvas ? "default" : "outline"}
           aria-pressed={clipToCanvas}
           aria-label="Toggle clip to canvas"
           title="Clip to canvas"
           onClick={() => setClipToCanvas((v: boolean) => !v)}
-          className="h-8 w-8"
+          className={`h-8 w-8 ${clipToCanvas ? '' : 'hover:text-primary hover:border-primary/50 hover:bg-primary/10'}`}
         >
           <Crop className="h-4 w-4" />
         </Button>
