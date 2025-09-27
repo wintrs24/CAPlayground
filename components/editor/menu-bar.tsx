@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
-import { packCA } from "@/lib/ca/ca-file";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { Switch } from "@/components/ui/switch";
@@ -26,6 +25,7 @@ import { useEffect, useState, JSX } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import JSZip from "jszip";
 import { Slider } from "../ui/slider";
+import { getProject, updateProject, deleteProject as idbDeleteProject, listFiles } from "@/lib/idb";
  
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
@@ -41,7 +41,6 @@ type MenuBarProps = {
 export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLeft, toggleRight }: MenuBarProps) {
   const router = useRouter();
   const { doc, undo, redo, setDoc, activeCA, setActiveCA } = useEditor();
-  const [projects, setProjects] = useLocalStorage<ProjectMeta[]>("caplayground-projects", []);
   const { toast } = useToast();
 
   const [renameOpen, setRenameOpen] = useState(false);
@@ -95,85 +94,19 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const exportCA = async () => {
     try {
       if (!doc) return;
-      const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
-      const curKey = doc.activeCA;
-      const cur = doc.docs[curKey];
-      const rewriteLayer = (layer: AnyLayer): AnyLayer => {
-        if (layer.type === 'group') {
-          const g = layer as GroupLayer;
-          return { ...g, children: (g.children || []).map(rewriteLayer) } as AnyLayer;
-        }
-        if (layer.type === 'image') {
-          const asset = (cur.assets || {})[(layer as any).id];
-          if (asset) {
-            return { ...layer, src: `assets/${asset.filename}` } as AnyLayer;
-          }
-        }
-        return { ...layer } as AnyLayer;
-      };
-
-      const root: GroupLayer = {
-        id: doc.meta.id,
-        name: doc.meta.name || 'Project',
-        type: 'group',
-        position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
-        size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
-        backgroundColor: doc.meta.background,
-        geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
-        children: ((cur.layers as AnyLayer[]) || []).map(rewriteLayer),
-      };
-
-      const assets: Record<string, { path: string; data: Blob | ArrayBuffer | string }> = {};
-      const dataURLToBlob = (dataURL: string): Blob => {
-        const [meta, data] = dataURL.split(',');
-        const isBase64 = /;base64$/i.test(meta);
-        const mimeMatch = meta.match(/^data:([^;]+)(;base64)?$/i);
-        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-        if (isBase64) {
-          const byteString = atob(data);
-          const ia = new Uint8Array(byteString.length);
-          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-          return new Blob([ia], { type: mime });
-        } else {
-          return new Blob([decodeURIComponent(data)], { type: mime });
-        }
-      };
-
-      if (cur.assets) {
-        for (const [layerId, info] of Object.entries(cur.assets)) {
-          try {
-            const blob = info.dataURL.startsWith('data:') ? dataURLToBlob(info.dataURL) : new Blob();
-            assets[info.filename] = { path: `assets/${info.filename}`, data: blob };
-          } catch {}
-        }
-      }
-
-      const caBlob = await packCA({
-        project: {
-          id: doc.meta.id,
-          name: doc.meta.name,
-          width: doc.meta.width,
-          height: doc.meta.height,
-          background: doc.meta.background,
-          geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
-        },
-        root,
-        assets,
-        states: (cur as any).states,
-        stateOverrides: (cur as any).stateOverrides,
-        stateTransitions: (cur as any).stateTransitions,
-      });
-      const caZip = new JSZip();
-      await caZip.loadAsync(caBlob);
+      const proj = await getProject(doc.meta.id);
+      const nameSafe = ((proj?.name || doc.meta.name) || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
+      const folder = `${(proj?.name || doc.meta.name) || 'Project'}.ca`;
+      const files = await listFiles(doc.meta.id, `${folder}/`);
       const outputZip = new JSZip();
-      const folderName = `${nameSafe}.ca`;
-      for (const [relativePath, file] of Object.entries(caZip.files)) {
-        if (!file.dir) {
-          const content = await file.async('uint8array');
-          outputZip.file(`${folderName}/${relativePath}`, content);
+      for (const f of files) {
+        if (f.type === 'text') {
+          outputZip.file(f.path, String(f.data));
+        } else {
+          const buf = f.data as ArrayBuffer;
+          outputZip.file(f.path, buf);
         }
       }
-      
       const finalZipBlob = await outputZip.generateAsync({ type: 'blob' });
 
       const url = URL.createObjectURL(finalZipBlob);
@@ -198,22 +131,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     try {
       setExportingTendies(true);
       if (!doc) return;
-      
-      const nameSafe = (doc.meta.name || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
-      const dataURLToBlob = (dataURL: string): Blob => {
-        const [meta, data] = dataURL.split(',');
-        const isBase64 = /;base64$/i.test(meta);
-        const mimeMatch = meta.match(/^data:([^;]+)(;base64)?$/i);
-        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-        if (isBase64) {
-          const byteString = atob(data);
-          const ia = new Uint8Array(byteString.length);
-          for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-          return new Blob([ia], { type: mime });
-        } else {
-          return new Blob([decodeURIComponent(data)], { type: mime });
-        }
-      };
+      const proj = await getProject(doc.meta.id);
+      const nameSafe = ((proj?.name || doc.meta.name) || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
 
       const templateResponse = await fetch('/api/templates/tendies', {
         method: 'GET',
@@ -244,73 +163,27 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           outputZip.file(relativePath, content);
         }
       }
-      const caKeys = ['background', 'floating'] as const;
-      for (const key of caKeys) {
-        const caDoc = doc.docs[key];
-        const rewriteLayer = (layer: AnyLayer): AnyLayer => {
-          if (layer.type === 'group') {
-            const g = layer as GroupLayer;
-            return { ...g, children: (g.children || []).map(rewriteLayer) } as AnyLayer;
-          }
-          if (layer.type === 'image') {
-            const asset = (caDoc.assets || {})[(layer as any).id];
-            if (asset) {
-              return { ...layer, src: `assets/${asset.filename}` } as AnyLayer;
-            }
-          }
-          return { ...layer } as AnyLayer;
-        };
-
-        const root: GroupLayer = {
-          id: doc.meta.id,
-          name: doc.meta.name || 'Project',
-          type: 'group',
-          position: { x: Math.round((doc.meta.width || 0) / 2), y: Math.round((doc.meta.height || 0) / 2) },
-          size: { w: doc.meta.width || 0, h: doc.meta.height || 0 },
-          backgroundColor: doc.meta.background,
-          geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
-          children: ((caDoc.layers as AnyLayer[]) || []).map(rewriteLayer),
-        };
-
-        const assets: Record<string, { path: string; data: Blob | ArrayBuffer | string }> = {};
-        if (caDoc.assets) {
-          for (const [_, info] of Object.entries(caDoc.assets)) {
-            try {
-              const blob = info.dataURL.startsWith('data:') ? dataURLToBlob(info.dataURL) : new Blob();
-              assets[info.filename] = { path: `assets/${info.filename}`, data: blob };
-            } catch {}
-          }
+      const folder = `${(proj?.name || doc.meta.name) || 'Project'}.ca`;
+      const allFiles = await listFiles(doc.meta.id, `${folder}/`);
+      const backgroundPrefix = `${folder}/Background.ca/`;
+      const floatingPrefix = `${folder}/Floating.ca/`;
+      const caMap: Record<'background'|'floating', Array<{ path: string; data: Uint8Array | string }>> = { background: [], floating: [] };
+      for (const f of allFiles) {
+        if (f.path.startsWith(backgroundPrefix)) {
+          caMap.background.push({ path: f.path.substring(backgroundPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
+        } else if (f.path.startsWith(floatingPrefix)) {
+          caMap.floating.push({ path: f.path.substring(floatingPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
         }
-
-        const caBlob = await packCA({
-          project: {
-            id: doc.meta.id,
-            name: doc.meta.name,
-            width: doc.meta.width,
-            height: doc.meta.height,
-            background: doc.meta.background,
-            geometryFlipped: (doc.meta as any).geometryFlipped ?? 0,
-          },
-          root,
-          assets,
-          states: (caDoc as any).states,
-          stateOverrides: (caDoc as any).stateOverrides,
-          stateTransitions: (caDoc as any).stateTransitions,
-        });
-
-        const caZip = new JSZip();
-        await caZip.loadAsync(await caBlob.arrayBuffer());
-
+      }
+      const caKeys = ['background','floating'] as const;
+      for (const key of caKeys) {
         const caFolderPath = key === 'floating'
           ? `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Floating-390w-844h@3x~iphone.ca`
           : `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Background-390w-844h@3x~iphone.ca`;
-
-        for (const [relativePath, file] of Object.entries(caZip.files)) {
-          if (!file.dir) {
-            const content = await file.async('uint8array');
-            const fullPath = `${caFolderPath}/${relativePath}`;
-            outputZip.file(fullPath, content);
-          }
+        for (const file of caMap[key]) {
+          const fullPath = `${caFolderPath}/${file.path}`;
+          if (typeof file.data === 'string') outputZip.file(fullPath, file.data);
+          else outputZip.file(fullPath, file.data);
         }
       }
 
@@ -343,20 +216,10 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     }
   };
 
-  const performRename = () => {
+  const performRename = async () => {
     if (!name.trim()) return;
-    const next = (projects ?? []).map((p) => (p.id === projectId ? { ...p, name: name.trim() } : p));
-    setProjects(next);
-    const key = `caplayground-project:${projectId}`;
-    try {
-      const current = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-      if (current) {
-        const parsed = JSON.parse(current);
-        parsed.meta.name = name.trim();
-        localStorage.setItem(key, JSON.stringify(parsed));
-      }
-    } catch {}
-    
+    const proj = await getProject(projectId);
+    if (proj) await updateProject({ ...proj, name: name.trim() });
     setDoc((prev) => {
       if (!prev) return prev;
       return { ...prev, meta: { ...prev.meta, name: name.trim() } };
@@ -364,10 +227,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     setRenameOpen(false);
   };
 
-  const performDelete = () => {
-    const next = (projects ?? []).filter((p) => p.id !== projectId);
-    setProjects(next);
-    try { localStorage.removeItem(`caplayground-project:${projectId}`); } catch {}
+  const performDelete = async () => {
+    await idbDeleteProject(projectId);
     router.push("/projects");
   };
 

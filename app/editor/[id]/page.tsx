@@ -12,6 +12,7 @@ import { StatesPanel } from "@/components/editor/states-panel";
 import { Inspector } from "@/components/editor/inspector";
 import { CanvasPreview } from "@/components/editor/canvas-preview";
 import EditorOnboarding from "@/components/editor/onboarding";
+import { getProject } from "@/lib/idb";
 
 export default function EditorPage() {
   const params = useParams<{ id: string }>();
@@ -28,18 +29,18 @@ export default function EditorPage() {
 
   useEffect(() => {
     if (!projectId) return;
-    try {
-      const listRaw = localStorage.getItem("caplayground-projects");
-      const list = listRaw ? JSON.parse(listRaw) as Array<{ id: string; name: string; width?: number; height?: number }> : [];
-      const p = list.find((x) => x.id === projectId);
-      if (!p) {
+    (async () => {
+      try {
+        const p = await getProject(projectId);
+        if (!p) {
+          router.replace("/projects");
+          return;
+        }
+        setMeta({ id: p.id, name: p.name, width: p.width ?? 390, height: p.height ?? 844 });
+      } catch {
         router.replace("/projects");
-        return;
       }
-      setMeta({ id: p.id, name: p.name, width: p.width ?? 390, height: p.height ?? 844 });
-    } catch {
-      router.replace("/projects");
-    }
+    })();
   }, [projectId]);
 
   if (!projectId || !meta) return null;

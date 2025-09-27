@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useLocalStorage } from "@/hooks/use-local-storage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +28,7 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 import type React from "react";
 import type { AnyLayer, CAProject } from "@/lib/ca/types";
 import { unpackCA } from "@/lib/ca/ca-file";
+import { ensureUniqueProjectName, createProject, updateProject, deleteProject as idbDeleteProject, getProject, listFiles, listProjects, putBlobFile, putTextFile } from "@/lib/idb";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
   Select,
@@ -38,16 +38,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface Project {
-  id: string;
-  name: string;
-  createdAt: string;
-  width?: number;
-  height?: number;
-}
+interface Project { id: string; name: string; createdAt: string; width?: number; height?: number }
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useLocalStorage<Project[]>("caplayground-projects", []);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -73,6 +67,89 @@ export default function ProjectsPage() {
 
   const projectsArray = Array.isArray(projects) ? projects : [];
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const ls = typeof window !== 'undefined' ? localStorage.getItem('caplayground-projects') : null;
+        const list: Project[] = ls ? JSON.parse(ls) : [];
+        if (!list || list.length === 0) {
+          const idbList = await listProjects();
+          setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+          return;
+        }
+
+        const existing = await listProjects();
+        const existingIds = new Set(existing.map(e => e.id));
+        for (const p of list) {
+          if (existingIds.has(p.id)) continue;
+          const key = `caplayground-project:${p.id}`;
+          const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
+          const nameBase = p.name?.trim() || 'Project';
+          const uniqueName = await ensureUniqueProjectName(nameBase);
+          const meta = { id: p.id, name: uniqueName, createdAt: p.createdAt || new Date().toISOString(), width: Math.round(p.width || 390), height: Math.round(p.height || 844) };
+          await createProject({ id: meta.id, name: meta.name, createdAt: meta.createdAt, width: meta.width!, height: meta.height! });
+          const folder = `${meta.name}.ca`;
+          let parsed: any = null;
+          try { parsed = raw ? JSON.parse(raw) : null; } catch {}
+          const fixedStates = ["Locked","Unlock","Sleep"] as const;
+          const prepare = (layers: any[] | undefined, states?: string[], stateOverrides?: any, stateTransitions?: any) => ({
+            layers: Array.isArray(layers) ? layers : [],
+            states: (states && states.length ? states : [...fixedStates]) as any,
+            stateOverrides: stateOverrides || {},
+            stateTransitions: stateTransitions || [],
+          });
+          let backgroundDoc = prepare([]);
+          let floatingDoc = prepare([]);
+          if (parsed) {
+            if (Array.isArray(parsed.layers)) {
+              floatingDoc = prepare(parsed.layers, parsed.states, parsed.stateOverrides, parsed.stateTransitions);
+            } else if (parsed.docs) {
+              backgroundDoc = prepare(parsed.docs.background?.layers, parsed.docs.background?.states, parsed.docs.background?.stateOverrides, parsed.docs.background?.stateTransitions);
+              floatingDoc = prepare(parsed.docs.floating?.layers, parsed.docs.floating?.states, parsed.docs.floating?.stateOverrides, parsed.docs.floating?.stateTransitions);
+            }
+          }
+          const writeCA = async (caKey: 'Background.ca'|'Floating.ca', doc: ReturnType<typeof prepare>) => {
+            const root = {
+              id: meta.id,
+              name: meta.name,
+              type: 'group',
+              position: { x: Math.round((meta.width || 0)/2), y: Math.round((meta.height || 0)/2) },
+              size: { w: meta.width || 0, h: meta.height || 0 },
+              backgroundColor: '#e5e7eb',
+              geometryFlipped: 0,
+              children: (doc.layers || []) as any[],
+            } as any;
+            const { serializeCAML } = await import('@/lib/ca/caml');
+            const caml = serializeCAML(root, { id: meta.id, name: meta.name, width: meta.width, height: meta.height, background: '#e5e7eb', geometryFlipped: 0 } as any, doc.states as any, doc.stateOverrides as any, doc.stateTransitions as any);
+            await putTextFile(meta.id, `${folder}/${caKey}/main.caml`, caml);
+            const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
+            await putTextFile(meta.id, `${folder}/${caKey}/index.xml`, indexXml);
+            const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`;
+            await putTextFile(meta.id, `${folder}/${caKey}/assetManifest.caml`, assetManifest);
+            const assets = (parsed?.docs?.[caKey === 'Floating.ca' ? 'floating' : 'background']?.assets) || parsed?.assets || {};
+            for (const [_, info] of Object.entries(assets as Record<string, { filename: string; dataURL: string }>)) {
+              try {
+                const blob = await dataURLToBlob((info as any).dataURL);
+                await putBlobFile(meta.id, `${folder}/${caKey}/assets/${(info as any).filename}`, blob);
+              } catch {}
+            }
+          };
+          await writeCA('Background.ca', backgroundDoc);
+          await writeCA('Floating.ca', floatingDoc);
+        }
+        try {
+          for (const p of list) localStorage.removeItem(`caplayground-project:${p.id}`);
+          localStorage.removeItem('caplayground-projects');
+        } catch {}
+        const idbList = await listProjects();
+        setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+      } catch {
+        const idbList = await listProjects();
+        setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+      }
+    })();
+  }, []);
+
   const recordProjectCreated = () => {
     try {
       fetch("/api/analytics/project-created", { method: "POST", keepalive: true }).catch(() => {})
@@ -96,31 +173,41 @@ export default function ProjectsPage() {
   }, []);
 
   useEffect(() => {
-    try {
-      const map: Record<string, { bg: string; width?: number; height?: number }> = {};
-      const docs: Record<string, { meta: Pick<CAProject,'id'|'name'|'width'|'height'|'background'>; layers: AnyLayer[] }> = {};
-      for (const p of projectsArray) {
-        const key = `caplayground-project:${p.id}`;
-        const raw = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            const meta = parsed?.meta ?? {};
-            const bg = typeof meta.background === 'string' ? meta.background : '#e5e7eb';
-            const width = Number(meta.width) || p.width;
-            const height = Number(meta.height) || p.height;
-            map[p.id] = { bg, width, height };
-            const layers = Array.isArray(parsed?.layers) ? parsed.layers as AnyLayer[] : [];
-            docs[p.id] = { meta: { id: p.id, name: p.name, width: width || 390, height: height || 844, background: bg }, layers };
-          } catch {}
-        } else {
-          map[p.id] = { bg: '#e5e7eb', width: p.width, height: p.height };
-          docs[p.id] = { meta: { id: p.id, name: p.name, width: p.width || 390, height: p.height || 844, background: '#e5e7eb' }, layers: [] };
+    (async () => {
+      try {
+        const map: Record<string, { bg: string; width?: number; height?: number }> = {};
+        const docs: Record<string, { meta: Pick<CAProject,'id'|'name'|'width'|'height'|'background'>; layers: AnyLayer[] }> = {};
+        for (const p of projectsArray) {
+          const folder = `${p.name}.ca`;
+          const [floating, background] = await Promise.all([
+            listFiles(p.id, `${folder}/Floating.ca/`),
+            listFiles(p.id, `${folder}/Background.ca/`),
+          ]);
+          const byPath = new Map([...floating, ...background].map(f => [f.path, f] as const));
+          const main = byPath.get(`${folder}/Floating.ca/main.caml`) || byPath.get(`${folder}/Background.ca/main.caml`);
+          let bg = '#e5e7eb';
+          let width = p.width;
+          let height = p.height;
+          let layers: AnyLayer[] = [];
+          if (main && main.type === 'text' && typeof main.data === 'string') {
+            try {
+              const { parseCAML } = await import('@/lib/ca/caml');
+              const root = parseCAML(main.data) as any;
+              if (root) {
+                width = Math.round(root.size?.w || width || 390);
+                height = Math.round(root.size?.h || height || 844);
+                if (typeof root.backgroundColor === 'string') bg = root.backgroundColor;
+                layers = root?.type === 'group' ? (root.children || []) : [root];
+              }
+            } catch {}
+          }
+          map[p.id] = { bg, width, height };
+          docs[p.id] = { meta: { id: p.id, name: p.name, width: width || 390, height: height || 844, background: bg }, layers };
         }
-      }
-      setPreviews(map);
-      setThumbDocs(docs);
-    } catch {}
+        setPreviews(map);
+        setThumbDocs(docs);
+      } catch {}
+    })();
   }, [projectsArray]);
 
   function ProjectThumb({ doc }: { doc: { meta: Pick<CAProject, 'width'|'height'|'background'>; layers: AnyLayer[] } }) {
@@ -243,33 +330,55 @@ export default function ProjectsPage() {
     return sorted;
   }, [projectsArray, query, dateFilter, sortBy]);
 
-  const createProject = () => {
-    if (newProjectName.trim() === "") return;
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name: newProjectName.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    setProjects([...projectsArray, newProject]);
-    recordProjectCreated();
-    setNewProjectName("");
+  // helper to convert dataURL -> Blob
+  const dataURLToBlob = async (dataURL: string): Promise<Blob> => {
+    const [meta, data] = dataURL.split(',');
+    const isBase64 = /;base64$/i.test(meta);
+    const mimeMatch = meta.match(/^data:([^;]+)(;base64)?$/i);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    if (isBase64) {
+      const byteString = atob(data);
+      const ia = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      return new Blob([ia], { type: mime });
+    } else {
+      return new Blob([decodeURIComponent(data)], { type: mime });
+    }
   };
 
-  const createProjectFromDialog = () => {
+  const createProjectFromDialog = async () => {
     const name = newProjectName.trim();
     if (!name) return;
     const w = Number(rootWidth);
     const h = Number(rootHeight);
     if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
 
-    const newProject: Project = {
-      id: Date.now().toString(),
-      name,
-      createdAt: new Date().toISOString(),
-      width: Math.round(w),
-      height: Math.round(h),
-    };
-    setProjects([...projectsArray, newProject]);
+    const id = Date.now().toString();
+    const uniqueName = await ensureUniqueProjectName(name);
+    const createdAt = new Date().toISOString();
+    await createProject({ id, name: uniqueName, createdAt, width: Math.round(w), height: Math.round(h) });
+    const folder = `${uniqueName}.ca`;
+    const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
+    const assetManifest = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n<caml xmlns=\"http://www.apple.com/CoreAnimation/1.0\">\n  <MicaAssetManifest>\n    <modules type=\"NSArray\"/>\n  </MicaAssetManifest>\n</caml>`;
+    const emptyRoot = {
+      id,
+      name: uniqueName,
+      type: 'group',
+      position: { x: Math.round(w/2), y: Math.round(h/2) },
+      size: { w: Math.round(w), h: Math.round(h) },
+      backgroundColor: '#e5e7eb',
+      geometryFlipped: 0,
+      children: [],
+    } as any;
+    const { serializeCAML } = await import('@/lib/ca/caml');
+    const caml = serializeCAML(emptyRoot, { id, name: uniqueName, width: Math.round(w), height: Math.round(h), background: '#e5e7eb', geometryFlipped: 0 } as any, ["Locked","Unlock","Sleep"], {}, []);
+    for (const sub of ['Floating.ca','Background.ca'] as const) {
+      await putTextFile(id, `${folder}/${sub}/main.caml`, caml);
+      await putTextFile(id, `${folder}/${sub}/index.xml`, indexXml);
+      await putTextFile(id, `${folder}/${sub}/assetManifest.caml`, assetManifest);
+    }
+    const idbList = await listProjects();
+    setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
     recordProjectCreated();
     setNewProjectName("");
     setRootWidth(390);
@@ -283,34 +392,25 @@ export default function ProjectsPage() {
     setIsRenameOpen(true);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (editingProjectId === null || editingName.trim() === "") return;
-    
-    setProjects(
-      projectsArray.map((project) =>
-        project.id === editingProjectId
-          ? { ...project, name: editingName.trim() }
-          : project
-      )
-    );
-    
-    try {
-      const key = `caplayground-project:${editingProjectId}`;
-      const current = typeof window !== 'undefined' ? localStorage.getItem(key) : null;
-      if (current) {
-        const parsed = JSON.parse(current);
-        if (parsed?.meta) parsed.meta.name = editingName.trim();
-        localStorage.setItem(key, JSON.stringify(parsed));
-      }
-    } catch {}
+    const unique = await ensureUniqueProjectName(editingName.trim());
+    const current = await getProject(editingProjectId);
+    if (current) {
+      await updateProject({ ...current, name: unique });
+      const idbList = await listProjects();
+      setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+    }
     
     setEditingProjectId(null);
     setEditingName("");
     setIsRenameOpen(false);
   };
 
-  const deleteProject = (id: string) => {
-    setProjects(projectsArray.filter((project) => project.id !== id));
+  const deleteProject = async (id: string) => {
+    await idbDeleteProject(id);
+    const idbList = await listProjects();
+    setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
   };
 
   const confirmDelete = (id: string) => {
@@ -340,38 +440,50 @@ export default function ProjectsPage() {
       if (!file) return;
       const bundle = await unpackCA(file);
       const id = Date.now().toString();
-      const name = bundle.project.name || "Imported Project";
+      const base = bundle.project.name || "Imported Project";
+      const name = await ensureUniqueProjectName(base);
       const width = Math.round(bundle.project.width || (bundle.root?.size?.w ?? 0));
       const height = Math.round(bundle.project.height || (bundle.root?.size?.h ?? 0));
-
-      const newProj: Project = {
-        id,
-        name,
-        createdAt: new Date().toISOString(),
-        width,
-        height,
-      };
-      setProjects([...(projectsArray || []), newProj]);
-      recordProjectCreated();
-
+      await createProject({ id, name, createdAt: new Date().toISOString(), width, height });
+      const folder = `${name}.ca`;
+      const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
+      const assetManifest = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n<caml xmlns=\"http://www.apple.com/CoreAnimation/1.0\">\n  <MicaAssetManifest>\n    <modules type=\"NSArray\"/>\n  </MicaAssetManifest>\n</caml>`;
       const root = bundle.root as any;
-      const layers = root?.type === 'group' && Array.isArray(root.children)
-        ? root.children
-        : root
-          ? [root]
-          : [];
-      const importedStates = Array.isArray(bundle.states) ? bundle.states.filter((n) => !/^base(\s*state)?$/i.test((n || '').trim())) : [];
-      const doc = {
-        meta: { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb' },
-        layers,
-        selectedId: null,
-        states: importedStates.length > 0 ? importedStates : ["Locked", "Unlock", "Sleep"],
-        stateOverrides: bundle.stateOverrides || {},
-        stateTransitions: bundle.stateTransitions || [],
+      const mkCaml = async (layers: AnyLayer[]) => {
+        const { serializeCAML } = await import('@/lib/ca/caml');
+        const group = {
+          id,
+          name,
+          type: 'group',
+          position: { x: Math.round((width||0)/2), y: Math.round((height||0)/2) },
+          size: { w: width||0, h: height||0 },
+          backgroundColor: root?.backgroundColor ?? '#e5e7eb',
+          geometryFlipped: (bundle.project.geometryFlipped ?? 0) as 0|1,
+          children: layers,
+        } as any;
+        return serializeCAML(group, { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb', geometryFlipped: (bundle.project.geometryFlipped ?? 0) as 0|1 } as any, bundle.states as any, bundle.stateOverrides as any, bundle.stateTransitions as any);
       };
-      try {
-        localStorage.setItem(`caplayground-project:${id}`, JSON.stringify(doc));
-      } catch {}
+      const layers = root?.type === 'group' && Array.isArray(root.children) ? root.children : (root ? [root] : []);
+      const camlFloating = await mkCaml(layers);
+      const camlBackground = await mkCaml([]);
+      await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating);
+      await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml);
+      await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest);
+      await putTextFile(id, `${folder}/Background.ca/main.caml`, camlBackground);
+      await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml);
+      await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest);
+      // assets
+      if (bundle.assets) {
+        for (const [filename, asset] of Object.entries(bundle.assets)) {
+          try {
+            const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer]);
+            await putBlobFile(id, `${folder}/Floating.ca/assets/${filename}`, data);
+          } catch {}
+        }
+      }
+      const idbList = await listProjects();
+      setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+      recordProjectCreated();
 
       router.push(`/editor/${id}`);
     } catch (err) {

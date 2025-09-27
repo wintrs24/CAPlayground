@@ -2,7 +2,8 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer } from "@/lib/ca/types";
-import { useLocalStorage } from "@/hooks/use-local-storage";
+import { serializeCAML } from "@/lib/ca/caml";
+import { getProject, listFiles, putBlobFile, putTextFile } from "@/lib/idb";
 
 type CADoc = {
   layers: AnyLayer[];
@@ -23,7 +24,6 @@ export type ProjectDocument = {
   };
 };
 
-const STORAGE_PREFIX = "caplayground-project:";
 const genId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 export type EditorContextValue = {
@@ -71,8 +71,6 @@ export function EditorProvider({
   initialMeta: Pick<CAProject, "id" | "name" | "width" | "height"> & { background?: string };
   children: React.ReactNode;
 }) {
-  const storageKey = STORAGE_PREFIX + projectId;
-  const [storedDoc, setStoredDoc] = useLocalStorage<ProjectDocument | null>(storageKey, null);
   const [doc, setDoc] = useState<ProjectDocument | null>(null);
   const pastRef = useRef<ProjectDocument[]>([]);
   const futureRef = useRef<ProjectDocument[]>([]);
@@ -129,122 +127,203 @@ export function EditorProvider({
   useEffect(() => {
     if (doc !== null) return;
     const fixedStates = ["Locked", "Unlock", "Sleep"] as const;
-    if (storedDoc) {
-      const anyDoc: any = storedDoc as any;
-      const isOldShape = Array.isArray((anyDoc as any).layers);
-      if (isOldShape) {
-        const migrated: ProjectDocument = {
+    // Load from IndexedDB files if present; otherwise initialize new empty project structure
+    (async () => {
+      try {
+        const proj = await getProject(projectId);
+        const meta = {
+          id: initialMeta.id,
+          name: proj?.name ?? initialMeta.name,
+          width: proj?.width ?? initialMeta.width,
+          height: proj?.height ?? initialMeta.height,
+          background: initialMeta.background ?? "#e5e7eb",
+          geometryFlipped: 0 as 0 | 1,
+        };
+
+        // Attempt to read Floating and Background CAML files for layers and assets from DB
+        let folder = `${(proj?.name || initialMeta.name)}.ca`;
+        let [floatingFiles, backgroundFiles] = await Promise.all([
+          listFiles(projectId, `${folder}/Floating.ca/`),
+          listFiles(projectId, `${folder}/Background.ca/`),
+        ]);
+        // Fallback: if nothing found (project renamed but files under old folder), auto-detect folder
+        if ((floatingFiles.length + backgroundFiles.length) === 0) {
+          const all = await listFiles(projectId);
+          const anyMain = all.find(f => /\.ca\/(Floating|Background)\.ca\/main\.caml$/.test(f.path));
+          if (anyMain) {
+            const parts = anyMain.path.split('/');
+            folder = parts[0];
+            [floatingFiles, backgroundFiles] = [
+              all.filter(f => f.path.startsWith(`${folder}/Floating.ca/`)),
+              all.filter(f => f.path.startsWith(`${folder}/Background.ca/`)),
+            ];
+          }
+        }
+
+        const readDocFromFiles = async (files: Awaited<ReturnType<typeof listFiles>>): Promise<CADoc> => {
+          const byPath = new Map(files.map((f) => [f.path, f]));
+          const main = byPath.get(`${folder}/Floating.ca/main.caml`) || byPath.get(`${folder}/Background.ca/main.caml`);
+          let layers: AnyLayer[] = [];
+          let assets: Record<string, { filename: string; dataURL: string }> = {};
+          let states: string[] = [...fixedStates];
+          let stateOverrides: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
+          let stateTransitions: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }>; }> = [];
+          if (main && main.type === 'text' && typeof main.data === 'string') {
+            try {
+              const { parseCAML, parseStates, parseStateOverrides, parseStateTransitions } = await import("@/lib/ca/caml");
+              const root = parseCAML(main.data);
+              if (root) {
+                const rootLayer = root as any;
+                layers = rootLayer?.type === 'group' && Array.isArray(rootLayer.children) ? rootLayer.children : [rootLayer];
+                states = parseStates(main.data);
+                stateOverrides = parseStateOverrides(main.data) as any;
+                stateTransitions = parseStateTransitions(main.data) as any;
+              }
+            } catch {}
+          }
+          // Load assets dataURLs back from blobs
+          for (const f of files) {
+            if (f.path.includes('/assets/')) {
+              const filename = f.path.split('/assets/')[1];
+              try {
+                const buf = f.data as ArrayBuffer;
+                const blob = new Blob([buf]);
+                const dataURL = await new Promise<string>((resolve) => {
+                  const r = new FileReader();
+                  r.onload = () => resolve(String(r.result));
+                  r.readAsDataURL(blob);
+                });
+                // map by layer-id unknown; keep filename keyed by filename (editor uses by layer id). We'll keep empty; real mapping restored during editing on replacement/add.
+                // No-op mapping since we don't know which layer id maps to which asset here.
+                // The editor will store assets by layerId upon edits.
+              } catch {}
+            }
+          }
+          return {
+            layers,
+            selectedId: null,
+            assets,
+            states: states.length ? states : [...fixedStates],
+            activeState: 'Base State',
+            stateOverrides,
+            stateTransitions,
+          };
+        };
+
+        const floatingDoc = await readDocFromFiles(floatingFiles);
+        const backgroundDoc = await readDocFromFiles(backgroundFiles);
+
+        const initial: ProjectDocument = {
+          meta,
+          activeCA: 'floating',
+          docs: { background: backgroundDoc, floating: floatingDoc },
+        };
+        setDoc(initial);
+      } catch {
+        setDoc({
           meta: {
-            id: anyDoc.meta?.id ?? initialMeta.id,
-            name: anyDoc.meta?.name ?? initialMeta.name,
-            width: anyDoc.meta?.width ?? initialMeta.width,
-            height: anyDoc.meta?.height ?? initialMeta.height,
-            background: anyDoc.meta?.background ?? initialMeta.background ?? "#e5e7eb",
-            geometryFlipped: (anyDoc.meta?.geometryFlipped ?? 0) as 0 | 1,
+            id: initialMeta.id,
+            name: initialMeta.name,
+            width: initialMeta.width,
+            height: initialMeta.height,
+            background: initialMeta.background ?? "#e5e7eb",
+            geometryFlipped: 0,
           },
           activeCA: 'floating',
           docs: {
-            background: {
-              layers: [],
-              selectedId: null,
-              assets: {},
-              states: [...fixedStates],
-              activeState: 'Base State',
-              stateOverrides: {},
-              stateTransitions: [],
-            },
-            floating: {
-              layers: (anyDoc.layers as AnyLayer[]) || [],
-              selectedId: anyDoc.selectedId ?? null,
-              assets: anyDoc.assets || {},
-              states: [...fixedStates],
-              activeState: (anyDoc.activeState as any) || 'Base State',
-              stateOverrides: anyDoc.stateOverrides || {},
-              stateTransitions: anyDoc.stateTransitions || [],
-            },
+            background: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {}, stateTransitions: [] },
+            floating: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {}, stateTransitions: [] },
           },
-        };
-        setDoc(migrated);
-      } else {
-        const next: ProjectDocument = {
-          ...(storedDoc as ProjectDocument),
-          activeCA: (storedDoc as any).activeCA || 'floating',
-          docs: {
-            background: {
-              states: [...fixedStates],
-              activeState: ((storedDoc as any).docs?.background?.activeState as any) || 'Base State',
-              stateOverrides: (storedDoc as any).docs?.background?.stateOverrides || {},
-              stateTransitions: (storedDoc as any).docs?.background?.stateTransitions || [],
-              layers: (storedDoc as any).docs?.background?.layers || [],
-              selectedId: (storedDoc as any).docs?.background?.selectedId ?? null,
-              assets: (storedDoc as any).docs?.background?.assets || {},
-            },
-            floating: {
-              states: [...fixedStates],
-              activeState: ((storedDoc as any).docs?.floating?.activeState as any) || 'Base State',
-              stateOverrides: (storedDoc as any).docs?.floating?.stateOverrides || {},
-              stateTransitions: (storedDoc as any).docs?.floating?.stateTransitions || [],
-              layers: (storedDoc as any).docs?.floating?.layers || [],
-              selectedId: (storedDoc as any).docs?.floating?.selectedId ?? null,
-              assets: (storedDoc as any).docs?.floating?.assets || {},
-            },
-          },
-        } as ProjectDocument;
-        // ensure geometryFlipped in meta
-        (next as any).meta = {
-          ...next.meta,
-          geometryFlipped: ((next.meta as any).geometryFlipped ?? 0) as 0 | 1,
-        };
-        setDoc(next);
+        });
       }
-    } else {
-      setDoc({
-        meta: {
-          id: initialMeta.id,
-          name: initialMeta.name,
-          width: initialMeta.width,
-          height: initialMeta.height,
-          background: initialMeta.background ?? "#e5e7eb",
-          geometryFlipped: 0,
-        },
-        activeCA: 'floating',
-        docs: {
-          background: {
-            layers: [],
-            selectedId: null,
-            assets: {},
-            states: ["Locked", "Unlock", "Sleep"],
-            activeState: 'Base State',
-            stateOverrides: {},
-            stateTransitions: [],
-          },
-          floating: {
-            layers: [],
-            selectedId: null,
-            assets: {},
-            states: ["Locked", "Unlock", "Sleep"],
-            activeState: 'Base State',
-            stateOverrides: {},
-            stateTransitions: [],
-          },
-        },
-      });
-    }
-  }, [doc, storedDoc, initialMeta.id]);
+    })();
+  }, [doc, projectId, initialMeta.id, initialMeta.name, initialMeta.width, initialMeta.height, initialMeta.background]);
 
   const persist = useCallback(() => {
-    if (doc) setStoredDoc(doc);
-  }, [doc, setStoredDoc]);
+    // Trigger writing to IndexedDB immediately
+    if (!doc) return;
+    writeToIndexedDB(doc).catch(() => {});
+  }, [doc]);
 
   useEffect(() => {
     if (!doc) return;
     if (skipPersistRef.current) {
-     
       skipPersistRef.current = false;
       return;
     }
-    setStoredDoc(doc);
-  }, [doc, setStoredDoc]);
+    writeToIndexedDB(doc).catch(() => {});
+  }, [doc]);
+
+  const writeToIndexedDB = useCallback(async (snapshot: ProjectDocument) => {
+    try {
+      const folder = `${snapshot.meta.name}.ca`;
+      const caKeys: Array<'background' | 'floating'> = ['background', 'floating'];
+      for (const key of caKeys) {
+        const caFolder = key === 'floating' ? 'Floating.ca' : 'Background.ca';
+        const caDoc = snapshot.docs[key];
+        // Build root and caml from current doc
+        const root: GroupLayer = {
+          id: snapshot.meta.id,
+          name: snapshot.meta.name,
+          type: 'group',
+          position: { x: Math.round((snapshot.meta.width || 0) / 2), y: Math.round((snapshot.meta.height || 0) / 2) },
+          size: { w: snapshot.meta.width || 0, h: snapshot.meta.height || 0 },
+          backgroundColor: snapshot.meta.background,
+          geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
+          children: (caDoc.layers as AnyLayer[]) || [],
+        } as GroupLayer;
+
+        // Serialize CAML
+        const caml = serializeCAML(
+          root,
+          {
+            id: snapshot.meta.id,
+            name: snapshot.meta.name,
+            width: snapshot.meta.width,
+            height: snapshot.meta.height,
+            background: snapshot.meta.background,
+            geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
+          } as any,
+          (caDoc as any).states,
+          (caDoc as any).stateOverrides,
+          (caDoc as any).stateTransitions,
+        );
+        await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, caml);
+        // index.xml and assetManifest.caml
+        const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
+        await putTextFile(projectId, `${folder}/${caFolder}/index.xml`, indexXml);
+        const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`;
+        await putTextFile(projectId, `${folder}/${caFolder}/assetManifest.caml`, assetManifest);
+
+        // Assets: write copies into assets folder
+        const assets = caDoc.assets || {};
+        for (const [layerId, info] of Object.entries(assets)) {
+          try {
+            const dataURL = info.dataURL;
+            const blob = await dataURLToBlob(dataURL);
+            await putBlobFile(projectId, `${folder}/${caFolder}/assets/${info.filename}`, blob);
+          } catch {}
+        }
+      }
+    } catch (e) {
+      // ignore errors during background persistence
+    }
+  }, [projectId]);
+
+  async function dataURLToBlob(dataURL: string): Promise<Blob> {
+    const [meta, data] = dataURL.split(',');
+    const isBase64 = /;base64$/i.test(meta);
+    const mimeMatch = meta.match(/^data:([^;]+)(;base64)?$/i);
+    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+    if (isBase64) {
+      const byteString = atob(data);
+      const ia = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+      return new Blob([ia], { type: mime });
+    } else {
+      return new Blob([decodeURIComponent(data)], { type: mime });
+    }
+  }
 
   const selectLayer = useCallback((id: string | null) => {
     setDoc((prev) => {
