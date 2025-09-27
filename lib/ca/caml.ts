@@ -200,6 +200,18 @@ function parseCALayer(el: Element): AnyLayer {
     } as AnyLayer;
   }
 
+  if (sublayerNodes.length === 0) {
+    return {
+      ...base,
+      type: 'shape',
+      shape: 'rect',
+      fill: (base as any).backgroundColor,
+      radius: (base as any).cornerRadius,
+      borderColor: (base as any).borderColor,
+      borderWidth: (base as any).borderWidth,
+    } as AnyLayer;
+  }
+
   const children = sublayerNodes.map((n) => parseCALayer(n));
   const group: GroupLayer = {
     ...base,
