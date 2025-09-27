@@ -31,6 +31,9 @@ export type EditorContextValue = {
   setDoc: React.Dispatch<React.SetStateAction<ProjectDocument | null>>;
   activeCA: 'background' | 'floating';
   setActiveCA: (v: 'background' | 'floating') => void;
+  savingStatus: 'idle' | 'saving' | 'saved';
+  lastSavedAt?: number;
+  flushPersist: () => Promise<void>;
   addTextLayer: () => void;
   addImageLayer: (src?: string) => void;
   addImageLayerFromFile: (file: File) => Promise<void>;
@@ -72,6 +75,10 @@ export function EditorProvider({
   children: React.ReactNode;
 }) {
   const [doc, setDoc] = useState<ProjectDocument | null>(null);
+  const [savingStatus, setSavingStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<number | undefined>(undefined);
+  const saveTimerRef = useRef<number | null>(null);
+  const lastSavePromiseRef = useRef<Promise<void> | null>(null);
   const pastRef = useRef<ProjectDocument[]>([]);
   const futureRef = useRef<ProjectDocument[]>([]);
   const skipPersistRef = useRef(false);
@@ -232,10 +239,41 @@ export function EditorProvider({
     })();
   }, [doc, projectId, initialMeta.id, initialMeta.name, initialMeta.width, initialMeta.height, initialMeta.background]);
 
+  const doSave = useCallback((snapshot?: ProjectDocument): Promise<void> => {
+    const snap = snapshot ?? doc;
+    if (!snap) return Promise.resolve();
+    setSavingStatus('saving');
+    const p = writeToIndexedDB(snap)
+      .then(() => {
+        setSavingStatus('saved');
+        setLastSavedAt(Date.now());
+      })
+      .catch(() => {
+      });
+    lastSavePromiseRef.current = p;
+    return p;
+  }, [doc]);
+
+  const flushPersist = useCallback(async () => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    await doSave();
+  }, [doSave]);
+
   const persist = useCallback(() => {
     if (!doc) return;
-    writeToIndexedDB(doc).catch(() => {});
-  }, [doc]);
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSavingStatus('saving');
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      doSave();
+    }, 500);
+  }, [doc, doSave]);
 
   useEffect(() => {
     if (!doc) return;
@@ -243,8 +281,25 @@ export function EditorProvider({
       skipPersistRef.current = false;
       return;
     }
-    writeToIndexedDB(doc).catch(() => {});
-  }, [doc]);
+    persist();
+  }, [doc, persist]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        flushPersist();
+      }
+    };
+    const onPageHide = () => {
+      flushPersist();
+    };
+    window.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      window.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [flushPersist]);
 
   const writeToIndexedDB = useCallback(async (snapshot: ProjectDocument) => {
     try {
@@ -844,7 +899,10 @@ export function EditorProvider({
     doc,
     setDoc,
     activeCA: doc?.activeCA ?? 'floating',
-    setActiveCA: (v) => setDoc((prev) => prev ? ({ ...prev, activeCA: v }) : prev),
+    setActiveCA: (v) => setDoc((prev) => (prev ? { ...prev, activeCA: v } : prev)),
+    savingStatus,
+    lastSavedAt,
+    flushPersist,
     addTextLayer,
     addImageLayer,
     addImageLayerFromFile,
@@ -872,7 +930,39 @@ export function EditorProvider({
     setIsAnimationPlaying,
     animatedLayers,
     setAnimatedLayers,
-  }), [doc, addTextLayer, addImageLayer, addImageLayerFromFile, replaceImageForLayer, addShapeLayer, updateLayer, updateLayerTransient, selectLayer, deleteLayer, persist, undo, redo, addState, renameState, deleteState, setActiveState, updateStateOverride, updateStateOverrideTransient, isAnimationPlaying, animatedLayers]);
+  }), [
+    doc,
+    savingStatus,
+    lastSavedAt,
+    flushPersist,
+    addTextLayer,
+    addImageLayer,
+    addImageLayerFromFile,
+    addImageLayerFromBlob,
+    replaceImageForLayer,
+    addShapeLayer,
+    updateLayer,
+    updateLayerTransient,
+    selectLayer,
+    deleteLayer,
+    copySelectedLayer,
+    pasteFromClipboard,
+    duplicateLayer,
+    moveLayer,
+    persist,
+    undo,
+    redo,
+    addState,
+    renameState,
+    deleteState,
+    setActiveState,
+    updateStateOverride,
+    updateStateOverrideTransient,
+    isAnimationPlaying,
+    setIsAnimationPlaying,
+    animatedLayers,
+    setAnimatedLayers,
+  ]);
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 }

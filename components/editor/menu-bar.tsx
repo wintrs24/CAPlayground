@@ -40,7 +40,7 @@ type MenuBarProps = {
 
 export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLeft, toggleRight }: MenuBarProps) {
   const router = useRouter();
-  const { doc, undo, redo, setDoc, activeCA, setActiveCA } = useEditor();
+  const { doc, undo, redo, setDoc, activeCA, setActiveCA, savingStatus, lastSavedAt, flushPersist } = useEditor();
   const { toast } = useToast();
 
   const [renameOpen, setRenameOpen] = useState(false);
@@ -51,6 +51,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportingTendies, setExportingTendies] = useState(false);
+  const [showManualSave, setShowManualSave] = useState(false);
   const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
@@ -247,7 +248,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
 
   return (
     <div className="w-full h-12 flex items-center justify-between px-3 border-b bg-background/60 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div>
+      <div className="flex items-center gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 px-2 border border-border">
@@ -258,11 +259,12 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           <DropdownMenuContent align="start" className="w-52">
             <DropdownMenuLabel>Project</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <Link href="/projects">
-              <DropdownMenuItem className="cursor-pointer">
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back to projects
-              </DropdownMenuItem>
-            </Link>
+            <DropdownMenuItem
+              className="cursor-pointer"
+              onClick={async () => { await flushPersist(); router.push('/projects'); }}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" /> Back to projects
+            </DropdownMenuItem>
             <DropdownMenuItem className="cursor-pointer" onClick={() => setRenameOpen(true)}>
               <Pencil className="h-4 w-4 mr-2" /> Rename
             </DropdownMenuItem>
@@ -271,6 +273,34 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {/* Saving status */}
+        <div onMouseEnter={() => setShowManualSave(true)} onMouseLeave={() => setShowManualSave(false)}>
+          {showManualSave ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 text-xs text-muted-foreground"
+              onClick={async () => { await flushPersist(); setShowManualSave(false); }}
+              title="Save now"
+            >
+              Manual Save
+            </Button>
+          ) : (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full border ${
+                savingStatus === 'saving'
+                  ? 'border-amber-500 text-amber-700 dark:text-amber-400'
+                  : savingStatus === 'saved'
+                  ? 'border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                  : 'border-muted text-muted-foreground'
+              }`}
+              aria-live="polite"
+              title={lastSavedAt ? `Last saved ${new Date(lastSavedAt).toLocaleTimeString()}` : undefined}
+            >
+              {savingStatus === 'saving' ? 'Saving…' : savingStatus === 'saved' ? 'Saved' : 'Idle'}
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-2">
         {/* switch between ca files */}
