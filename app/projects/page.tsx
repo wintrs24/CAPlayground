@@ -747,32 +747,35 @@ export default function ProjectsPage() {
                         </div>
                         {/* rename/delete */}
                         <div className="ml-2 flex items-center gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8"
-                          aria-label="Rename project"
-                          title="Rename"
-                          onClick={(e) => { e.stopPropagation(); startEditing(project); }}
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          aria-label="Delete project"
-                          title="Delete"
-                          onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
-                        >
-                          <Trash2 className="h-4 w-4" />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className={`h-8 w-8 ${isSelectMode ? 'opacity-50 pointer-events-none' : ''}`}
+                            aria-label="Rename project"
+                            title="Rename"
+                            disabled={isSelectMode}
+                            onClick={(e) => { e.stopPropagation(); startEditing(project); }}
+                          >
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className={`h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10 ${isSelectMode ? 'opacity-50 pointer-events-none' : ''}`}
+                            aria-label="Delete project"
+                            title="Delete"
+                            disabled={isSelectMode}
+                            onClick={(e) => { e.stopPropagation(); confirmDelete(project.id); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
                       {/* Open Project */}
                       <div className="mt-2">
                         <Button
-                          className="w-full justify-center"
+                          className={`w-full justify-center ${isSelectMode ? 'opacity-50 pointer-events-none' : ''}`}
+                          disabled={isSelectMode}
                           onClick={(e) => { e.stopPropagation(); router.push(`/editor/${project.id}`); }}
                         >
                           Open Project <ArrowRight className="h-4 w-4 ml-2" />
