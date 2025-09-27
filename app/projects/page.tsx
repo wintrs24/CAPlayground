@@ -64,6 +64,9 @@ export default function ProjectsPage() {
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "7" | "30" | "year">("all");
   const [sortBy, setSortBy] = useState<"recent" | "name-asc" | "name-desc">("recent");
+  const PAGE_SIZE = 9;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const projectsArray = Array.isArray(projects) ? projects : [];
 
@@ -329,6 +332,26 @@ export default function ProjectsPage() {
     });
     return sorted;
   }, [projectsArray, query, dateFilter, sortBy]);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [query, dateFilter, sortBy, projectsArray.length]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      const e = entries[0];
+      if (e.isIntersecting) {
+        setVisibleCount((prev) => {
+          const next = Math.min(prev + PAGE_SIZE, filteredProjects.length);
+          return next;
+        });
+      }
+    }, { root: null, rootMargin: "200px", threshold: 0 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [filteredProjects.length]);
 
   // helper to convert dataURL -> Blob
   const dataURLToBlob = async (dataURL: string): Promise<Blob> => {
@@ -677,7 +700,7 @@ export default function ProjectsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredProjects.map((project) => {
+              {filteredProjects.slice(0, visibleCount).map((project) => {
                 const isSelected = selectedIds.includes(project.id);
                 const pv = previews[project.id];
                 const doc = thumbDocs[project.id] ?? { meta: { width: pv?.width || project.width || 390, height: pv?.height || project.height || 844, background: pv?.bg || '#e5e7eb' }, layers: [] } as any;
@@ -759,6 +782,9 @@ export default function ProjectsPage() {
                   </Card>
                 );
               })}
+              {visibleCount < filteredProjects.length && (
+                <div ref={sentinelRef} className="col-span-full h-8" />
+              )}
             </div>
           )}
         </div>
