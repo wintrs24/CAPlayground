@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
@@ -55,6 +55,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [exportView, setExportView] = useState<'select'|'success'>("select");
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -91,9 +92,9 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [undo, redo, toggleLeft, toggleRight]);
 
-  const exportCA = async () => {
+  const exportCA = async (): Promise<boolean> => {
     try {
-      if (!doc) return;
+      if (!doc) return false;
       const proj = await getProject(doc.meta.id);
       const nameSafe = ((proj?.name || doc.meta.name) || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
       const folder = `${(proj?.name || doc.meta.name) || 'Project'}.ca`;
@@ -117,6 +118,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      return true;
     } catch (e) {
       console.error('Export failed', e);
       toast({
@@ -124,6 +126,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         description: "Failed to export .ca file. Please try again.",
         variant: "destructive",
       });
+      return false;
     }
   };
 
@@ -202,8 +205,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         title: "Export successful",
         description: `Tendies file "${nameSafe}.tendies" has been downloaded.`,
       });
-      
-      setExportOpen(false);
+      setExportView('success');
     } catch (e) {
       console.error('Tendies export failed', e);
       toast({
@@ -419,42 +421,76 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           </DropdownMenu>
         </div>
         <div>
-          <Button variant="secondary" disabled={!doc} onClick={() => setExportOpen(true)}>Export</Button>
-          <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+          <Button variant="secondary" disabled={!doc} onClick={() => { setExportView('select'); setExportOpen(true); }}>Export</Button>
+          <Dialog open={exportOpen} onOpenChange={(v)=>{ setExportOpen(v); if (!v) setExportView('select'); }}>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Export</DialogTitle>
-                <DialogDescription>Select a format to export your project.</DialogDescription>
+              <DialogHeader className={exportView === 'success' ? 'flex items-center justify-start' : undefined}>
+                {exportView === 'success' ? (
+                  <Button variant="ghost" className="h-8 w-auto px-2 gap-1 self-start" onClick={() => setExportView('select')}>
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </Button>
+                ) : (
+                  <>
+                    <DialogTitle>Export</DialogTitle>
+                    <DialogDescription>Select a format to export your project.</DialogDescription>
+                  </>
+                )}
               </DialogHeader>
-              <div className="grid gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => { exportCA(); setExportOpen(false); }}
-                  disabled={!doc}
-                  className="w-full justify-start text-left py-10"
-                >
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span>Export .ca file</span>
-                    <span className="text-xs text-muted-foreground">Download a .ca archive you can re-import later.</span>
+              <div className="relative overflow-hidden">
+                <div className="flex w-[200%] transition-transform duration-300 ease-out"
+                  style={{ transform: exportView === 'select' ? 'translateX(0%)' : 'translateX(-50%)' }}>
+                  <div className="w-1/2 px-0">
+                    <div className="grid gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={async () => {
+                          const ok = await exportCA();
+                          if (ok) setExportView('success');
+                        }}
+                        disabled={!doc}
+                        className="w-full justify-start text-left py-10"
+                      >
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span>Export .ca file</span>
+                          <span className="text-xs text-muted-foreground">Download a .ca archive you can re-import later.</span>
+                        </div>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { exportTendies(); }}
+                        disabled={!doc || exportingTendies}
+                        className="w-full justify-start text-left py-10"
+                      >
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span>Export Tendies file</span>
+                          <span className="text-xs text-muted-foreground">
+                            {exportingTendies ? 'Creating tendies file...' : 'Create a tendies wallpaper file with your animation.'}
+                          </span>
+                        </div>
+                      </Button>
+                    </div>
                   </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => { exportTendies(); }}
-                  disabled={!doc || exportingTendies}
-                  className="w-full justify-start text-left py-10"
-                >
-                  <div className="flex flex-col items-start gap-0.5">
-                    <span>Export Tendies file</span>
-                    <span className="text-xs text-muted-foreground">
-                      {exportingTendies ? 'Creating tendies file...' : 'Create a tendies wallpaper file with your animation.'}
-                    </span>
+                  {/* Success panel */}
+                  <div className="w-1/2 px-0">
+                    <div className="py-6 flex flex-col items-center text-center gap-3">
+                      <div className="text-2xl font-semibold">Thank you for using CAPlayground!</div>
+                      <div className="text-sm text-muted-foreground">Got a minute? Please consider starring the GitHub repo.</div>
+                      <a
+                        href="https://github.com/CAPlayground/CAPlayground"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-md border px-3 py-2 hover:bg-muted"
+                      >
+                        <Star className="h-4 w-4" />
+                        Star the repo
+                      </a>
+                      <div className="pt-2">
+                        <Button onClick={() => setExportOpen(false)}>Close</Button>
+                      </div>
+                    </div>
                   </div>
-                </Button>
+                </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setExportOpen(false)}>Close</Button>
-              </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
