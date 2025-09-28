@@ -7,11 +7,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
 import { useEditor } from "./editor-context";
+import { LayerContextMenu } from "./layer-context-menu";
 import type { AnyLayer, GroupLayer, ShapeLayer } from "@/lib/ca/types";
 
 export function CanvasPreview() {
   const ref = useRef<HTMLDivElement | null>(null);
-  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile, isAnimationPlaying, setIsAnimationPlaying, animatedLayers, setAnimatedLayers } = useEditor();
+  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile, isAnimationPlaying, setIsAnimationPlaying, animatedLayers, setAnimatedLayers, moveLayer, deleteLayer } = useEditor();
   const docRef = useRef<typeof doc>(doc);
   useEffect(() => { docRef.current = doc; }, [doc]);
   const [size, setSize] = useState({ w: 600, h: 400 });
@@ -62,6 +63,21 @@ export function CanvasPreview() {
         return base || 'image.png';
       } catch { return 'image.png'; }
     };
+
+  const findSiblingsOf = (layers: AnyLayer[], id: string): { siblings: AnyLayer[]; index: number } | null => {
+    const walk = (arr: AnyLayer[]): { siblings: AnyLayer[]; index: number } | null => {
+      const idx = arr.findIndex((l) => l.id === id);
+      if (idx >= 0) return { siblings: arr, index: idx };
+      for (const l of arr) {
+        if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
+          const res = walk((l as any).children as AnyLayer[]);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+    return walk(layers);
+  };
     const fetchToBlob = async (url: string): Promise<{ blob: Blob; filename?: string } | null> => {
       try {
         const res = await fetch(url, { mode: 'cors' });
@@ -179,6 +195,68 @@ export function CanvasPreview() {
       window.removeEventListener('paste', pasteHandler);
     };
   }, [copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase();
+      const isEditable = !!((e.target as HTMLElement | null)?.isContentEditable);
+      if (tag === 'input' || tag === 'textarea' || isEditable) return;
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const curKey = doc?.activeCA ?? 'floating';
+      const cur = doc?.docs?.[curKey];
+      const selId = cur?.selectedId || null;
+      if (!selId) return;
+      e.preventDefault();
+      deleteLayer(selId);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [doc, deleteLayer]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod) return;
+      const key = e.key;
+      if (key !== ']' && key !== '[') return;
+      const curKey = doc?.activeCA ?? 'floating';
+      const cur = doc?.docs?.[curKey];
+      const selId = cur?.selectedId || null;
+      if (!cur || !selId) return;
+      const res = findSiblingsOf(cur.layers || [], selId);
+      if (!res) return;
+      const { siblings, index } = res;
+      const n = siblings.length;
+      if (n <= 1) return;
+      e.preventDefault();
+
+      const bringForward = () => {
+        if (index < n - 2) {
+          moveLayer(selId, siblings[index + 2].id);
+        } else if (index === n - 2) {
+          moveLayer(siblings[n - 1].id, selId);
+        }
+      };
+      const sendBackward = () => {
+        if (index > 0) moveLayer(selId, siblings[index - 1].id);
+      };
+      const sendToBack = () => {
+        if (index > 0) moveLayer(selId, siblings[0].id);
+      };
+      const bringToFront = () => {
+        if (index < n - 1) {
+          for (let i = index + 1; i < n; i++) moveLayer(siblings[i].id, selId);
+        }
+      };
+
+      if (key === ']' && e.shiftKey) return bringToFront();
+      if (key === '[' && e.shiftKey) return sendToBack();
+      if (key === ']') return bringForward();
+      if (key === '[') return sendBackward();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [doc, moveLayer]);
 
   const { fitScale, baseOffsetX, baseOffsetY } = useMemo(() => {
     const w = doc?.meta.width ?? 390;
@@ -720,7 +798,7 @@ export function CanvasPreview() {
 
   // moved helpers above
 
-  const renderLayer = (l: AnyLayer, containerH: number = (doc?.meta.height ?? 0), useYUp: boolean = getRootFlip() === 0): ReactNode => {
+  const renderLayer = (l: AnyLayer, containerH: number = (doc?.meta.height ?? 0), useYUp: boolean = getRootFlip() === 0, siblings: AnyLayer[] = renderedLayers): ReactNode => {
     const { left, top } = computeCssLT(l, containerH, useYUp);
     const a = getAnchor(l);
     const common: React.CSSProperties = {
@@ -738,30 +816,32 @@ export function CanvasPreview() {
 
     if (l.type === "text") {
       return (
-        <div
-          key={l.id}
-          style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: l.align ?? "left" }}
-          onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
-        >
-          {l.text}
-        </div>
+        <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
+          <div
+            style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: l.align ?? "left" }}
+            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
+          >
+            {l.text}
+          </div>
+        </LayerContextMenu>
       );
     }
     if (l.type === "image") {
       return (
-        <img
-          key={l.id}
-          src={l.src}
-          alt={l.name}
-          style={{
-            ...common,
-            objectFit: "fill" as React.CSSProperties["objectFit"],
-            maxWidth: "none",
-            maxHeight: "none",
-          }}
-          draggable={false}
-          onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
-        />
+        <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
+          <img
+            src={l.src}
+            alt={l.name}
+            style={{
+              ...common,
+              objectFit: "fill" as React.CSSProperties["objectFit"],
+              maxWidth: "none",
+              maxHeight: "none",
+            }}
+            draggable={false}
+            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
+          />
+        </LayerContextMenu>
       );
     }
     if (l.type === "shape") {
@@ -770,16 +850,20 @@ export function CanvasPreview() {
       const legacy = s.radius;
       const borderRadius = s.shape === "circle" ? 9999 : ((corner ?? legacy ?? 0));
       return (
-        <div key={l.id} style={{ ...common, background: s.fill, borderRadius }} onMouseDown={(e) => startDrag(l, e, containerH, useYUp)} />
+        <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
+          <div style={{ ...common, background: s.fill, borderRadius }} onMouseDown={(e) => startDrag(l, e, containerH, useYUp)} />
+        </LayerContextMenu>
       );
     }
     // group
     const g = l as GroupLayer;
     const nextUseYUp = useYUp; // stacking future support
     return (
-      <div key={g.id} style={{ ...common, background: g.backgroundColor }} onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}>
-        {g.children.map((c) => renderLayer(c, g.size.h, nextUseYUp))}
-      </div>
+      <LayerContextMenu key={g.id} layer={g} siblings={siblings}>
+        <div style={{ ...common, background: g.backgroundColor }} onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}>
+          {g.children.map((c) => renderLayer(c, g.size.h, nextUseYUp, g.children))}
+        </div>
+      </LayerContextMenu>
     );
   };
 

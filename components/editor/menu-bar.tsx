@@ -448,6 +448,11 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 <div className="flex items-center justify-between"><span>Pan</span><span className="font-mono">Shift + Drag or Middle Click</span></div>
                 <div className="flex items-center justify-between"><span>Toggle Left Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + L</span></div>
                 <div className="flex items-center justify-between"><span>Toggle Right Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + I</span></div>
+                <div className="flex items-center justify-between"><span>Bring Forward</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + ]</span></div>
+                <div className="flex items-center justify-between"><span>Send Backward</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + [</span></div>
+                <div className="flex items-center justify-between"><span>Bring to Front</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + ]</span></div>
+                <div className="flex items-center justify-between"><span>Send to Back</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + [</span></div>
+                <div className="flex items-center justify-between"><span>Delete Layer</span><span className="font-mono">Delete</span></div>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={() => {
