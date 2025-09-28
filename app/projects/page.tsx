@@ -277,11 +277,13 @@ export default function ProjectsPage() {
         top,
         width: l.size.w,
         height: l.size.h,
-        transform: `rotate(${(l as any).rotation ?? 0}deg)`,
+        transform: `rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${(l as any).rotation ?? 0}deg)`,
         transformOrigin: `${a.x * 100}% ${a.y * 100}%`,
         opacity: (l as any).opacity ?? 1,
         display: (l as any).visible === false ? 'none' as any : undefined,
         overflow: 'hidden',
+        backfaceVisibility: 'hidden',
+        transformStyle: 'preserve-3d',
       };
       if (l.type === 'text') {
         const t = l as any;
