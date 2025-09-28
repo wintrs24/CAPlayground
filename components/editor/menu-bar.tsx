@@ -36,9 +36,15 @@ type MenuBarProps = {
   showRight?: boolean;
   toggleLeft?: () => void;
   toggleRight?: () => void;
+  leftWidth?: number;
+  rightWidth?: number;
+  statesHeight?: number;
+  setLeftWidth?: (n: number) => void;
+  setRightWidth?: (n: number) => void;
+  setStatesHeight?: (n: number) => void;
 };
 
-export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLeft, toggleRight }: MenuBarProps) {
+export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLeft, toggleRight, leftWidth, rightWidth, statesHeight, setLeftWidth, setRightWidth, setStatesHeight }: MenuBarProps) {
   const router = useRouter();
   const { doc, undo, redo, setDoc, activeCA, setActiveCA, savingStatus, lastSavedAt, flushPersist } = useEditor();
   const { toast } = useToast();
@@ -455,6 +461,35 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 <div className="flex items-center justify-between"><span>Bring to Front</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + ]</span></div>
                 <div className="flex items-center justify-between"><span>Send to Back</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + [</span></div>
                 <div className="flex items-center justify-between"><span>Delete Layer</span><span className="font-mono">Delete</span></div>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Panels</DropdownMenuLabel>
+              <div className="px-2 py-1.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span>Left panel width</span>
+                  <span className="font-mono text-muted-foreground">{leftWidth ?? '—'} px</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Right panel width</span>
+                  <span className="font-mono text-muted-foreground">{rightWidth ?? '—'} px</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>States panel height</span>
+                  <span className="font-mono text-muted-foreground">{statesHeight ?? '—'} px</span>
+                </div>
+                <div className="pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setLeftWidth?.(320);
+                      setRightWidth?.(400);
+                      setStatesHeight?.(350);
+                    }}
+                  >
+                    Reset to defaults
+                  </Button>
+                </div>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={() => {

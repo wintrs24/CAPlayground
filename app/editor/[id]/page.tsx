@@ -4,6 +4,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import { useParams, useRouter } from "next/navigation";
 import { EditorProvider } from "@/components/editor/editor-context";
 import { MenuBar } from "@/components/editor/menu-bar";
@@ -19,9 +20,9 @@ export default function EditorPage() {
   const router = useRouter();
   const projectId = params?.id;
   const [meta, setMeta] = useState<{ id: string; name: string; width: number; height: number; background?: string } | null>(null);
-  const [leftWidth, setLeftWidth] = useState(320);
-  const [rightWidth, setRightWidth] = useState(400);
-  const [statesHeight, setStatesHeight] = useState(350);
+  const [leftWidth, setLeftWidth] = useLocalStorage<number>("caplay_panel_left_width", 320);
+  const [rightWidth, setRightWidth] = useLocalStorage<number>("caplay_panel_right_width", 400);
+  const [statesHeight, setStatesHeight] = useLocalStorage<number>("caplay_panel_states_height", 350);
   const leftPaneRef = useRef<HTMLDivElement | null>(null);
   const [showLeft, setShowLeft] = useState(true);
   const [showRight, setShowRight] = useState(true);
@@ -54,6 +55,12 @@ export default function EditorPage() {
           showRight={showRight}
           toggleLeft={() => setShowLeft((v) => !v)}
           toggleRight={() => setShowRight((v) => !v)}
+          leftWidth={leftWidth}
+          rightWidth={rightWidth}
+          statesHeight={statesHeight}
+          setLeftWidth={setLeftWidth}
+          setRightWidth={setRightWidth}
+          setStatesHeight={setStatesHeight}
         />
         <div className="flex-1 px-4 py-4 overflow-hidden">
           <div className="h-full w-full flex gap-0">
