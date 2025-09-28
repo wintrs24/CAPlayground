@@ -238,6 +238,7 @@ export function Inspector() {
         <div className="space-y-1">
           <Label htmlFor="w">Width</Label>
           <Input id="w" type="number" step="0.01" value={getBuf('w', fmt2(selected.size.w))}
+            disabled={selected.type === 'text' && (((selected as any).wrapped ?? 1) as number) !== 1}
             onChange={(e) => {
               setBuf('w', e.target.value);
               const v = e.target.value.trim();
@@ -258,6 +259,7 @@ export function Inspector() {
         <div className="space-y-1">
           <Label htmlFor="h">Height</Label>
           <Input id="h" type="number" step="0.01" value={getBuf('h', fmt2(selected.size.h))}
+            disabled={selected.type === 'text'}
             onChange={(e) => {
               setBuf('h', e.target.value);
               const v = e.target.value.trim();
@@ -514,6 +516,41 @@ export function Inspector() {
                 if (v === "") return;
                 updateLayer(selected.id, { fontSize: Number(v) } as any)
               }} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="fontFamily">Font</Label>
+            <Select value={(selected as any).fontFamily || 'SFProText-Regular'}
+              onValueChange={(v) => updateLayer(selected.id, { fontFamily: v } as any)}>
+              <SelectTrigger className="h-8 text-xs" id="fontFamily">
+                <SelectValue placeholder="Select font" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SFProText-Regular">SFProText-Regular</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Alignment</Label>
+            <Select value={(selected as any).align || 'left'}
+              onValueChange={(v) => updateLayer(selected.id, { align: v as any } as any)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Select alignment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+                <SelectItem value="justified">Justified</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label>Wrap lines</Label>
+            <div className="flex items-center gap-2 h-8">
+              <Switch checked={(((selected as any).wrapped ?? 1) as number) === 1}
+                onCheckedChange={(checked) => updateLayer(selected.id, { wrapped: (checked ? 1 : 0) as any } as any)} />
+              <span className="text-xs text-muted-foreground">When on, drag horizontal bounds to wrap text.</span>
+            </div>
           </div>
           <div className="space-y-1">
             <Label htmlFor="color">Color</Label>

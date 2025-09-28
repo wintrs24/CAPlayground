@@ -651,6 +651,21 @@ export function CanvasPreview() {
     return { x, y };
   };
 
+  const findSiblingsOf = (layers: AnyLayer[], id: string): { siblings: AnyLayer[]; index: number } | null => {
+    const walk = (arr: AnyLayer[]): { siblings: AnyLayer[]; index: number } | null => {
+      const idx = arr.findIndex((l) => l.id === id);
+      if (idx >= 0) return { siblings: arr, index: idx };
+      for (const l of arr) {
+        if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
+          const res = walk((l as any).children as AnyLayer[]);
+          if (res) return res;
+        }
+      }
+      return null;
+    };
+    return walk(layers);
+  };
+
   const startDrag = (l: AnyLayer, e: ReactMouseEvent, containerH?: number, useYUp?: boolean) => {
     if (e.shiftKey || e.button === 1) return;
     e.preventDefault();
@@ -815,10 +830,13 @@ export function CanvasPreview() {
     };
 
     if (l.type === "text") {
+      const t = l as any;
+      const cssAlign = (t.align === 'justified') ? 'justify' : (t.align || 'left');
+      const whiteSpace: React.CSSProperties['whiteSpace'] = (t.wrapped ?? 1) === 1 ? 'normal' : 'nowrap';
       return (
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
           <div
-            style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: l.align ?? "left" }}
+            style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: cssAlign as any, whiteSpace }}
             onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
           >
             {l.text}
@@ -903,6 +921,8 @@ export function CanvasPreview() {
         startTop: number;
         canvasH: number;
         yUp: boolean;
+        aX: number;
+        aY: number;
         lastX: number;
         lastY: number;
         lastW: number;
@@ -932,6 +952,7 @@ export function CanvasPreview() {
     const canvasH = docRef.current?.meta.height ?? 0;
     const yUp = (getRootFlip() === 0);
     const startLT = computeCssLT(l, canvasH, yUp);
+    const a = getAnchor(l);
     resizeDragRef.current = {
       id: l.id,
       handle,
@@ -945,6 +966,8 @@ export function CanvasPreview() {
       startTop: startLT.top,
       canvasH,
       yUp,
+      aX: a.x,
+      aY: a.y,
       lastX: l.position.x,
       lastY: l.position.y,
       lastW: l.size.w,
@@ -984,8 +1007,40 @@ export function CanvasPreview() {
           else w = Math.max(1, h * aspect);
         }
       }
-      const x = d.startX;
-      const y = d.startY;
+      let left = d.startLeft;
+      let top = d.startTop;
+      switch (d.handle) {
+        case "e":
+          left = d.startLeft;
+          break;
+        case "w":
+          left = d.startLeft + d.startW - w;
+          break;
+        case "s":
+          top = d.startTop;
+          break;
+        case "n":
+          top = d.startTop + d.startH - h;
+          break;
+        case "ne":
+          left = d.startLeft;
+          top = d.startTop + d.startH - h;
+          break;
+        case "se":
+          left = d.startLeft;
+          top = d.startTop;
+          break;
+        case "sw":
+          left = d.startLeft + d.startW - w;
+          top = d.startTop;
+          break;
+        case "nw":
+          left = d.startLeft + d.startW - w;
+          top = d.startTop + d.startH - h;
+          break;
+      }
+      const x = left + d.aX * w;
+      const y = d.yUp ? ((d.canvasH - top) - (1 - d.aY) * h) : (top + d.aY * h);
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
       d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
@@ -1067,8 +1122,19 @@ export function CanvasPreview() {
     pointerEvents: "auto",
     cursor: "nwse-resize",
   };
-  const handles: Array<{ key: string; x: string | number; y: string | number; cursor: React.CSSProperties["cursor"]; h: any }>
-    = [
+  let handles: Array<{ key: string; x: string | number; y: string | number; cursor: React.CSSProperties["cursor"]; h: any }> = [];
+  if (l.type === 'text') {
+    const wrapped = (((l as any).wrapped ?? 1) as number) === 1;
+    if (wrapped) {
+      handles = [
+        { key: "e", x: "100%", y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "e", e) },
+        { key: "w", x: 0, y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "w", e) },
+      ];
+    } else {
+      handles = [];
+    }
+  } else {
+    handles = [
       { key: "nw", x: 0, y: 0, cursor: "nwse-resize", h: (e: any) => beginResize(l, "nw", e) },
       { key: "n", x: "50%", y: 0, cursor: "ns-resize", h: (e: any) => beginResize(l, "n", e) },
       { key: "ne", x: "100%", y: 0, cursor: "nesw-resize", h: (e: any) => beginResize(l, "ne", e) },
@@ -1078,6 +1144,7 @@ export function CanvasPreview() {
       { key: "sw", x: 0, y: "100%", cursor: "nesw-resize", h: (e: any) => beginResize(l, "sw", e) },
       { key: "w", x: 0, y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "w", e) },
     ];
+  }
   const rotationHandleStyle: React.CSSProperties = {
     position: "absolute",
     left: "50%",

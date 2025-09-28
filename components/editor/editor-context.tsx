@@ -397,6 +397,8 @@ export function EditorProvider({
         color: "#111827",
         fontSize: 16,
         align: "left",
+        fontFamily: "SFProText-Regular",
+        wrapped: 1,
       };
       const key = prev.activeCA;
       const cur = prev.docs[key];

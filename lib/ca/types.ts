@@ -52,7 +52,10 @@ export type TextLayer = LayerBase & {
   fontFamily?: string;
   fontSize?: number;
   color?: string;
-  align?: 'left' | 'center' | 'right';
+  // Horizontal alignment. Backwards-compatible with prior implementation.
+  align?: 'left' | 'center' | 'right' | 'justified';
+  // When 1, text is wrapped within the bounds width. When 0, no wrapping.
+  wrapped?: 0 | 1;
 };
 
 export type ShapeKind = 'rect' | 'circle' | 'rounded-rect';

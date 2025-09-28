@@ -107,6 +107,35 @@ function parseNumberList(input?: string): number[] {
     .map((s) => Number(s));
 }
 
+function floatsToHexColor(rgb: string | undefined): string | undefined {
+  if (!rgb) return undefined;
+  const parts = rgb.split(/[\s]+/).map((s) => Number(s));
+  if (parts.length < 3) return undefined;
+  const to255 = (f: number) => {
+    const n = Math.max(0, Math.min(1, Number.isFinite(f) ? f : 0));
+    return Math.round(n * 255);
+  };
+  const [r, g, b] = [to255(parts[0]), to255(parts[1]), to255(parts[2])];
+  const hex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
+}
+
+function hexToForegroundColor(value?: string): string | undefined {
+  if (!value) return undefined;
+  const m = value.trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{8})$/i);
+  if (!m) return undefined;
+  const hex = m[1].length === 6 ? m[1] : m[1].slice(0, 6);
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const toUnit = (n: number) => (n / 255);
+  const fmt = (n: number) => {
+    const s = (Math.round(n * 10000) / 10000).toString();
+    return s;
+  };
+  return `${fmt(toUnit(r))} ${fmt(toUnit(g))} ${fmt(toUnit(b))}`;
+}
+
 export function parseCAML(xml: string): AnyLayer | null {
   const doc = new DOMParser().parseFromString(xml, 'application/xml');
   const caml = doc.getElementsByTagNameNS(CAML_NS, 'caml')[0] || doc.documentElement;
@@ -133,6 +162,56 @@ export function parseStates(xml: string): string[] {
   } catch {
     return [];
   }
+}
+
+function parseCATextLayer(el: Element): AnyLayer {
+  const id = attr(el, 'id') || crypto.randomUUID();
+  const name = attr(el, 'name') || 'Text Layer';
+  const bounds = parseNumberList(attr(el, 'bounds'));
+  const position = parseNumberList(attr(el, 'position'));
+  const anchorPt = parseNumberList(attr(el, 'anchorPoint'));
+  const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const rotationZ = attr(el, 'transform.rotation.z');
+  const rotationX = attr(el, 'transform.rotation.x');
+  const rotationY = attr(el, 'transform.rotation.y');
+  const fontSizeAttr = attr(el, 'fontSize');
+  const alignmentMode = attr(el, 'alignmentMode') as TextLayer['align'] | undefined;
+  const wrappedAttr = attr(el, 'wrapped');
+  let fontFamily: string | undefined;
+  let textValue: string = '';
+  const fontEl = el.getElementsByTagNameNS(CAML_NS, 'font')[0] as Element | undefined;
+  if (fontEl) {
+    fontFamily = fontEl.getAttribute('value') || undefined;
+  }
+  const stringEl = el.getElementsByTagNameNS(CAML_NS, 'string')[0] as Element | undefined;
+  if (stringEl) {
+    textValue = stringEl.getAttribute('value') || '';
+  }
+  const colorHex = floatsToHexColor(attr(el, 'foregroundColor'));
+
+  const base = {
+    id,
+    name,
+    position: { x: position[0] ?? 0, y: position[1] ?? 0 },
+    size: { w: bounds[2] ?? 0, h: bounds[3] ?? 0 },
+    rotation: rotationZ ? ((Number(rotationZ) * 180) / Math.PI) : undefined,
+    rotationX: rotationX ? ((Number(rotationX) * 180) / Math.PI) : undefined,
+    rotationY: rotationY ? ((Number(rotationY) * 180) / Math.PI) : undefined,
+    anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
+    geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+  } as const;
+
+  const layer: AnyLayer = {
+    ...base,
+    type: 'text',
+    text: textValue || '',
+    fontFamily,
+    fontSize: fontSizeAttr ? Number(fontSizeAttr) : undefined,
+    color: colorHex,
+    align: alignmentMode,
+    wrapped: typeof wrappedAttr !== 'undefined' ? ((wrappedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+  } as AnyLayer;
+  return layer;
 }
 
 function parseCALayer(el: Element): AnyLayer {
@@ -216,7 +295,8 @@ function parseCALayer(el: Element): AnyLayer {
   } as const;
 
   const sublayersEl = el.getElementsByTagNameNS(CAML_NS, 'sublayers')[0];
-  const sublayerNodes = sublayersEl ? Array.from(sublayersEl.children).filter((n) => n.namespaceURI === CAML_NS && n.localName === 'CALayer') as Element[] : [];
+  const sublayerNodesRaw = sublayersEl ? Array.from(sublayersEl.children).filter((n) => n.namespaceURI === CAML_NS) as Element[] : [];
+  const sublayerNodes = sublayerNodesRaw;
 
   if (imageSrc && sublayerNodes.length === 0) {
     return {
@@ -238,6 +318,23 @@ function parseCALayer(el: Element): AnyLayer {
     } as AnyLayer;
   }
 
+  if (sublayersEl) {
+    const children: AnyLayer[] = [];
+    const kids = Array.from(sublayersEl.children).filter((n) => (n as any).namespaceURI === CAML_NS) as Element[];
+    for (const n of kids) {
+      if (n.localName === 'CALayer') children.push(parseCALayer(n));
+      else if (n.localName === 'CATextLayer') children.push(parseCATextLayer(n));
+    }
+    if (children.length > 0) {
+      const group: GroupLayer = {
+        ...base,
+        type: 'group',
+        children,
+      };
+      return group;
+    }
+  }
+
   if (sublayerNodes.length === 0) {
     return {
       ...base,
@@ -249,13 +346,9 @@ function parseCALayer(el: Element): AnyLayer {
       borderWidth: (base as any).borderWidth,
     } as AnyLayer;
   }
-
+  // Fallback
   const children = sublayerNodes.map((n) => parseCALayer(n));
-  const group: GroupLayer = {
-    ...base,
-    type: 'group',
-    children,
-  };
+  const group: GroupLayer = { ...base, type: 'group', children };
   return group;
 }
 
@@ -413,7 +506,8 @@ function setAttr(el: Element, name: string, value: string | number | undefined) 
 }
 
 function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject): Element {
-  const el = doc.createElementNS(CAML_NS, 'CALayer');
+  const isText = layer.type === 'text';
+  const el = doc.createElementNS(CAML_NS, isText ? 'CATextLayer' : 'CALayer');
   setAttr(el, 'id', layer.id);
   setAttr(el, 'name', layer.name);
   setAttr(el, 'bounds', `0 0 ${Math.max(0, layer.size.w)} ${Math.max(0, layer.size.h)}`);
@@ -465,11 +559,30 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
   }
 
   if (layer.type === 'text') {
-    setAttr(el, 'text', layer.text);
-    setAttr(el, 'fontFamily', layer.fontFamily);
-    setAttr(el, 'fontSize', layer.fontSize ?? undefined);
-    setAttr(el, 'color', layer.color);
-    setAttr(el, 'align', layer.align);
+    const fg = hexToForegroundColor((layer as TextLayer).color || '#000000');
+    setAttr(el, 'foregroundColor', fg);
+    // font size
+    setAttr(el, 'fontSize', (layer as TextLayer).fontSize ?? undefined);
+    // alignment
+    const align = (layer as TextLayer).align || 'left';
+    const alignmentMode = align === 'justified' ? 'justified' : align;
+    setAttr(el, 'alignmentMode', alignmentMode);
+    // wrapping
+    const wrapped = (layer as TextLayer).wrapped ?? 1;
+    setAttr(el, 'wrapped', wrapped);
+    setAttr(el, 'resizingMode', 'auto');
+    setAttr(el, 'allowsEdgeAntialiasing', '1');
+    setAttr(el, 'allowsGroupOpacity', '1');
+    setAttr(el, 'contentsFormat', 'AutomaticAppKit');
+    setAttr(el, 'cornerCurve', 'circular');
+    const font = doc.createElementNS(CAML_NS, 'font');
+    font.setAttribute('type', 'string');
+    font.setAttribute('value', (layer as TextLayer).fontFamily || 'SFProText-Regular');
+    el.appendChild(font);
+    const str = doc.createElementNS(CAML_NS, 'string');
+    str.setAttribute('type', 'string');
+    str.setAttribute('value', (layer as TextLayer).text || '');
+    el.appendChild(str);
   }
 
   if (layer.type === 'group') {
