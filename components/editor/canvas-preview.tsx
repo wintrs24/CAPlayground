@@ -957,19 +957,17 @@ export function CanvasPreview() {
       const currentWorld = clientToWorld(ev.clientX, ev.clientY);
       const dx = currentWorld.x - startWorld.x;
       const dy = currentWorld.y - startWorld.y;
-      let left = d.startLeft;
-      let top = d.startTop;
       let w = d.startW;
       let h = d.startH;
       switch (d.handle) {
         case "e": w = Math.max(1, d.startW + dx); break;
-        case "w": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; break;
+        case "w": w = Math.max(1, d.startW - dx); break;
         case "s": h = Math.max(1, d.startH + dy); break;
-        case "n": h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
+        case "n": h = Math.max(1, d.startH - dy); break;
         case "se": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH + dy); break;
-        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
-        case "sw": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; h = Math.max(1, d.startH + dy); break;
-        case "nw": w = Math.max(1, d.startW - dx); left = d.startLeft + dx; h = Math.max(1, d.startH - dy); top = d.startTop + dy; break;
+        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); break;
+        case "sw": w = Math.max(1, d.startW - dx); h = Math.max(1, d.startH + dy); break;
+        case "nw": w = Math.max(1, d.startW - dx); h = Math.max(1, d.startH - dy); break;
       }
       if (ev.shiftKey && d.startW > 0 && d.startH > 0) {
         const aspect = d.startW / d.startH;
@@ -985,22 +983,9 @@ export function CanvasPreview() {
           if (dw >= dh) h = Math.max(1, w / aspect);
           else w = Math.max(1, h * aspect);
         }
-        // Reposition the active handle so the opposite edge stays fixed in CSS space
-        switch (d.handle) {
-          case "e": left = d.startLeft; break;
-          case "w": left = d.startLeft + (d.startW - w); break;
-          case "s": top = d.startTop; break;
-          case "n": top = d.startTop + (d.startH - h); break;
-          case "se": left = d.startLeft; top = d.startTop; break;
-          case "ne": left = d.startLeft; top = d.startTop + (d.startH - h); break;
-          case "sw": left = d.startLeft + (d.startW - w); top = d.startTop; break;
-          case "nw": left = d.startLeft + (d.startW - w); top = d.startTop + (d.startH - h); break;
-        }
       }
-      // Convert CSS-space back to position (center/anchor aware)
-      const a = getAnchor((renderedLayers.find(r => r.id === d.id) as AnyLayer) || (l as AnyLayer));
-      const x = left + a.x * w;
-      const y = d.yUp ? ((d.canvasH - top) - (1 - a.y) * h) : (top + a.y * h);
+      const x = d.startX;
+      const y = d.startY;
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
       d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
