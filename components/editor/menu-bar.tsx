@@ -305,20 +305,21 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       <div className="flex items-center gap-2">
         {/* switch between ca files */}
         <div className="hidden md:flex flex-1 items-center justify-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-8 px-3 rounded-full gap-2"
-                aria-label={`Active CA: ${activeCA === 'floating' ? 'Floating' : 'Background'}`}
-                aria-expanded={false}
-                role="button"
-              >
-                <span className="text-sm">{activeCA === 'floating' ? 'Floating' : 'Background'}</span>
-                <ArrowUpDown className="h-4 w-4 opacity-70" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-80 p-2">
+          <div className="border rounded-md p-0.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="h-8 px-2 gap-2"
+                  aria-label={`Active CA: ${activeCA === 'floating' ? 'Floating' : 'Background'}`}
+                  aria-expanded={false}
+                  role="button"
+                >
+                  <span className="text-sm">{activeCA === 'floating' ? 'Floating' : 'Background'}</span>
+                  <ArrowUpDown className="h-4 w-4 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-80 p-2">
               <DropdownMenuLabel>
                 <div className="text-sm font-medium">Choose Active CA</div>
               </DropdownMenuLabel>
@@ -357,8 +358,9 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                   </div>
                 </Button>
               </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
         <div className="flex items-center gap-1 border rounded-md p-0.5">
           <Button
