@@ -263,8 +263,6 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-52">
-            <DropdownMenuLabel>Project</DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuItem
               className="cursor-pointer"
               onClick={async () => { await flushPersist(); router.push('/projects'); }}
