@@ -190,7 +190,7 @@ export function EditorOnboarding({ showLeft, showRight }: { showLeft: boolean; s
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => { if (typeof window !== 'undefined') window.open('https://docs.enkei64.xyz_', '_blank', 'noopener,noreferrer'); }}
+                onClick={() => { if (typeof window !== 'undefined') window.open('https://docs.enkei64.xyz', '_blank', 'noopener,noreferrer'); }}
               >
                 Documentation
               </Button>

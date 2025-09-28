@@ -281,7 +281,7 @@ export default function ProjectsPage() {
         transformOrigin: `${a.x * 100}% ${a.y * 100}%`,
         opacity: (l as any).opacity ?? 1,
         display: (l as any).visible === false ? 'none' as any : undefined,
-        overflow: 'hidden',
+        overflow: 'hidden',  
         backfaceVisibility: 'hidden',
         transformStyle: 'preserve-3d',
       };
