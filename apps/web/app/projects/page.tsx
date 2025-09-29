@@ -421,26 +421,6 @@ export default function ProjectsPage() {
     const uniqueName = await ensureUniqueProjectName(name);
     const createdAt = new Date().toISOString();
     await createProject({ id, name: uniqueName, createdAt, width: Math.round(w), height: Math.round(h) });
-    const folder = `${uniqueName}.ca`;
-    const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
-    const assetManifest = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n<caml xmlns=\"http://www.apple.com/CoreAnimation/1.0\">\n  <MicaAssetManifest>\n    <modules type=\"NSArray\"/>\n  </MicaAssetManifest>\n</caml>`;
-    const emptyRoot = {
-      id,
-      name: uniqueName,
-      type: 'group',
-      position: { x: Math.round(w/2), y: Math.round(h/2) },
-      size: { w: Math.round(w), h: Math.round(h) },
-      backgroundColor: '#e5e7eb',
-      geometryFlipped: 0,
-      children: [],
-    } as any;
-    const { serializeCAML } = await import('@/lib/ca/caml');
-    const caml = serializeCAML(emptyRoot, { id, name: uniqueName, width: Math.round(w), height: Math.round(h), background: '#e5e7eb', geometryFlipped: 0 } as any, ["Locked","Unlock","Sleep"], {}, []);
-    for (const sub of ['Floating.ca','Background.ca'] as const) {
-      await putTextFile(id, `${folder}/${sub}/main.caml`, caml);
-      await putTextFile(id, `${folder}/${sub}/index.xml`, indexXml);
-      await putTextFile(id, `${folder}/${sub}/assetManifest.caml`, assetManifest);
-    }
     const idbList = await listProjects();
     setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
     recordProjectCreated();

@@ -218,8 +218,10 @@ export function EditorProvider({
           activeCA: 'floating',
           docs: { background: backgroundDoc, floating: floatingDoc },
         };
+        skipPersistRef.current = true;
         setDoc(initial);
       } catch {
+        skipPersistRef.current = true;
         setDoc({
           meta: {
             id: initialMeta.id,
