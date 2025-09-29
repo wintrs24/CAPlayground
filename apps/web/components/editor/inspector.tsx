@@ -635,7 +635,22 @@ export function Inspector() {
                           onCheckedChange={(checked) => {
                             const enabled = !!checked;
                             const currentAnim = (selectedBase as any)?.animations || {};
-                            updateLayer(selectedBase!.id, { animations: { ...currentAnim, enabled, keyPath: (currentAnim.keyPath ?? 'position'), autoreverses: (currentAnim.autoreverses ?? 0), values: (currentAnim.values ?? []), infinite: (currentAnim.infinite ?? 1) } } as any);
+                            const kp = (currentAnim.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
+                            let values: Array<{ x: number; y: number } | number> = Array.isArray(currentAnim.values) ? [...currentAnim.values] : [];
+                            if (enabled && values.length === 0) {
+                              if (kp === 'position') {
+                                values = [{ x: (selectedBase as any).position?.x ?? 0, y: (selectedBase as any).position?.y ?? 0 }];
+                              } else if (kp === 'position.x') {
+                                values = [((selectedBase as any).position?.x ?? 0) as number];
+                              } else if (kp === 'position.y') {
+                                values = [((selectedBase as any).position?.y ?? 0) as number];
+                              } else if (kp === 'transform.rotation.z') {
+                                values = [Number((selectedBase as any)?.rotation ?? 0)];
+                              } else {
+                                values = [0];
+                              }
+                            }
+                            updateLayer(selectedBase!.id, { animations: { ...currentAnim, enabled, keyPath: kp, autoreverses: (currentAnim.autoreverses ?? 0), values, infinite: (currentAnim.infinite ?? 1) } } as any);
                           }}
                         />
                       </div>
@@ -650,7 +665,22 @@ export function Inspector() {
                     onCheckedChange={(checked) => {
                       const enabled = !!checked;
                       const currentAnim = (selectedBase as any)?.animations || {};
-                      updateLayer(selectedBase!.id, { animations: { ...currentAnim, enabled, keyPath: (currentAnim.keyPath ?? 'position'), autoreverses: (currentAnim.autoreverses ?? 0), values: (currentAnim.values ?? []), infinite: (currentAnim.infinite ?? 1) } } as any);
+                      const kp = (currentAnim.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
+                      let values: Array<{ x: number; y: number } | number> = Array.isArray(currentAnim.values) ? [...currentAnim.values] : [];
+                      if (enabled && values.length === 0) {
+                        if (kp === 'position') {
+                          values = [{ x: (selectedBase as any).position?.x ?? 0, y: (selectedBase as any).position?.y ?? 0 }];
+                        } else if (kp === 'position.x') {
+                          values = [((selectedBase as any).position?.x ?? 0) as number];
+                        } else if (kp === 'position.y') {
+                          values = [((selectedBase as any).position?.y ?? 0) as number];
+                        } else if (kp === 'transform.rotation.z') {
+                          values = [Number((selectedBase as any)?.rotation ?? 0)];
+                        } else {
+                          values = [0];
+                        }
+                      }
+                      updateLayer(selectedBase!.id, { animations: { ...currentAnim, enabled, keyPath: kp, autoreverses: (currentAnim.autoreverses ?? 0), values, infinite: (currentAnim.infinite ?? 1) } } as any);
                     }}
                   />
                 )}

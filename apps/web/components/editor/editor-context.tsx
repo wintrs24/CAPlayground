@@ -310,32 +310,38 @@ export function EditorProvider({
       for (const key of caKeys) {
         const caFolder = key === 'floating' ? 'Floating.ca' : 'Background.ca';
         const caDoc = snapshot.docs[key];
-        const root: GroupLayer = {
-          id: snapshot.meta.id,
-          name: snapshot.meta.name,
-          type: 'group',
-          position: { x: Math.round((snapshot.meta.width || 0) / 2), y: Math.round((snapshot.meta.height || 0) / 2) },
-          size: { w: snapshot.meta.width || 0, h: snapshot.meta.height || 0 },
-          backgroundColor: snapshot.meta.background,
-          geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
-          children: (caDoc.layers as AnyLayer[]) || [],
-        } as GroupLayer;
-
-        const caml = serializeCAML(
-          root,
-          {
+        // For Background.ca, do not serialize a CAML root; write a minimal empty CAML document instead.
+        if (key === 'background') {
+          const emptyCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`;
+          await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, emptyCaml);
+        } else {
+          const root: GroupLayer = {
             id: snapshot.meta.id,
             name: snapshot.meta.name,
-            width: snapshot.meta.width,
-            height: snapshot.meta.height,
-            background: snapshot.meta.background,
+            type: 'group',
+            position: { x: Math.round((snapshot.meta.width || 0) / 2), y: Math.round((snapshot.meta.height || 0) / 2) },
+            size: { w: snapshot.meta.width || 0, h: snapshot.meta.height || 0 },
+            backgroundColor: snapshot.meta.background,
             geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
-          } as any,
-          (caDoc as any).states,
-          (caDoc as any).stateOverrides,
-          (caDoc as any).stateTransitions,
-        );
-        await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, caml);
+            children: (caDoc.layers as AnyLayer[]) || [],
+          } as GroupLayer;
+
+          const caml = serializeCAML(
+            root,
+            {
+              id: snapshot.meta.id,
+              name: snapshot.meta.name,
+              width: snapshot.meta.width,
+              height: snapshot.meta.height,
+              background: snapshot.meta.background,
+              geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
+            } as any,
+            (caDoc as any).states,
+            (caDoc as any).stateOverrides,
+            (caDoc as any).stateTransitions,
+          );
+          await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, caml);
+        }
         const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
         await putTextFile(projectId, `${folder}/${caFolder}/index.xml`, indexXml);
         const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`;

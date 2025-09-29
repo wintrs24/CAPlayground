@@ -294,6 +294,75 @@ function parseCALayer(el: Element): AnyLayer {
     geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
   } as const;
 
+  // Parse per-layer keyframe animations
+  let parsedAnimations: {
+    enabled?: boolean;
+    keyPath?: 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
+    autoreverses?: 0 | 1;
+    values?: Array<{ x: number; y: number } | number>;
+    durationSeconds?: number;
+    infinite?: 0 | 1;
+    repeatDurationSeconds?: number;
+  } | undefined;
+  try {
+    const animationsEl = el.getElementsByTagNameNS(CAML_NS, 'animations')[0];
+    const animNode = animationsEl?.getElementsByTagNameNS(CAML_NS, 'animation')[0];
+    if (animNode) {
+      const kp = (animNode.getAttribute('keyPath') || 'position') as 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
+      const valuesNode = animNode.getElementsByTagNameNS(CAML_NS, 'values')[0];
+      const vals: Array<{ x: number; y: number } | number> = [];
+      if (valuesNode) {
+        if (kp === 'position') {
+          const pts = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'CGPoint'));
+          for (const p of pts) {
+            const v = p.getAttribute('value') || '';
+            const parts = v.split(/[\s]+/).map((s) => Number(s));
+            const x = Math.round(Number.isFinite(parts[0]) ? parts[0] : 0);
+            const y = Math.round(Number.isFinite(parts[1]) ? parts[1] : 0);
+            vals.push({ x, y });
+          }
+        } else if (kp === 'position.x') {
+          const nums = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'NSNumber'));
+          for (const n of nums) {
+            const v = Number(n.getAttribute('value') || '');
+            vals.push(Math.round(Number.isFinite(v) ? v : 0));
+          }
+        } else if (kp === 'position.y') {
+          const nums = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'NSNumber'));
+          for (const n of nums) {
+            const v = Number(n.getAttribute('value') || '');
+            vals.push(Math.round(Number.isFinite(v) ? v : 0));
+          }
+        } else if (kp === 'transform.rotation.x' || kp === 'transform.rotation.y' || kp === 'transform.rotation.z') {
+          const reals = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'real'));
+          for (const r of reals) {
+            const rad = Number(r.getAttribute('value') || '');
+            const deg = ((Number.isFinite(rad) ? rad : 0) * 180) / Math.PI;
+            vals.push(deg);
+          }
+        }
+      }
+      const enabled = vals.length > 0;
+      const autorevAttr = animNode.getAttribute('autoreverses');
+      const autoreverses: 0 | 1 = (Number(autorevAttr) || 0) ? 1 : 0;
+      const durAttr = animNode.getAttribute('duration');
+      const durationSeconds = Number(durAttr);
+      const repCount = animNode.getAttribute('repeatCount');
+      const repDurAttr = animNode.getAttribute('repeatDuration');
+      const infinite: 0 | 1 = (repCount === 'inf' || repDurAttr === 'inf') ? 1 : 0;
+      const repeatDurationSeconds = !infinite && Number.isFinite(Number(repDurAttr || '')) ? Number(repDurAttr) : undefined;
+      parsedAnimations = {
+        enabled,
+        keyPath: kp,
+        autoreverses,
+        values: vals,
+        durationSeconds: Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : undefined,
+        infinite,
+        repeatDurationSeconds: repeatDurationSeconds,
+      };
+    }
+  } catch {}
+
   const sublayersEl = el.getElementsByTagNameNS(CAML_NS, 'sublayers')[0];
   const sublayerNodesRaw = sublayersEl ? Array.from(sublayersEl.children).filter((n) => n.namespaceURI === CAML_NS) as Element[] : [];
   const sublayerNodes = sublayerNodesRaw;
@@ -303,6 +372,7 @@ function parseCALayer(el: Element): AnyLayer {
       ...base,
       type: 'image',
       src: imageSrc,
+      ...(parsedAnimations ? { animations: parsedAnimations } : {}),
     } as AnyLayer;
   }
 
@@ -315,6 +385,7 @@ function parseCALayer(el: Element): AnyLayer {
       fontSize,
       color: color || undefined,
       align: align || undefined,
+      ...(parsedAnimations ? { animations: parsedAnimations } : {}),
     } as AnyLayer;
   }
 
@@ -330,6 +401,7 @@ function parseCALayer(el: Element): AnyLayer {
         ...base,
         type: 'group',
         children,
+        ...(parsedAnimations ? { animations: parsedAnimations } : {} as any),
       };
       return group;
     }
@@ -344,11 +416,12 @@ function parseCALayer(el: Element): AnyLayer {
       radius: (base as any).cornerRadius,
       borderColor: (base as any).borderColor,
       borderWidth: (base as any).borderWidth,
+      ...(parsedAnimations ? { animations: parsedAnimations } : {}),
     } as AnyLayer;
   }
   // Fallback
   const children = sublayerNodes.map((n) => parseCALayer(n));
-  const group: GroupLayer = { ...base, type: 'group', children };
+  const group: GroupLayer = { ...base, type: 'group', children, ...(parsedAnimations ? { animations: parsedAnimations } : {} as any) };
   return group;
 }
 
