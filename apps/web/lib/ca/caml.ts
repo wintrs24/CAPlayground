@@ -393,7 +393,7 @@ export function serializeCAML(
           defaultVal = layerIndex[override.targetId].position.x;
           break;
         case "position.y":
-          defaultVal = layerIndex[override.targetId].position.x;
+          defaultVal = layerIndex[override.targetId].position.y;
           break;
         case "bounds.size.width":
           defaultVal = layerIndex[override.targetId].size.w;
