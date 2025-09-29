@@ -1,7 +1,7 @@
 <table width="100%">
   <tr>
     <td align="right" width="120">
-      <img src="/public/icon-dark.png" alt="CAPlayground Logo" width="100" />
+      <img src="apps/web/public/icon-dark.png" alt="CAPlayground Logo" width="100" />
     </td>
     <td align="left">
       <h1>CAPlayground</span></h1>
