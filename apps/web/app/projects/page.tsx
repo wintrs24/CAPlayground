@@ -112,19 +112,24 @@ export default function ProjectsPage() {
             }
           }
           const writeCA = async (caKey: 'Background.ca'|'Floating.ca', doc: ReturnType<typeof prepare>) => {
-            const root = {
-              id: meta.id,
-              name: meta.name,
-              type: 'group',
-              position: { x: Math.round((meta.width || 0)/2), y: Math.round((meta.height || 0)/2) },
-              size: { w: meta.width || 0, h: meta.height || 0 },
-              backgroundColor: '#e5e7eb',
-              geometryFlipped: 0,
-              children: (doc.layers || []) as any[],
-            } as any;
-            const { serializeCAML } = await import('@/lib/ca/caml');
-            const caml = serializeCAML(root, { id: meta.id, name: meta.name, width: meta.width, height: meta.height, background: '#e5e7eb', geometryFlipped: 0 } as any, doc.states as any, doc.stateOverrides as any, doc.stateTransitions as any);
-            await putTextFile(meta.id, `${folder}/${caKey}/main.caml`, caml);
+            if (caKey === 'Background.ca') {
+              const emptyCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`;
+              await putTextFile(meta.id, `${folder}/${caKey}/main.caml`, emptyCaml);
+            } else {
+              const root = {
+                id: meta.id,
+                name: meta.name,
+                type: 'group',
+                position: { x: Math.round((meta.width || 0)/2), y: Math.round((meta.height || 0)/2) },
+                size: { w: meta.width || 0, h: meta.height || 0 },
+                backgroundColor: '#e5e7eb',
+                geometryFlipped: 0,
+                children: (doc.layers || []) as any[],
+              } as any;
+              const { serializeCAML } = await import('@/lib/ca/caml');
+              const caml = serializeCAML(root, { id: meta.id, name: meta.name, width: meta.width, height: meta.height, background: '#e5e7eb', geometryFlipped: 0 } as any, doc.states as any, doc.stateOverrides as any, doc.stateTransitions as any);
+              await putTextFile(meta.id, `${folder}/${caKey}/main.caml`, caml);
+            }
             const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
             await putTextFile(meta.id, `${folder}/${caKey}/index.xml`, indexXml);
             const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`;
@@ -509,11 +514,11 @@ export default function ProjectsPage() {
       };
       const layers = root?.type === 'group' && Array.isArray(root.children) ? root.children : (root ? [root] : []);
       const camlFloating = await mkCaml(layers);
-      const camlBackground = await mkCaml([]);
+      const emptyBackgroundCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`;
       await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating);
       await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml);
       await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest);
-      await putTextFile(id, `${folder}/Background.ca/main.caml`, camlBackground);
+      await putTextFile(id, `${folder}/Background.ca/main.caml`, emptyBackgroundCaml);
       await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml);
       await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest);
       // assets
