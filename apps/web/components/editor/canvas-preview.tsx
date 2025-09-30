@@ -23,6 +23,7 @@ export function CanvasPreview() {
   const [SNAP_THRESHOLD] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [snapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
+  const [snapResizeEnabled] = useLocalStorage<boolean>("caplay_settings_snap_resize", true);
   const [showEdgeGuide, setShowEdgeGuide] = useLocalStorage<boolean>("caplay_preview_edge_guide", false);
   const [clipToCanvas, setClipToCanvas] = useLocalStorage<boolean>("caplay_preview_clip", false);
   const panDragRef = useRef<{
@@ -985,6 +986,129 @@ export function CanvasPreview() {
         case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); break;
         case "sw": w = Math.max(1, d.startW - dx); h = Math.max(1, d.startH + dy); break;
         case "nw": w = Math.max(1, d.startW - dx); h = Math.max(1, d.startH - dy); break;
+      }
+      
+      if (snapResizeEnabled) {
+        const canvasW = docRef.current?.meta.width ?? 0;
+        const canvasH = docRef.current?.meta.height ?? 0;
+        const th = SNAP_THRESHOLD;
+        const affectsW = ["e", "w", "ne", "se", "sw", "nw"].includes(d.handle);
+        const affectsH = ["n", "s", "ne", "se", "sw", "nw"].includes(d.handle);
+        
+        let testLeft = d.startLeft;
+        let testTop = d.startTop;
+        switch (d.handle) {
+          case "w":
+          case "nw":
+          case "sw":
+            testLeft = d.startLeft + d.startW - w;
+            break;
+        }
+        switch (d.handle) {
+          case "n":
+          case "ne":
+          case "nw":
+            testTop = d.startTop + d.startH - h;
+            break;
+        }
+        
+        const testRight = testLeft + w;
+        const testBottom = testTop + h;  
+        const xTargets: number[] = [];
+        const yTargets: number[] = [];
+        
+        if (snapEdgesEnabled) {
+          xTargets.push(0, canvasW);
+          yTargets.push(0, canvasH);
+        }
+        if (snapLayersEnabled) {
+          const others = (renderedLayers || []).filter((ol) => ol.id !== d.id);
+          for (const ol of others) {
+            const L = ol as any;
+            const lw = L.size?.w ?? 0;
+            const lh = L.size?.h ?? 0;
+            const lt = computeCssLT(L, canvasH, d.yUp);
+            const left = lt.left;
+            const right = lt.left + lw;
+            const top = lt.top;
+            const bottom = lt.top + lh;
+            xTargets.push(left, right);
+            yTargets.push(top, bottom);
+          }
+        }
+        
+        if (affectsW) {
+          const snapLeft = ["w", "nw", "sw"].includes(d.handle);
+          const snapRight = ["e", "ne", "se"].includes(d.handle);
+          
+          if (snapLeft) {
+            let bestDist = th + 1;
+            let bestTarget: number | null = null;
+            for (const target of xTargets) {
+              const dist = Math.abs(testLeft - target);
+              if (dist <= th && dist < bestDist) {
+                bestDist = dist;
+                bestTarget = target;
+              }
+            }
+            if (bestTarget !== null) {
+              w = d.startLeft + d.startW - bestTarget;
+            }
+          }
+          
+          if (snapRight) {
+            let bestDist = th + 1;
+            let bestTarget: number | null = null;
+            for (const target of xTargets) {
+              const dist = Math.abs(testRight - target);
+              if (dist <= th && dist < bestDist) {
+                bestDist = dist;
+                bestTarget = target;
+              }
+            }
+            if (bestTarget !== null) {
+              w = bestTarget - testLeft;
+            }
+          }
+        }
+        
+        if (affectsH) {
+          const snapTop = ["n", "ne", "nw"].includes(d.handle);
+          const snapBottom = ["s", "se", "sw"].includes(d.handle);
+          
+          if (snapTop) {
+            let bestDist = th + 1;
+            let bestTarget: number | null = null;
+            for (const target of yTargets) {
+              const dist = Math.abs(testTop - target);
+              if (dist <= th && dist < bestDist) {
+                bestDist = dist;
+                bestTarget = target;
+              }
+            }
+            if (bestTarget !== null) {
+              h = d.startTop + d.startH - bestTarget;
+            }
+          }
+          
+          if (snapBottom) {
+            let bestDist = th + 1;
+            let bestTarget: number | null = null;
+            for (const target of yTargets) {
+              const dist = Math.abs(testBottom - target);
+              if (dist <= th && dist < bestDist) {
+                bestDist = dist;
+                bestTarget = target;
+              }
+            }
+            if (bestTarget !== null) {
+              h = bestTarget - testTop;
+            }
+          }
+        }
+        
+        w = Math.max(1, w);
+        h = Math.max(1, h);
       }
       if (ev.shiftKey && d.startW > 0 && d.startH > 0) {
         const aspect = d.startW / d.startH;

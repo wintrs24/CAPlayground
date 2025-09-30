@@ -60,6 +60,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [showManualSave, setShowManualSave] = useState(false);
   const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
+  const [snapResizeEnabled, setSnapResizeEnabled] = useLocalStorage<boolean>("caplay_settings_snap_resize", true);
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exportView, setExportView] = useState<'select'|'success'>("select");
@@ -435,6 +436,10 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 <div className="flex items-center justify-between gap-3 py-2">
                   <Label htmlFor="snap-layers" className="text-sm">Snap to other layers</Label>
                   <Switch id="snap-layers" checked={!!snapLayersEnabled} onCheckedChange={(c) => setSnapLayersEnabled(!!c)} />
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <Label htmlFor="snap-resize" className="text-sm">Snap when resizing</Label>
+                  <Switch id="snap-resize" checked={!!snapResizeEnabled} onCheckedChange={(c) => setSnapResizeEnabled(!!c)} />
                 </div>
                 <div className="flex items-center justify-between gap-3 py-2">
                   <Label htmlFor="snap-threshold" className="text-sm">Sensitivity</Label>
