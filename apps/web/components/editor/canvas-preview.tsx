@@ -809,6 +809,7 @@ export function CanvasPreview() {
   const renderLayer = (l: AnyLayer, containerH: number = (doc?.meta.height ?? 0), useYUp: boolean = getRootFlip() === 0, siblings: AnyLayer[] = renderedLayers): ReactNode => {
     const { left, top } = computeCssLT(l, containerH, useYUp);
     const a = getAnchor(l);
+    const transformOriginY = useYUp ? (1 - a.y) * 100 : a.y * 100;
     const common: React.CSSProperties = {
       position: "absolute",
       left,
@@ -816,7 +817,7 @@ export function CanvasPreview() {
       width: l.size.w,
       height: l.size.h,
       transform: `rotateX(${-((l as any).rotationX ?? 0)}deg) rotateY(${-((l as any).rotationY ?? 0)}deg) rotate(${-(l.rotation ?? 0)}deg)`,
-      transformOrigin: `${a.x * 100}% ${a.y * 100}%`,
+      transformOrigin: `${a.x * 100}% ${transformOriginY}%`,
       backfaceVisibility: "visible",
       display: l.visible === false ? "none" : undefined,
       cursor: "move",
@@ -1090,14 +1091,17 @@ export function CanvasPreview() {
   };
 
   const renderSelectionOverlay = (l: AnyLayer) => {
+  const useYUp = getRootFlip() === 0;
+  const a = getAnchor(l);
+  const transformOriginY = useYUp ? (1 - a.y) * 100 : a.y * 100;
   const boxStyle: React.CSSProperties = {
     position: "absolute",
-    left: computeCssLT(l, (doc?.meta.height ?? 0), getRootFlip() === 0).left,
-    top: computeCssLT(l, (doc?.meta.height ?? 0), getRootFlip() === 0).top,
+    left: computeCssLT(l, (doc?.meta.height ?? 0), useYUp).left,
+    top: computeCssLT(l, (doc?.meta.height ?? 0), useYUp).top,
     width: l.size.w,
     height: l.size.h,
     transform: `rotateX(${-((l as any).rotationX ?? 0)}deg) rotateY(${-((l as any).rotationY ?? 0)}deg) rotate(${-(l.rotation ?? 0)}deg)`,
-    transformOrigin: `${((l as any).anchorPoint?.x ?? 0.5) * 100}% ${((l as any).anchorPoint?.y ?? 0.5) * 100}%`,
+    transformOrigin: `${a.x * 100}% ${transformOriginY}%`,
     backfaceVisibility: "hidden",
     outline: "1px solid rgba(59,130,246,0.9)",
     boxShadow: "0 0 0 2px rgba(59,130,246,0.2) inset",
