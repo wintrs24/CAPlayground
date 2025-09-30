@@ -533,7 +533,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                       >
                         <div className="flex flex-col items-start gap-0.5">
                           <span>Export .ca file</span>
-                          <span className="text-xs text-muted-foreground">Download a .ca archive you can re-import later.</span>
+                          <span className="text-xs text-muted-foreground">Download a .zip with your floating.ca and background.ca files.</span>
                         </div>
                       </Button>
                       <Button
