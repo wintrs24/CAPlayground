@@ -822,7 +822,7 @@ export function CanvasPreview() {
       top,
       width: l.size.w,
       height: l.size.h,
-      transform: `rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${l.rotation ?? 0}deg)`,
+      transform: `rotateX(${-((l as any).rotationX ?? 0)}deg) rotateY(${-((l as any).rotationY ?? 0)}deg) rotate(${-(l.rotation ?? 0)}deg)`,
       transformOrigin: `${a.x * 100}% ${a.y * 100}%`,
       backfaceVisibility: "visible",
       display: l.visible === false ? "none" : undefined,
@@ -1070,7 +1070,7 @@ export function CanvasPreview() {
     const centerY = lt.top + a.y * l.size.h;
     const world = clientToWorld(e.clientX, e.clientY);
     const angle0 = Math.atan2(world.y - centerY, world.x - centerX) * 180 / Math.PI;
-    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 - (l.rotation ?? 0), canvasH, yUp, lastRot: l.rotation ?? 0 };
+    rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 + (l.rotation ?? 0), canvasH, yUp, lastRot: l.rotation ?? 0 };
     const onMove = (ev: MouseEvent) => {
       const d = rotationDragRef.current;
       if (!d) return;
@@ -1079,7 +1079,7 @@ export function CanvasPreview() {
       if (ev.shiftKey) {
         angle = Math.round(angle / 15) * 15;
       }
-      const rot = angle - d.startAngle;
+      const rot = -(angle - d.startAngle);
       d.lastRot = rot;
       updateLayerTransient(d.id, { rotation: rot as any });
     };
@@ -1103,7 +1103,7 @@ export function CanvasPreview() {
     top: computeCssLT(l, (doc?.meta.height ?? 0), getRootFlip() === 0).top,
     width: l.size.w,
     height: l.size.h,
-    transform: `rotateX(${(l as any).rotationX ?? 0}deg) rotateY(${(l as any).rotationY ?? 0}deg) rotate(${l.rotation ?? 0}deg)`,
+    transform: `rotateX(${-((l as any).rotationX ?? 0)}deg) rotateY(${-((l as any).rotationY ?? 0)}deg) rotate(${-(l.rotation ?? 0)}deg)`,
     transformOrigin: `${((l as any).anchorPoint?.x ?? 0.5) * 100}% ${((l as any).anchorPoint?.y ?? 0.5) * 100}%`,
     backfaceVisibility: "hidden",
     outline: "1px solid rgba(59,130,246,0.9)",
