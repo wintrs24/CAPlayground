@@ -363,9 +363,12 @@ export function EditorProvider({
     setDoc((prev) => {
       if (!prev) return prev;
       pushHistory(prev);
+      const canvasW = prev.meta.width || 390;
+      const canvasH = prev.meta.height || 844;
       const layer: TextLayer = {
         ...addBase("Text Layer"),
         type: "text",
+        position: { x: canvasW / 2, y: canvasH / 2 },
         text: "Text Layer",
         color: "#111827",
         fontSize: 16,
@@ -387,13 +390,39 @@ export function EditorProvider({
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+    
+    const { width: imgW, height: imgH } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = dataURL;
+    });
+    
     setDoc((prev) => {
       if (!prev) return prev;
       pushHistory(prev);
+      const canvasW = prev.meta.width || 390;
+      const canvasH = prev.meta.height || 844;
+      const aspectRatio = imgW / imgH;
+      let w = imgW;
+      let h = imgH;
+      
+      if (w > canvasW || h > canvasH) {
+        const scaleW = canvasW / imgW;
+        const scaleH = canvasH / imgH;
+        const scale = Math.min(scaleW, scaleH);
+        w = imgW * scale;
+        h = imgH * scale;
+      }
+      
+      const x = canvasW / 2;
+      const y = canvasH / 2;
+      
       const layer: ImageLayer = {
         ...addBase(filename || "Pasted Image"),
         type: "image",
-        size: { w: 200, h: 120 },
+        position: { x, y },
+        size: { w, h },
         src: dataURL,
         fit: "fill",
       };
@@ -461,13 +490,40 @@ export function EditorProvider({
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+    
+    const { width: imgW, height: imgH } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = reject;
+      img.src = dataURL;
+    });
+    
     setDoc((prev) => {
       if (!prev) return prev;
       pushHistory(prev);
+      
+      const canvasW = prev.meta.width || 390;
+      const canvasH = prev.meta.height || 844;
+      const aspectRatio = imgW / imgH;
+      let w = imgW;
+      let h = imgH;
+      
+      if (w > canvasW || h > canvasH) {
+        const scaleW = canvasW / imgW;
+        const scaleH = canvasH / imgH;
+        const scale = Math.min(scaleW, scaleH);
+        w = imgW * scale;
+        h = imgH * scale;
+      }
+      
+      const x = canvasW / 2;
+      const y = canvasH / 2;
+      
       const layer: ImageLayer = {
         ...addBase(file.name || "Image Layer"),
         type: "image",
-        size: { w: 200, h: 120 },
+        position: { x, y },
+        size: { w, h },
         src: dataURL,
         fit: "fill",
       };
@@ -484,9 +540,12 @@ export function EditorProvider({
     setDoc((prev) => {
       if (!prev) return prev;
       pushHistory(prev);
+      const canvasW = prev.meta.width || 390;
+      const canvasH = prev.meta.height || 844;
       const layer: ShapeLayer = {
         ...addBase("Shape Layer"),
         type: "shape",
+        position: { x: canvasW / 2, y: canvasH / 2 },
         size: { w: 120, h: 120 },
         shape,
         fill: "#60a5fa",
