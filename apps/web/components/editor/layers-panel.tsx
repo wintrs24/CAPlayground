@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreVertical } from "lucide-react";
+import { Plus, MoreVertical, ChevronRight, ChevronDown } from "lucide-react";
 import { useEditor } from "./editor-context";
 import { useRef, useState } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
@@ -18,6 +18,21 @@ export function LayersPanel() {
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>("");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [rootCollapsed, setRootCollapsed] = useState(false);
+
+  const toggleCollapse = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const startRename = (l: AnyLayer) => {
     setEditingId(l.id);
@@ -35,13 +50,17 @@ export function LayersPanel() {
   };
 
   const renderItem = (l: AnyLayer, depth: number) => {
+    const isGroup = l.type === "group";
+    const hasChildren = isGroup && (l as GroupLayer).children.length > 0;
+    const isCollapsed = collapsed.has(l.id);
+    
     const row = (
       <div
         key={l.id}
-        className={`px-2 py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'} ${dragOverId === l.id ? 'ring-1 ring-accent/60' : ''}`}
+        className={`py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'} ${dragOverId === l.id ? 'ring-1 ring-accent/60' : ''}`}
         onClick={() => selectLayer(l.id)}
         onDoubleClick={() => startRename(l)}
-        style={{ paddingLeft: 8 + depth * 12 }}
+        style={{ paddingLeft: 8 + depth * 16 }}
         draggable
         onDragStart={(e) => {
           e.stopPropagation();
@@ -65,7 +84,21 @@ export function LayersPanel() {
           moveLayer(src, l.id);
         }}
       >
-        <div className="truncate flex-1 min-w-0">
+        <div className="truncate flex-1 min-w-0 flex items-center gap-1">
+          {hasChildren ? (
+            <button
+              onClick={(e) => toggleCollapse(l.id, e)}
+              className="shrink-0 hover:bg-accent/50 rounded p-0.5"
+            >
+              {isCollapsed ? (
+                <ChevronRight className="h-3 w-3" />
+              ) : (
+                <ChevronDown className="h-3 w-3" />
+              )}
+            </button>
+          ) : (
+            <div className="w-4 shrink-0" />
+          )}
           {editingId === l.id ? (
             <input
               className="w-full bg-transparent border border-muted rounded-sm px-1 py-0.5 text-sm"
@@ -85,7 +118,7 @@ export function LayersPanel() {
             </>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 pr-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -108,7 +141,7 @@ export function LayersPanel() {
         </div>
       </div>
     );
-    if (l.type === "group") {
+    if (isGroup && !isCollapsed) {
       const g = l as GroupLayer;
       return (
         <div key={l.id}>
@@ -153,13 +186,7 @@ export function LayersPanel() {
       </div>
 
       <div className="flex-1 overflow-hidden p-3">
-        <div className="text-sm rounded-lg border bg-card shadow-sm divide-y flex flex-col overflow-hidden">
-          <div
-            className={`px-2 py-2 font-medium select-none cursor-pointer ${selectedId === '__root__' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
-            onClick={() => selectLayer('__root__' as any)}
-          >
-            Root Layer
-          </div>
+        <div className="text-sm rounded-lg border bg-card shadow-sm flex flex-col overflow-hidden">
           <div
             className="flex-1 overflow-auto"
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
@@ -170,10 +197,37 @@ export function LayersPanel() {
               moveLayer(src, null);
             }}
           >
-            {layers.length === 0 && (
-              <div className="px-2 py-2 text-muted-foreground">No layers yet</div>
+            <div
+              className={`py-2 pl-2 pr-2 font-medium select-none cursor-pointer flex items-center gap-1 ${selectedId === '__root__' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+              onClick={() => selectLayer('__root__' as any)}
+            >
+              {layers.length > 0 ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRootCollapsed(!rootCollapsed);
+                  }}
+                  className="shrink-0 hover:bg-accent/50 rounded p-0.5"
+                >
+                  {rootCollapsed ? (
+                    <ChevronRight className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  )}
+                </button>
+              ) : (
+                <div className="w-4 shrink-0" />
+              )}
+              <span>Root Layer</span>
+            </div>
+            {!rootCollapsed && (
+              <>
+                {layers.length === 0 && (
+                  <div className="py-2 text-muted-foreground" style={{ paddingLeft: 24 }}>No layers yet</div>
+                )}
+                {layers.map((l) => renderItem(l, 1))}
+              </>
             )}
-            {layers.map((l) => renderItem(l, 0))}
           </div>
         </div>
       </div>
