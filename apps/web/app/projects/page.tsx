@@ -24,6 +24,9 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload, ArrowRight } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { devices, getDevicesByCategory, type DeviceSpec } from "@/lib/devices";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import type React from "react";
 import type { AnyLayer, CAProject } from "@/lib/ca/types";
@@ -49,6 +52,8 @@ export default function ProjectsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [rootWidth, setRootWidth] = useState<number>(390);
   const [rootHeight, setRootHeight] = useState<number>(844);
+  const [useDeviceSelector, setUseDeviceSelector] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<string>('iPhone 14');
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const router = useRouter();
@@ -418,9 +423,18 @@ export default function ProjectsPage() {
   const createProjectFromDialog = async () => {
     const name = newProjectName.trim();
     if (!name) return;
-    const w = Number(rootWidth);
-    const h = Number(rootHeight);
-    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
+    
+    let w: number, h: number;
+    if (useDeviceSelector) {
+      const device = devices.find(d => d.name === selectedDevice);
+      if (!device) return;
+      w = device.width;
+      h = device.height;
+    } else {
+      w = Number(rootWidth);
+      h = Number(rootHeight);
+      if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
+    }
 
     const id = Date.now().toString();
     const uniqueName = await ensureUniqueProjectName(name);
@@ -432,6 +446,8 @@ export default function ProjectsPage() {
     setNewProjectName("");
     setRootWidth(390);
     setRootHeight(844);
+    setUseDeviceSelector(false);
+    setSelectedDevice('iPhone 14');
     setIsCreateOpen(false);
   };
 
@@ -663,36 +679,80 @@ export default function ProjectsPage() {
                   autoFocus
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="root-width">Width (px)</label>
-                  <Input
-                    id="root-width"
-                    type="number"
-                    min={1}
-                    value={rootWidth}
-                    onChange={(e) => setRootWidth(Number(e.target.value))}
-                    onKeyDown={handleKeyPress}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium" htmlFor="root-height">Height (px)</label>
-                  <Input
-                    id="root-height"
-                    type="number"
-                    min={1}
-                    value={rootHeight}
-                    onChange={(e) => setRootHeight(Number(e.target.value))}
-                    onKeyDown={handleKeyPress}
-                  />
-                </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="device-selector" 
+                  checked={useDeviceSelector} 
+                  onCheckedChange={(checked) => setUseDeviceSelector(!!checked)}
+                />
+                <Label htmlFor="device-selector" className="text-sm font-medium cursor-pointer">
+                  Set bounds by device
+                </Label>
               </div>
+              
+              {useDeviceSelector ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium" htmlFor="device-select">Device</label>
+                  <Select value={selectedDevice} onValueChange={setSelectedDevice}>
+                    <SelectTrigger id="device-select">
+                      <SelectValue placeholder="Select a device" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">iPhone</div>
+                      {getDevicesByCategory('iPhone').map((device) => (
+                        <SelectItem key={device.name} value={device.name}>
+                          {device.name} ({device.width} × {device.height})
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">iPad</div>
+                      {getDevicesByCategory('iPad').map((device) => (
+                        <SelectItem key={device.name} value={device.name}>
+                          {device.name} ({device.width} × {device.height})
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">iPod touch</div>
+                      {getDevicesByCategory('iPod touch').map((device) => (
+                        <SelectItem key={device.name} value={device.name}>
+                          {device.name} ({device.width} × {device.height})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">390 × 844 is the most compatible and default for iPhones.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="root-width">Width (px)</label>
+                    <Input
+                      id="root-width"
+                      type="number"
+                      min={1}
+                      value={rootWidth}
+                      onChange={(e) => setRootWidth(Number(e.target.value))}
+                      onKeyDown={handleKeyPress}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="root-height">Height (px)</label>
+                    <Input
+                      id="root-height"
+                      type="number"
+                      min={1}
+                      value={rootHeight}
+                      onChange={(e) => setRootHeight(Number(e.target.value))}
+                      onKeyDown={handleKeyPress}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
               <Button
                 onClick={createProjectFromDialog}
-                disabled={!newProjectName.trim() || !Number.isFinite(rootWidth) || !Number.isFinite(rootHeight) || rootWidth <= 0 || rootHeight <= 0}
+                disabled={!newProjectName.trim() || (!useDeviceSelector && (!Number.isFinite(rootWidth) || !Number.isFinite(rootHeight) || rootWidth <= 0 || rootHeight <= 0))}
               >
                 Create
               </Button>
