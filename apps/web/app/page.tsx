@@ -1,5 +1,6 @@
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
+import { FeaturedWallpapers } from "@/components/featured-wallpapers"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Send, Map as MapIcon, Github, Star } from "lucide-react"
@@ -142,6 +143,37 @@ export default async function HomePage() {
           </section>
         </main>
       </div>
+
+      <FeaturedWallpapers />
+
+      {/* Ready to get started? */}
+      <section className="relative py-16 md:py-24 bg-background overflow-hidden">
+        <div className="squares-bg" aria-hidden="true" />
+        <div className="relative container mx-auto px-3 min-[600px]:px-4 lg:px-6">
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="font-heading text-3xl md:text-4xl font-bold">Ready to get started?</h2>
+            <p className="text-muted-foreground mt-3">Build your first animated wallpaper in minutes.</p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link href="/projects">
+                <Button size="lg" className="px-6 bg-accent hover:bg-accent/90 text-white font-semibold">
+                  <span className="inline-flex items-center gap-2">
+                    Get Started
+                    <Send className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                </Button>
+              </Link>
+              <Link href="https://github.com/CAPlayground/CAPlayground" target="_blank" rel="noopener noreferrer">
+                <Button size="lg" variant="outline" className="px-6">
+                  <span className="inline-flex items-center gap-2">
+                    <Github className="h-5 w-5" aria-hidden="true" />
+                    <span>View GitHub</span>
+                  </span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <Footer />
     </div>
