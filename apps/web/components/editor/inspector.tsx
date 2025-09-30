@@ -88,7 +88,7 @@ export function Inspector() {
     return eff;
   })();
 
-  const animEnabled: boolean = !!(selectedBase as any)?.animations?.enabled;
+  const animEnabled: boolean = !!(selectedBase as any)?.animations?.enabled && (selectedBase as any)?.type !== 'video';
   
   const {
     disablePosX,
@@ -740,13 +740,20 @@ export function Inspector() {
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label>Enable animation</Label>
+                {(selectedBase as any)?.type === 'video' && (
+                  <span className="text-xs text-muted-foreground mr-auto ml-2">
+                    Note: Animations are not supported for video layers.
+                  </span>
+                )}
                 {current?.activeState && current.activeState !== 'Base State' ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div>
                         <Switch
-                          checked={!!(selectedBase as any)?.animations?.enabled}
+                          checked={(selectedBase as any)?.type === 'video' ? false : !!(selectedBase as any)?.animations?.enabled}
+                          disabled={(selectedBase as any)?.type === 'video'}
                           onCheckedChange={(checked) => {
+                            if ((selectedBase as any)?.type === 'video') return;
                             const enabled = !!checked;
                             const currentAnim = (selectedBase as any)?.animations || {};
                             const kp = (currentAnim.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
@@ -775,8 +782,10 @@ export function Inspector() {
                   </Tooltip>
                 ) : (
                   <Switch
-                    checked={!!(selectedBase as any)?.animations?.enabled}
+                    checked={(selectedBase as any)?.type === 'video' ? false : !!(selectedBase as any)?.animations?.enabled}
+                    disabled={(selectedBase as any)?.type === 'video'}
                     onCheckedChange={(checked) => {
+                      if ((selectedBase as any)?.type === 'video') return;
                       const enabled = !!checked;
                       const currentAnim = (selectedBase as any)?.animations || {};
                       const kp = (currentAnim.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
