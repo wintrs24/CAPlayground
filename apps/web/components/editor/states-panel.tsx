@@ -11,32 +11,34 @@ export function StatesPanel() {
   const active = current?.activeState || 'Base State';
 
   return (
-    <Card className="p-3 h-full flex flex-col" data-tour-id="states-panel">
-      <div className="flex items-center justify-between mb-2">
+    <Card className="p-0 gap-0 h-full flex flex-col" data-tour-id="states-panel">
+      <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
         <div className="font-medium">States</div>
       </div>
 
-      <div className="text-sm rounded border bg-muted/30 divide-y overflow-hidden">
-        <div className="px-2 py-2 font-medium select-none">Project States</div>
-        <div className="max-h-64 overflow-auto">
-          {/* base state */}
-          <button
-            type="button"
-            className={`w-full text-left px-2 py-2 flex items-center justify-between select-none ${active === 'Base State' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
-            onClick={() => setActiveState('Base State')}
-          >
-            <div className="truncate flex-1">Base State</div>
-          </button>
-          {states.map((s) => (
+      <div className="flex-1 overflow-hidden p-3">
+        <div className="text-sm rounded-lg border bg-card shadow-sm divide-y flex flex-col overflow-hidden">
+          <div className="px-2 py-2 font-medium select-none bg-muted/30">Project States</div>
+          <div className="flex-1 overflow-auto">
+            {/* base state */}
             <button
-              key={s}
               type="button"
-              className={`w-full text-left px-2 py-2 flex items-center justify-between ${active === s ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
-              onClick={() => setActiveState(s as any)}
+              className={`w-full text-left px-2 py-2 flex items-center justify-between select-none ${active === 'Base State' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+              onClick={() => setActiveState('Base State')}
             >
-              <div className="truncate flex-1">{s}</div>
+              <div className="truncate flex-1">Base State</div>
             </button>
-          ))}
+            {states.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`w-full text-left px-2 py-2 flex items-center justify-between ${active === s ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+                onClick={() => setActiveState(s as any)}
+              >
+                <div className="truncate flex-1">{s}</div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </Card>

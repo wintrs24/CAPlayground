@@ -121,8 +121,8 @@ export function LayersPanel() {
   };
 
   return (
-    <Card className="p-3 h-full flex flex-col" data-tour-id="layers-panel">
-      <div className="flex items-center justify-between mb-2">
+    <Card className="p-0 gap-0 h-full flex flex-col" data-tour-id="layers-panel">
+      <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
         <div className="font-medium">Layers</div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -152,27 +152,29 @@ export function LayersPanel() {
         />
       </div>
 
-      <div className="text-sm rounded border bg-muted/30 divide-y flex flex-col overflow-hidden">
-        <div
-          className={`px-2 py-2 font-medium select-none cursor-pointer ${selectedId === '__root__' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
-          onClick={() => selectLayer('__root__' as any)}
-        >
-          Root Layer
-        </div>
-        <div
-          className="flex-1 overflow-auto"
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-          onDrop={(e) => {
-            const src = e.dataTransfer.getData('text/cap-layer-id');
-            setDragOverId(null);
-            if (!src) return;
-            moveLayer(src, null);
-          }}
-        >
-          {layers.length === 0 && (
-            <div className="px-2 py-2 text-muted-foreground">No layers yet</div>
-          )}
-          {layers.map((l) => renderItem(l, 0))}
+      <div className="flex-1 overflow-hidden p-3">
+        <div className="text-sm rounded-lg border bg-card shadow-sm divide-y flex flex-col overflow-hidden">
+          <div
+            className={`px-2 py-2 font-medium select-none cursor-pointer ${selectedId === '__root__' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
+            onClick={() => selectLayer('__root__' as any)}
+          >
+            Root Layer
+          </div>
+          <div
+            className="flex-1 overflow-auto"
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+            onDrop={(e) => {
+              const src = e.dataTransfer.getData('text/cap-layer-id');
+              setDragOverId(null);
+              if (!src) return;
+              moveLayer(src, null);
+            }}
+          >
+            {layers.length === 0 && (
+              <div className="px-2 py-2 text-muted-foreground">No layers yet</div>
+            )}
+            {layers.map((l) => renderItem(l, 0))}
+          </div>
         </div>
       </div>
     </Card>

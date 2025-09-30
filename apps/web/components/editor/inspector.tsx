@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { SquareSlash } from "lucide-react";
+import { SquareSlash, Box, Layers, Palette, Type, Image as ImageIcon, Play } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function Inspector() {
   const { doc, setDoc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
@@ -109,57 +109,85 @@ export function Inspector() {
     };
   }, [selectedBase]);
 
+  type TabId = 'geometry' | 'compositing' | 'content' | 'text' | 'image' | 'animations';
+  const [activeTab, setActiveTab] = useState<TabId>('geometry');
+
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      { id: 'geometry' as TabId, icon: Box, label: 'Geometry' },
+      { id: 'compositing' as TabId, icon: Layers, label: 'Compositing' },
+      { id: 'content' as TabId, icon: Palette, label: 'Content' },
+    ];
+    if (selected?.type === 'text') {
+      baseTabs.push({ id: 'text' as TabId, icon: Type, label: 'Text' });
+    }
+    if (selected?.type === 'image') {
+      baseTabs.push({ id: 'image' as TabId, icon: ImageIcon, label: 'Image' });
+    }
+    baseTabs.push({ id: 'animations' as TabId, icon: Play, label: 'Animations' });
+    return baseTabs;
+  }, [selected?.type]);
+
+  useEffect(() => {
+    if (selected?.type === 'text' && activeTab === 'image') {
+      setActiveTab('text');
+    } else if (selected?.type === 'image' && activeTab === 'text') {
+      setActiveTab('image');
+    } else if (selected?.type !== 'text' && selected?.type !== 'image' && (activeTab === 'text' || activeTab === 'image')) {
+      setActiveTab('geometry');
+    }
+  }, [selected?.type, activeTab]);
+
   if (isRootSelected) {
     const widthVal = doc?.meta.width ?? 0;
     const heightVal = doc?.meta.height ?? 0;
     const gf = (doc?.meta as any)?.geometryFlipped ?? 0;
     return (
-      <Card className="p-3 h-full" data-tour-id="inspector">
-        <div className="font-medium mb-2">Inspector</div>
-        <Accordion type="multiple" defaultValue={["geom"]} className="space-y-1">
-          <AccordionItem value="geom">
-            <AccordionTrigger className="py-2 text-xs">Geometry (Root)</AccordionTrigger>
-            <AccordionContent className="pb-2">
-              <div className="grid grid-cols-2 gap-1.5">
-                <div className="space-y-1">
-                  <Label htmlFor="root-w">Width</Label>
-                  <Input id="root-w" type="number" step="1" value={String(widthVal)}
-                    onChange={(e)=>{
-                      const n = Number(e.target.value);
-                      if (!Number.isFinite(n)) return;
-                      setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, width: Math.max(0, Math.round(n)) }}) : prev);
-                    }} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="root-h">Height</Label>
-                  <Input id="root-h" type="number" step="1" value={String(heightVal)}
-                    onChange={(e)=>{
-                      const n = Number(e.target.value);
-                      if (!Number.isFinite(n)) return;
-                      setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, height: Math.max(0, Math.round(n)) }}) : prev);
-                    }} />
-                </div>
-                <div className="space-y-1 col-span-2">
-                  <Label>Flip Geometry</Label>
-                  <div className="flex items-center gap-2 h-8">
-                    <Switch checked={gf === 1}
-                      onCheckedChange={(checked)=> setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, geometryFlipped: checked ? 1 : 0 }}) : prev)} />
-                    <span className="text-xs text-muted-foreground">When on, origin becomes top-left and Y increases down.</span>
-                  </div>
-                </div>
+      <Card className="h-full flex flex-col overflow-hidden p-0 gap-0" data-tour-id="inspector">
+        <div className="px-3 py-2 border-b shrink-0">
+          <div className="font-medium">Inspector</div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className="space-y-1">
+              <Label htmlFor="root-w">Width</Label>
+              <Input id="root-w" type="number" step="1" value={String(widthVal)}
+                onChange={(e)=>{
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n)) return;
+                  setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, width: Math.max(0, Math.round(n)) }}) : prev);
+                }} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="root-h">Height</Label>
+              <Input id="root-h" type="number" step="1" value={String(heightVal)}
+                onChange={(e)=>{
+                  const n = Number(e.target.value);
+                  if (!Number.isFinite(n)) return;
+                  setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, height: Math.max(0, Math.round(n)) }}) : prev);
+                }} />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label>Flip Geometry</Label>
+              <div className="flex items-center gap-2 h-8">
+                <Switch checked={gf === 1}
+                  onCheckedChange={(checked)=> setDoc((prev)=> prev ? ({...prev, meta: { ...prev.meta, geometryFlipped: checked ? 1 : 0 }}) : prev)} />
+                <span className="text-xs text-muted-foreground">When on, origin becomes top-left and Y increases down.</span>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            </div>
+          </div>
+        </div>
       </Card>
     );
   }
 
   if (!selected) {
     return (
-      <Card className="p-3 h-full" data-tour-id="inspector">
-        <div className="font-medium mb-2">Inspector</div>
-        <div className="h-[calc(100%-1.75rem)] flex items-center justify-center">
+      <Card className="h-full flex flex-col overflow-hidden p-0 gap-0" data-tour-id="inspector">
+        <div className="px-3 py-2 border-b shrink-0">
+          <div className="font-medium">Inspector</div>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center text-center text-muted-foreground">
             <SquareSlash className="h-20 w-20 mb-3" />
             <div className="text-m">Select a layer to edit its properties.</div>
@@ -170,21 +198,48 @@ export function Inspector() {
   }
 
   return (
-    <Card className="p-3 h-full flex flex-col overflow-hidden" data-tour-id="inspector">
-      <div className="font-medium mb-2 shrink-0">Inspector</div>
-      <div className="min-h-0 overflow-y-auto pr-1">
-      {current?.activeState && current.activeState !== 'Base State' && (
-        <Alert className="text-xs">
-          <AlertDescription>
-            Note: Rotation and Bound state transitions don't work when tested. If you know a fix or it just works for you, please report in the CAPlayground Discord server.
-          </AlertDescription>
-        </Alert>
-      )}
+    <Card className="h-full flex flex-col overflow-hidden p-0 gap-0" data-tour-id="inspector">
+      <div className="px-3 py-2 border-b shrink-0">
+        <div className="font-medium">Inspector</div>
+      </div>
+      <div className="flex-1 flex overflow-hidden">
+        <div className="w-14 border-r flex flex-col gap-2 p-2 shrink-0">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <Tooltip key={tab.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      "h-10 w-10 flex items-center justify-center rounded-lg transition-all",
+                      activeTab === tab.id
+                        ? "text-green-600 dark:text-green-500"
+                        : "hover:bg-accent/50"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {tab.label}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
 
-      <Accordion type="multiple" defaultValue={["geom","comp","content","text","image","anim"]} className="space-y-1">
-        <AccordionItem value="geom">
-          <AccordionTrigger className="py-2 text-xs">Geometry</AccordionTrigger>
-          <AccordionContent className="pb-2">
+        <div className="flex-1 overflow-y-auto p-3">
+          {current?.activeState && current.activeState !== 'Base State' && (
+            <Alert className="text-xs mb-3">
+              <AlertDescription>
+                Note: Rotation and Bound state transitions don't work when tested. If you know a fix or it just works for you, please report in the CAPlayground Discord server.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {activeTab === 'geometry' && (
+            <div>
             {(disablePosX || disablePosY || disableRotX || disableRotY || disableRotZ) && (
               <Alert className="mb-3">
                 <AlertDescription className="text-xs">
@@ -383,12 +438,10 @@ export function Inspector() {
           </div>
         </div>
             </div>
-          </AccordionContent>
-        </AccordionItem>
+            </div>
+          )}
 
-        <AccordionItem value="comp">
-          <AccordionTrigger className="py-2 text-xs">Compositing</AccordionTrigger>
-          <AccordionContent className="pb-2">
+          {activeTab === 'compositing' && (
             <div className="grid grid-cols-2 gap-1.5">
         <div className="space-y-1">
           <Label htmlFor="opacity">Opacity (%)</Label>
@@ -441,12 +494,9 @@ export function Inspector() {
           </div>
         )}
             </div>
-          </AccordionContent>
-        </AccordionItem>
+          )}
 
-        <AccordionItem value="content">
-          <AccordionTrigger className="py-2 text-xs">Content</AccordionTrigger>
-          <AccordionContent className="pb-2">
+          {activeTab === 'content' && (
             <div className="grid grid-cols-2 gap-1.5">
         <div className="space-y-1">
           <Label>No background colour</Label>
@@ -494,15 +544,10 @@ export function Inspector() {
           </div>
         )}
             </div>
-          </AccordionContent>
-        </AccordionItem>
+          )}
 
-        {/* Text */}
-        {selected.type === "text" && (
-          <AccordionItem value="text">
-            <AccordionTrigger className="py-2 text-xs">Text</AccordionTrigger>
-            <AccordionContent className="pb-2">
-              <div className="grid grid-cols-2 gap-1.5">
+          {activeTab === 'text' && selected.type === "text" && (
+            <div className="grid grid-cols-2 gap-1.5">
           <div className="space-y-1 col-span-2">
             <Label htmlFor="text">Text</Label>
             <Input id="text" value={selected.text}
@@ -558,16 +603,10 @@ export function Inspector() {
               onChange={(e) => updateLayer(selected.id, { color: e.target.value } as any)} />
           </div>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        )}
+          )}
 
-        {/* Image */}
-        {selected.type === "image" && (
-          <AccordionItem value="image">
-            <AccordionTrigger className="py-2 text-xs">Image</AccordionTrigger>
-            <AccordionContent className="pb-2">
-              <div className="grid grid-cols-2 gap-1.5">
+          {activeTab === 'image' && selected.type === "image" && (
+            <div className="grid grid-cols-2 gap-1.5">
           <div className="space-y-1 col-span-2">
             <Label>Image</Label>
             <div className="flex items-center gap-2">
@@ -615,14 +654,9 @@ export function Inspector() {
             </div>
           </div>
               </div>
-            </AccordionContent>
-          </AccordionItem>
-        )}
+          )}
 
-        {/* Animations */}
-        <AccordionItem value="anim">
-          <AccordionTrigger className="py-2 text-xs">Animations</AccordionTrigger>
-          <AccordionContent className="pb-2">
+          {activeTab === 'animations' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label>Enable animation</Label>
@@ -952,9 +986,8 @@ export function Inspector() {
                 </div>
               </div>
             </div>
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
+          )}
+        </div>
       </div>
     </Card>
   );
