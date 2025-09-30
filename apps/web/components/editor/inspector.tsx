@@ -810,7 +810,7 @@ export function Inspector() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <Label>Autoreverse</Label>
                   <div className="flex items-center gap-2 h-8">
                     <Switch
@@ -824,7 +824,7 @@ export function Inspector() {
                     <span className="text-xs text-muted-foreground">Reverse on repeat</span>
                   </div>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <Label htmlFor="anim-duration">Duration (s)</Label>
                   <Input
                     id="anim-duration"
@@ -845,7 +845,7 @@ export function Inspector() {
                     disabled={!animEnabled}
                   />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2">
                   <Label>Loop infinitely</Label>
                   <div className="flex items-center gap-2 h-8">
                     <Switch
