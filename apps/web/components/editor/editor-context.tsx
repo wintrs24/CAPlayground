@@ -157,6 +157,32 @@ export function EditorProvider({
               }
             } catch {}
           }
+          const findAssetBinding = (layers: AnyLayer[], filename: string): string | null => {
+            const walk = (arr: AnyLayer[]): string | null => {
+              for (const layer of arr) {
+                if (layer.type === "image") {
+                  const name = (layer.src || "").split("/").pop();
+                  if (name === filename || (layer.src || "").includes(filename)) return layer.id;
+                } else if (layer.type === "video") {
+                  const video = layer as VideoLayer;
+                  const prefix = video.framePrefix || `${layer.id}_frame_`;
+                  let ext = video.frameExtension || ".jpg";
+                  if (!ext.startsWith(".")) ext = `.${ext}`;
+                  if (filename.startsWith(prefix) && filename.endsWith(ext)) {
+                    const indexPart = filename.slice(prefix.length, filename.length - ext.length);
+                    const frameIndex = Number(indexPart);
+                    if (!Number.isNaN(frameIndex)) return `${layer.id}_frame_${frameIndex}`;
+                  }
+                } else if (layer.type === "group") {
+                  const found = walk((layer as GroupLayer).children);
+                  if (found) return found;
+                }
+              }
+              return null;
+            };
+            return walk(layers);
+          };
+
           for (const f of files) {
             if (f.path.includes('/assets/')) {
               const filename = f.path.split('/assets/')[1];
@@ -168,21 +194,9 @@ export function EditorProvider({
                   r.onload = () => resolve(String(r.result));
                   r.readAsDataURL(blob);
                 });
-                const findLayerWithAsset = (layers: AnyLayer[], assetFilename: string): string | null => {
-                  for (const layer of layers) {
-                    if (layer.type === 'image' && layer.src && layer.src.includes(assetFilename)) {
-                      return layer.id;
-                    }
-                    if (layer.type === 'group') {
-                      const found = findLayerWithAsset((layer as GroupLayer).children, assetFilename);
-                      if (found) return found;
-                    }
-                  }
-                  return null;
-                };
-                const layerId = findLayerWithAsset(layers, filename);
-                if (layerId) {
-                  assets[layerId] = { filename, dataURL };
+                const bindingKey = findAssetBinding(layers, filename);
+                if (bindingKey) {
+                  assets[bindingKey] = { filename, dataURL };
                 }
               } catch {}
             }
@@ -601,6 +615,8 @@ export function EditorProvider({
     }
     
     const layerId = genId();
+    const framePrefix = `${layerId}_frame_`;
+    const frameExtension = '.jpg';
     const frameAssets: Array<{ dataURL: string; filename: string }> = [];
     
     for (let i = 0; i < frameCount; i++) {
@@ -611,7 +627,7 @@ export function EditorProvider({
         video.onseeked = () => {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           const dataURL = canvas.toDataURL('image/jpeg', 0.7);
-          const filename = `${layerId}_frame_${i}.jpg`;
+          const filename = `${framePrefix}${i}${frameExtension}`;
           frameAssets.push({ dataURL, filename });
           resolve();
         };
@@ -653,6 +669,8 @@ export function EditorProvider({
         fps,
         duration: actualDuration,
         autoReverses: false,
+        framePrefix,
+        frameExtension,
       };
       
       const key = prev.activeCA;
@@ -662,7 +680,7 @@ export function EditorProvider({
       frameAssets.forEach((frame, idx) => {
         const frameId = `${layer.id}_frame_${idx}`;
         assets[frameId] = { 
-          filename: frame.filename, 
+          filename: `${framePrefix}${idx}${frameExtension}`, 
           dataURL: frame.dataURL 
         };
       });

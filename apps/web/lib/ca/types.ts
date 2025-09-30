@@ -79,6 +79,8 @@ export type VideoLayer = LayerBase & {
   fps?: number;
   duration?: number;
   autoReverses?: boolean;
+  framePrefix?: string;
+  frameExtension?: string;
 };
 
 export type AnyLayer = ImageLayer | TextLayer | ShapeLayer | GroupLayer | VideoLayer;
