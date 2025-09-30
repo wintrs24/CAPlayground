@@ -9,7 +9,7 @@ export default function RoadmapPage() {
     <div className="min-h-screen flex flex-col">
       <Navigation />
       <main className="flex-1">
-        <section className="container mx-auto px-12 md:px-30 py-16 md:py-24">
+        <section className="container mx-auto px-3 min-[600px]:px-4 lg:px-6 py-16 md:py-24">
         <header className="mb-10 space-y-2">
           <h1 className="font-heading text-4xl md:text-5xl font-bold">Project Roadmap</h1>
           <p className="text-muted-foreground">What's cooking in CAPlayground? (Last Updated: 25th September, 2025)</p>
