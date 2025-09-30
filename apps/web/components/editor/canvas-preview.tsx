@@ -490,46 +490,39 @@ export function CanvasPreview() {
       return;
     }
 
-    const provided = (current?.stateTransitions || []).filter(t =>
-      (t.fromState === prevState || t.fromState === '*') &&
-      (t.toState === nextState || t.toState === '*')
-    );
-    let transitions = provided;
-    if (!provided.length) {
-      const gens: Array<{ elements: { targetId: string; keyPath: string; animation?: { duration?: number } }[] }> = [];
-      const addGen = (targetId: string, keyPath: string, duration = 0.8) => {
-        if (!gens.length) gens.push({ elements: [] });
-        gens[0].elements.push({ targetId, keyPath, animation: { duration } });
-      };
-      const ovs = current?.stateOverrides || {};
-      const toList = ovs[nextState || ''] || [];
-      const fromList = ovs[prevState || ''] || [];
-      const keys = [
-        'position.x','position.y','bounds.size.width','bounds.size.height','transform.rotation.z','opacity'
-      ];
-      const byKey = (arr: any[]) => {
-        const m = new Map<string, Map<string, number>>();
-        for (const it of arr) {
-          if (typeof it.value !== 'number') continue;
-          if (!m.has(it.targetId)) m.set(it.targetId, new Map());
-          m.get(it.targetId)!.set(it.keyPath, it.value);
+    const gens: Array<{ elements: { targetId: string; keyPath: string; animation?: { duration?: number } }[] }> = [];
+    const addGen = (targetId: string, keyPath: string, duration = 0.8) => {
+      if (!gens.length) gens.push({ elements: [] });
+      gens[0].elements.push({ targetId, keyPath, animation: { duration } });
+    };
+    const ovs = current?.stateOverrides || {};
+    const toList = ovs[nextState || ''] || [];
+    const fromList = ovs[prevState || ''] || [];
+    const keys = [
+      'position.x','position.y','bounds.size.width','bounds.size.height','transform.rotation.z','opacity'
+    ];
+    const byKey = (arr: any[]) => {
+      const m = new Map<string, Map<string, number>>();
+      for (const it of arr) {
+        if (typeof it.value !== 'number') continue;
+        if (!m.has(it.targetId)) m.set(it.targetId, new Map());
+        m.get(it.targetId)!.set(it.keyPath, it.value);
+      }
+      return m;
+    };
+    const fromMap = byKey(fromList);
+    const toMap = byKey(toList);
+    const ids = new Set<string>([...fromMap.keys(), ...toMap.keys()]);
+    ids.forEach(id => {
+      keys.forEach(k => {
+        const a = fromMap.get(id)?.get(k);
+        const b = toMap.get(id)?.get(k);
+        if (typeof a === 'number' || typeof b === 'number') {
+          addGen(id, k as any, 0.8);
         }
-        return m;
-      };
-      const fromMap = byKey(fromList);
-      const toMap = byKey(toList);
-      const ids = new Set<string>([...fromMap.keys(), ...toMap.keys()]);
-      ids.forEach(id => {
-        keys.forEach(k => {
-          const a = fromMap.get(id)?.get(k);
-          const b = toMap.get(id)?.get(k);
-          if (typeof a === 'number' || typeof b === 'number') {
-            addGen(id, k as any, 0.8);
-          }
-        });
       });
-      transitions = gens as any;
-    }
+    });
+    const transitions = gens as any;
 
     if (!transitions.length) {
       setRenderedLayers(appliedLayers);
@@ -598,7 +591,7 @@ export function CanvasPreview() {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       animRef.current = null;
     };
-  }, [current?.activeState, appliedLayers, current?.stateTransitions]);
+  }, [current?.activeState, appliedLayers]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

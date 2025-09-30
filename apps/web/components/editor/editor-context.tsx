@@ -12,7 +12,6 @@ type CADoc = {
   states: string[];
   stateOverrides?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>;
   activeState?: 'Base State' | 'Locked' | 'Unlock' | 'Sleep';
-  stateTransitions?: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }>; }>;
 };
 
 export type ProjectDocument = {
@@ -171,17 +170,15 @@ export function EditorProvider({
           let assets: Record<string, { filename: string; dataURL: string }> = {};
           let states: string[] = [...fixedStates];
           let stateOverrides: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
-          let stateTransitions: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }>; }> = [];
           if (main && main.type === 'text' && typeof main.data === 'string') {
             try {
-              const { parseCAML, parseStates, parseStateOverrides, parseStateTransitions } = await import("@/lib/ca/caml");
+              const { parseCAML, parseStates, parseStateOverrides } = await import("@/lib/ca/caml");
               const root = parseCAML(main.data);
               if (root) {
                 const rootLayer = root as any;
                 layers = rootLayer?.type === 'group' && Array.isArray(rootLayer.children) ? rootLayer.children : [rootLayer];
                 states = parseStates(main.data);
                 stateOverrides = parseStateOverrides(main.data) as any;
-                stateTransitions = parseStateTransitions(main.data) as any;
               }
             } catch {}
           }
@@ -222,7 +219,6 @@ export function EditorProvider({
             states: states.length ? states : [...fixedStates],
             activeState: 'Base State',
             stateOverrides,
-            stateTransitions,
           };
         };
 
@@ -249,8 +245,8 @@ export function EditorProvider({
           },
           activeCA: 'floating',
           docs: {
-            background: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {}, stateTransitions: [] },
-            floating: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {}, stateTransitions: [] },
+            background: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {} },
+            floating: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {} },
           },
         });
       }
@@ -354,7 +350,6 @@ export function EditorProvider({
             } as any,
             (caDoc as any).states,
             (caDoc as any).stateOverrides,
-            (caDoc as any).stateTransitions,
           );
           await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, caml);
         }
