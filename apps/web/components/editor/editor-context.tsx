@@ -196,6 +196,22 @@ export function EditorProvider({
                   r.onload = () => resolve(String(r.result));
                   r.readAsDataURL(blob);
                 });
+                const findLayerWithAsset = (layers: AnyLayer[], assetFilename: string): string | null => {
+                  for (const layer of layers) {
+                    if (layer.type === 'image' && layer.src && layer.src.includes(assetFilename)) {
+                      return layer.id;
+                    }
+                    if (layer.type === 'group') {
+                      const found = findLayerWithAsset((layer as GroupLayer).children, assetFilename);
+                      if (found) return found;
+                    }
+                  }
+                  return null;
+                };
+                const layerId = findLayerWithAsset(layers, filename);
+                if (layerId) {
+                  assets[layerId] = { filename, dataURL };
+                }
               } catch {}
             }
           }
