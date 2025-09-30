@@ -141,6 +141,37 @@ export async function putBlobFile(projectId: string, path: string, data: Blob | 
   db.close();
 }
 
+export async function putBlobFilesBatch(projectId: string, files: Array<{ path: string; data: Blob | ArrayBuffer }>): Promise<void> {
+  // Convert all blobs to ArrayBuffers first (outside transaction)
+  const records: IDBFileRecord[] = [];
+  for (const file of files) {
+    const buffer = file.data instanceof Blob ? await file.data.arrayBuffer() : file.data;
+    records.push({
+      id: `${projectId}:${file.path}`,
+      projectId,
+      path: file.path,
+      type: 'blob',
+      data: buffer
+    });
+  }
+  
+  // Now write all records in a single transaction
+  const db = await openDB();
+  const t = tx(db, 'readwrite');
+  const store = t.objectStore('files');
+  
+  for (const rec of records) {
+    store.put(rec);
+  }
+  
+  await new Promise<void>((resolve, reject) => {
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+  });
+  
+  db.close();
+}
+
 export async function getFile(projectId: string, path: string): Promise<IDBFileRecord | undefined> {
   const db = await openDB();
   const t = tx(db);

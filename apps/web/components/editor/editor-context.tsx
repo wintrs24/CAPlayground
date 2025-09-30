@@ -1,9 +1,9 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer } from "@/lib/ca/types";
+import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer, VideoLayer } from "@/lib/ca/types";
 import { serializeCAML } from "@/lib/ca/caml";
-import { getProject, listFiles, putBlobFile, putTextFile } from "@/lib/idb";
+import { getProject, listFiles, putBlobFile, putBlobFilesBatch, putTextFile } from "@/lib/idb";
 import {
   genId,
   findById,
@@ -48,6 +48,7 @@ export type EditorContextValue = {
   addImageLayerFromBlob: (blob: Blob, filename?: string) => Promise<void>;
   replaceImageForLayer: (layerId: string, file: File) => Promise<void>;
   addShapeLayer: (shape?: ShapeLayer["shape"]) => void;
+  addVideoLayerFromFile: (file: File) => Promise<void>;
   updateLayer: (id: string, patch: Partial<AnyLayer>) => void;
   updateLayerTransient: (id: string, patch: Partial<AnyLayer>) => void;
   selectLayer: (id: string | null) => void;
@@ -328,12 +329,25 @@ export function EditorProvider({
         await putTextFile(projectId, `${folder}/${caFolder}/assetManifest.caml`, assetManifest);
 
         const assets = caDoc.assets || {};
-        for (const [layerId, info] of Object.entries(assets)) {
+        const assetFiles: Array<{ path: string; data: Blob }> = [];
+        
+        for (const [assetId, info] of Object.entries(assets)) {
           try {
             const dataURL = info.dataURL;
             const blob = await dataURLToBlob(dataURL);
-            await putBlobFile(projectId, `${folder}/${caFolder}/assets/${info.filename}`, blob);
-          } catch {}
+            const assetPath = `${folder}/${caFolder}/assets/${info.filename}`;
+            assetFiles.push({ path: assetPath, data: blob });
+          } catch (err) {
+            console.error('Failed to prepare asset:', info.filename, err);
+          }
+        }
+        
+        if (assetFiles.length > 0) {
+          try {
+            await putBlobFilesBatch(projectId, assetFiles);
+          } catch (err) {
+            console.error('Failed to write assets batch:', err);
+          }
         }
       }
     } catch (e) {
@@ -557,6 +571,106 @@ export function EditorProvider({
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase]);
+
+  const addVideoLayerFromFile = useCallback(async (file: File) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    
+    const videoURL = URL.createObjectURL(file);
+    video.src = videoURL;
+    
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = reject;
+    });
+    
+    const duration = video.duration;
+    const fps = 30;
+    const maxDuration = 12;
+    const actualDuration = Math.min(duration, maxDuration);
+    const frameCount = Math.floor(actualDuration * fps);
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) {
+      URL.revokeObjectURL(videoURL);
+      throw new Error('Failed to get canvas context');
+    }
+    
+    const layerId = genId();
+    const frameAssets: Array<{ dataURL: string; filename: string }> = [];
+    
+    for (let i = 0; i < frameCount; i++) {
+      const time = (i / fps);
+      video.currentTime = time;
+      
+      await new Promise<void>((resolve) => {
+        video.onseeked = () => {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+          const filename = `${layerId}_frame_${i}.jpg`;
+          frameAssets.push({ dataURL, filename });
+          resolve();
+        };
+      });
+    }
+    
+    URL.revokeObjectURL(videoURL);
+    
+    setDoc((prev) => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      
+      const canvasW = prev.meta.width || 390;
+      const canvasH = prev.meta.height || 844;
+      const videoW = video.videoWidth;
+      const videoH = video.videoHeight;
+      
+      let w = videoW;
+      let h = videoH;
+      
+      if (w > canvasW || h > canvasH) {
+        const scaleW = canvasW / videoW;
+        const scaleH = canvasH / videoH;
+        const scale = Math.min(scaleW, scaleH);
+        w = videoW * scale;
+        h = videoH * scale;
+      }
+      
+      const x = canvasW / 2;
+      const y = canvasH / 2;
+      
+      const layer: VideoLayer = {
+        ...addBase(file.name || "Video Layer"),
+        id: layerId,
+        type: "video",
+        position: { x, y },
+        size: { w, h },
+        frameCount,
+        fps,
+        duration: actualDuration,
+        autoReverses: false,
+      };
+      
+      const key = prev.activeCA;
+      const cur = prev.docs[key];
+      
+      const assets = { ...(cur.assets || {}) };
+      frameAssets.forEach((frame, idx) => {
+        const frameId = `${layer.id}_frame_${idx}`;
+        assets[frameId] = { 
+          filename: frame.filename, 
+          dataURL: frame.dataURL 
+        };
+      });
+      
+      const next = { ...cur, layers: [...cur.layers, layer], selectedId: layer.id, assets };
+      return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
+    });
+  }, [addBase, pushHistory]);
 
   const moveLayer = useCallback((sourceId: string, beforeId: string | null) => {
     if (!sourceId || sourceId === beforeId) return;
@@ -842,6 +956,7 @@ export function EditorProvider({
     addImageLayerFromBlob,
     replaceImageForLayer,
     addShapeLayer,
+    addVideoLayerFromFile,
     updateLayer,
     updateLayerTransient,
     selectLayer,
@@ -871,6 +986,7 @@ export function EditorProvider({
     addImageLayerFromBlob,
     replaceImageForLayer,
     addShapeLayer,
+    addVideoLayerFromFile,
     updateLayer,
     updateLayerTransient,
     selectLayer,

@@ -73,7 +73,15 @@ export type GroupLayer = LayerBase & {
   children: AnyLayer[];
 };
 
-export type AnyLayer = ImageLayer | TextLayer | ShapeLayer | GroupLayer;
+export type VideoLayer = LayerBase & {
+  type: 'video';
+  frameCount: number;
+  fps?: number;
+  duration?: number;
+  autoReverses?: boolean;
+};
+
+export type AnyLayer = ImageLayer | TextLayer | ShapeLayer | GroupLayer | VideoLayer;
 
 export type CAAsset = {
   path: string;

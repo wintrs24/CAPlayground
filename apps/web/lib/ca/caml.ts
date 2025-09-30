@@ -631,6 +631,48 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     el.appendChild(contents);
   }
 
+  if (layer.type === 'video') {
+    const videoLayer = layer as any;
+    const frameCount = videoLayer.frameCount || 0;
+    const fps = videoLayer.fps || 30;
+    const duration = videoLayer.duration || (frameCount / fps);
+    const autoReverses = videoLayer.autoReverses || false;
+    
+    if (frameCount > 0) {
+      const contents = doc.createElementNS(CAML_NS, 'contents');
+      contents.setAttribute('type', 'CGImage');
+      contents.setAttribute('src', `assets/${layer.id}_frame_0.jpg`);
+      el.appendChild(contents);
+    }
+    
+    if (frameCount > 1) {
+      const animationsEl = doc.createElementNS(CAML_NS, 'animations');
+      const a = doc.createElementNS(CAML_NS, 'animation');
+      a.setAttribute('type', 'CAKeyframeAnimation');
+      a.setAttribute('calculationMode', 'linear');
+      a.setAttribute('keyPath', 'contents');
+      a.setAttribute('beginTime', '1e-100');
+      a.setAttribute('duration', String(duration));
+      a.setAttribute('removedOnCompletion', '0');
+      a.setAttribute('repeatCount', 'inf');
+      a.setAttribute('repeatDuration', '0');
+      a.setAttribute('speed', '1');
+      a.setAttribute('timeOffset', '0');
+      a.setAttribute('autoreverses', autoReverses ? '1' : '0');
+      
+      const valuesEl = doc.createElementNS(CAML_NS, 'values');
+      for (let i = 0; i < frameCount; i++) {
+        const cgImage = doc.createElementNS(CAML_NS, 'CGImage');
+        cgImage.setAttribute('src', `assets/${layer.id}_frame_${i}.jpg`);
+        valuesEl.appendChild(cgImage);
+      }
+      
+      a.appendChild(valuesEl);
+      animationsEl.appendChild(a);
+      el.appendChild(animationsEl);
+    }
+  }
+
   if (layer.type === 'text') {
     const fg = hexToForegroundColor((layer as TextLayer).color || '#000000');
     setAttr(el, 'foregroundColor', fg);
