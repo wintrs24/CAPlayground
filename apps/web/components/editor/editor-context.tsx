@@ -4,6 +4,17 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer } from "@/lib/ca/types";
 import { serializeCAML } from "@/lib/ca/caml";
 import { getProject, listFiles, putBlobFile, putTextFile } from "@/lib/idb";
+import {
+  genId,
+  findById,
+  cloneLayerDeep,
+  updateInTree,
+  removeFromTree,
+  insertBeforeInTree,
+  deleteInTree,
+  containsId,
+} from "@/lib/editor/layer-utils";
+import { sanitizeFilename, dataURLToBlob } from "@/lib/editor/file-utils";
 
 type CADoc = {
   layers: AnyLayer[];
@@ -22,8 +33,6 @@ export type ProjectDocument = {
     floating: CADoc;
   };
 };
-
-const genId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 export type EditorContextValue = {
   doc: ProjectDocument | null;
@@ -50,9 +59,6 @@ export type EditorContextValue = {
   persist: () => void;
   undo: () => void;
   redo: () => void;
-  addState: (name?: string) => void;
-  renameState: (oldName: string, newName: string) => void;
-  deleteState: (name: string) => void;
   setActiveState: (state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => void;
   updateStateOverride: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
   updateStateOverrideTransient: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
@@ -96,38 +102,6 @@ export function EditorProvider({
   const pushHistory = useCallback((prev: ProjectDocument) => {
     pastRef.current.push(JSON.parse(JSON.stringify(prev)) as ProjectDocument);
     futureRef.current = [];
-  }, []);
-
-  const findById = useCallback((layers: AnyLayer[], id: string | null | undefined): AnyLayer | undefined => {
-    if (!id) return undefined;
-    for (const l of layers) {
-      if (l.id === id) return l;
-      if ((l as any).type === 'group') {
-        const g = l as GroupLayer;
-        const found = findById(g.children, id);
-        if (found) return found;
-      }
-    }
-    return undefined;
-  }, []);
-
-  const cloneLayerDeep = useCallback((layer: AnyLayer): AnyLayer => {
-    const newId = genId();
-    if (layer.type === 'group') {
-      const g = layer as GroupLayer;
-      return {
-        ...JSON.parse(JSON.stringify({ ...g, id: newId })) as GroupLayer,
-        id: newId,
-        children: g.children.map(cloneLayerDeep),
-        position: { x: (g.position?.x ?? 0) + 10, y: (g.position?.y ?? 0) + 10 },
-        name: `${g.name} copy`,
-      } as AnyLayer;
-    }
-    const base = JSON.parse(JSON.stringify({ ...layer })) as AnyLayer;
-    (base as any).id = newId;
-    (base as any).name = `${layer.name} copy`;
-    (base as any).position = { x: (layer as any).position?.x + 10, y: (layer as any).position?.y + 10 };
-    return base;
   }, []);
 
   useEffect(() => {
@@ -371,21 +345,6 @@ export function EditorProvider({
     }
   }, [projectId]);
 
-  async function dataURLToBlob(dataURL: string): Promise<Blob> {
-    const [meta, data] = dataURL.split(',');
-    const isBase64 = /;base64$/i.test(meta);
-    const mimeMatch = meta.match(/^data:([^;]+)(;base64)?$/i);
-    const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-    if (isBase64) {
-      const byteString = atob(data);
-      const ia = new Uint8Array(byteString.length);
-      for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-      return new Blob([ia], { type: mime });
-    } else {
-      return new Blob([decodeURIComponent(data)], { type: mime });
-    }
-  }
-
   const selectLayer = useCallback((id: string | null) => {
     setDoc((prev) => {
       if (!prev) return prev;
@@ -394,7 +353,7 @@ export function EditorProvider({
       pushHistory(prev);
       return { ...prev, docs: nextDocs } as ProjectDocument;
     });
-  }, []);
+  }, [pushHistory]);
 
   const addBase = useCallback((name: string): LayerBase => ({
     id: genId(),
@@ -526,17 +485,6 @@ export function EditorProvider({
     });
   }, [addBase]);
 
-  function sanitizeFilename(name: string): string {
-    const n = (name || '').trim();
-    if (!n) return '';
-    const parts = n.split('.');
-    const ext = parts.length > 1 ? parts.pop() as string : '';
-    const base = parts.join('.') || 'image';
-    const safeBase = base.replace(/[^a-z0-9\-_.]+/gi, '_');
-    const safeExt = (ext || '').replace(/[^a-z0-9]+/gi, '').toLowerCase();
-    return safeExt ? `${safeBase}.${safeExt}` : safeBase;
-  }
-
   const addShapeLayer = useCallback((shape: ShapeLayer["shape"] = "rect") => {
     setDoc((prev) => {
       if (!prev) return prev;
@@ -555,62 +503,6 @@ export function EditorProvider({
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase]);
-
-  const updateInTree = useCallback((layers: AnyLayer[], id: string, patch: Partial<AnyLayer>): AnyLayer[] => {
-    return layers.map((l) => {
-      if (l.id === id) return { ...l, ...patch } as AnyLayer;
-      if (l.type === "group") {
-        const g = l as GroupLayer;
-        return { ...g, children: updateInTree(g.children, id, patch) } as AnyLayer;
-      }
-      return l;
-    });
-  }, []);
-
-  const removeFromTree = useCallback((layers: AnyLayer[], id: string): { removed: AnyLayer | null; layers: AnyLayer[] } => {
-    let removed: AnyLayer | null = null;
-    const next: AnyLayer[] = [];
-    for (const l of layers) {
-      if (l.id === id) {
-        removed = l;
-        continue;
-      }
-      if (l.type === 'group') {
-        const g = l as GroupLayer;
-        const res = removeFromTree(g.children, id);
-        if (res.removed) removed = res.removed;
-        next.push({ ...g, children: res.layers } as AnyLayer);
-      } else {
-        next.push(l);
-      }
-    }
-    return { removed, layers: next };
-  }, []);
-
-  const insertBeforeInTree = useCallback((layers: AnyLayer[], targetId: string, node: AnyLayer): { inserted: boolean; layers: AnyLayer[] } => {
-    let inserted = false;
-    const next: AnyLayer[] = [];
-    for (let i = 0; i < layers.length; i++) {
-      const l = layers[i];
-      if (!inserted && l.id === targetId) {
-        next.push(node);
-        next.push(l);
-        inserted = true;
-      } else if (l.type === 'group') {
-        const g = l as GroupLayer;
-        const res = insertBeforeInTree(g.children, targetId, node);
-        if (res.inserted) {
-          inserted = true;
-          next.push({ ...g, children: res.layers } as AnyLayer);
-        } else {
-          next.push(l);
-        }
-      } else {
-        next.push(l);
-      }
-    }
-    return { inserted, layers: next };
-  }, []);
 
   const moveLayer = useCallback((sourceId: string, beforeId: string | null) => {
     if (!sourceId || sourceId === beforeId) return;
@@ -635,29 +527,7 @@ export function EditorProvider({
       const nextCur = { ...cur, layers: nextLayers } as CADoc;
       return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as ProjectDocument;
     });
-  }, [removeFromTree, insertBeforeInTree, pushHistory]);
-
-  const deleteInTree = useCallback((layers: AnyLayer[], id: string): AnyLayer[] => {
-    const next: AnyLayer[] = [];
-    for (const l of layers) {
-      if (l.id === id) continue;
-      if (l.type === "group") {
-        const g = l as GroupLayer;
-        next.push({ ...g, children: deleteInTree(g.children, id) } as AnyLayer);
-      } else {
-        next.push(l);
-      }
-    }
-    return next;
-  }, []);
-
-  const containsId = useCallback((layers: AnyLayer[], id: string): boolean => {
-    for (const l of layers) {
-      if (l.id === id) return true;
-      if (l.type === "group" && containsId((l as GroupLayer).children, id)) return true;
-    }
-    return false;
-  }, []);
+  }, [pushHistory]);
 
   const updateLayer = useCallback((id: string, patch: Partial<AnyLayer>) => {
     setDoc((prev) => {
@@ -689,7 +559,7 @@ export function EditorProvider({
       const nextCur = { ...cur, layers: nextLayers };
       return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as ProjectDocument;
     });
-  }, [updateInTree]);
+  }, [pushHistory]);
 
   const updateLayerTransient = useCallback((id: string, patch: Partial<AnyLayer>) => {
     skipPersistRef.current = true;
@@ -720,7 +590,7 @@ export function EditorProvider({
       const nextCur = { ...cur, layers: nextLayers };
       return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as ProjectDocument;
     });
-  }, [updateInTree]);
+  }, []);
 
   const deleteLayer = useCallback((id: string) => {
     setDoc((prev) => {
@@ -733,7 +603,7 @@ export function EditorProvider({
       const nextCur = { ...cur, layers: nextLayers, selectedId: nextSelected };
       return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as ProjectDocument;
     });
-  }, [deleteInTree, containsId]);
+  }, [pushHistory]);
 
   const copySelectedLayer = useCallback(() => {
     setDoc((prev) => {
@@ -757,7 +627,7 @@ export function EditorProvider({
       } catch {}
       return prev;
     });
-  }, [findById]);
+  }, []);
 
   const pasteFromClipboard = useCallback((payload?: any) => {
     setDoc((prev) => {
@@ -791,7 +661,7 @@ export function EditorProvider({
       const next = { ...cur, layers: [...cur.layers, ...cloned], selectedId: cloned[cloned.length - 1]?.id ?? cur.selectedId, assets };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
-  }, [cloneLayerDeep, pushHistory]);
+  }, [pushHistory]);
 
   const duplicateLayer = useCallback((id?: string) => {
     setDoc((prev) => {
@@ -832,7 +702,7 @@ export function EditorProvider({
       const next = { ...cur, layers: [...cur.layers, cloned], selectedId: (cloned as any).id, assets };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
-  }, [findById, cloneLayerDeep]);
+  }, [pushHistory]);
 
   const undo = useCallback(() => {
     setDoc((current) => {
@@ -854,18 +724,6 @@ export function EditorProvider({
       pastRef.current.push(current);
       return next;
     });
-  }, []);
-
-  const addState = useCallback((_name?: string) => {
-    return;
-  }, []);
-
-  const renameState = useCallback((_oldName: string, _newName: string) => {
-    return;
-  }, []);
-
-  const deleteState = useCallback((_name: string) => {
-    return;
   }, []);
 
   const setActiveState = useCallback((state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => {
@@ -941,9 +799,6 @@ export function EditorProvider({
     persist,
     undo,
     redo,
-    addState,
-    renameState,
-    deleteState,
     setActiveState,
     updateStateOverride,
     updateStateOverrideTransient,
@@ -973,9 +828,6 @@ export function EditorProvider({
     persist,
     undo,
     redo,
-    addState,
-    renameState,
-    deleteState,
     setActiveState,
     updateStateOverride,
     updateStateOverrideTransient,
