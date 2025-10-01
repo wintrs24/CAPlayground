@@ -862,10 +862,12 @@ export function CanvasPreview() {
       );
     }
     if (l.type === "image") {
+      const imgAsset = (current?.assets || {})[l.id];
+      const previewSrc = imgAsset?.dataURL || l.src;
       return (
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
           <img
-            src={l.src}
+            src={previewSrc}
             alt={l.name}
             style={{
               ...common,
