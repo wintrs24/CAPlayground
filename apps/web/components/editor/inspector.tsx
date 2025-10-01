@@ -1084,23 +1084,23 @@ export function Inspector() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Gyro Effects</Label>
+                  <Label className="text-sm font-semibold">Gyro Dictionaries</Label>
                   <Button size="sm" variant="outline">
-                    + Add Effect
+                    + Add Dictionary
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Configure how this layer responds to device tilt. You can add one effect per keyPath.
+                  Configure how this layer responds to device tilt. You can add up to 10 dictionaries (2 axes × 5 keyPaths) for this layer.
                 </p>
               </div>
 
               <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
-                No gyro effects yet. Click "+ Add Effect" to create one.
+                No gyro dictionaries yet. Click "+ Add Dictionary" to create one.
               </div>
 
               <Card className="p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Effect 1</Label>
+                  <Label className="text-sm font-medium">Tilt Effect</Label>
                   <Button size="sm" variant="ghost" className="h-7 text-destructive">
                     Remove
                   </Button>
