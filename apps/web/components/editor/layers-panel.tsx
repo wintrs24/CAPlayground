@@ -9,8 +9,9 @@ import { useRef, useState } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 
 export function LayersPanel() {
-  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, deleteLayer, duplicateLayer, moveLayer, updateLayer } = useEditor();
+  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, addVideoLayerFromFile, deleteLayer, duplicateLayer, moveLayer, updateLayer } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   const key = doc?.activeCA ?? 'floating';
   const current = doc?.docs?.[key];
   const layers = current?.layers ?? [];
@@ -114,7 +115,7 @@ export function LayersPanel() {
             />
           ) : (
             <>
-              {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type})</span>
+              {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type === "video" ? "video" : l.type})</span>
             </>
           )}
         </div>
@@ -167,6 +168,7 @@ export function LayersPanel() {
             <DropdownMenuItem onClick={addTextLayer}>Text Layer</DropdownMenuItem>
             <DropdownMenuItem onClick={() => addShapeLayer("rect")}>Basic Layer</DropdownMenuItem>
             <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>Image Layer…</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => videoInputRef.current?.click()}>Video Layer…</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <input
@@ -181,6 +183,21 @@ export function LayersPanel() {
               try { await addImageLayerFromFile(file); } catch {}
             }
             if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              try { await addVideoLayerFromFile(file); } catch (err) {
+                console.error('Failed to add video layer:', err);
+              }
+            }
+            if (videoInputRef.current) videoInputRef.current.value = "";
           }}
         />
       </div>

@@ -384,6 +384,27 @@ export function CanvasPreview() {
   }, [isAnimationPlaying]);
 
   const evalLayerAnimation = (l: AnyLayer, t: number) => {
+    if ((l as any).type === 'video') {
+      const video = l as any;
+      const frameCount = video.frameCount || 0;
+      const fps = video.fps || 30;
+      const duration = video.duration || (frameCount / fps);
+      const autoReverses = video.autoReverses || false;
+      
+      if (frameCount <= 1) return;
+      
+      let localT = t % duration;
+      if (autoReverses) {
+        const cycle = duration * 2;
+        const m = t % cycle;
+        localT = m <= duration ? m : (cycle - m);
+      }
+      
+      const frameIndex = Math.floor(localT * fps) % frameCount;
+      video.currentFrameIndex = frameIndex;
+      return;
+    }
+    
     const anim: any = (l as any).animations;
     if (!anim || !anim.enabled) return;
     const keyPath = (anim.keyPath || 'position') as 'position' | 'position.x' | 'position.y';
@@ -469,6 +490,7 @@ export function CanvasPreview() {
       for (const l of arr) {
         const anim: any = (l as any).animations;
         if (anim && anim.enabled) return true;
+        if ((l as any).type === 'video') return true;
         if ((l as any).type === 'group' && Array.isArray((l as any).children)) {
           if (check((l as any).children as AnyLayer[])) return true;
         }
@@ -844,6 +866,29 @@ export function CanvasPreview() {
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
           <img
             src={l.src}
+            alt={l.name}
+            style={{
+              ...common,
+              objectFit: "fill" as React.CSSProperties["objectFit"],
+              maxWidth: "none",
+              maxHeight: "none",
+            }}
+            draggable={false}
+            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
+          />
+        </LayerContextMenu>
+      );
+    }
+    if (l.type === "video") {
+      const v = l as any;
+      const frameIndex = v.currentFrameIndex ?? 0;
+      const frameAssetId = `${l.id}_frame_${frameIndex}`;
+      const frameAsset = (current?.assets || {})[frameAssetId];
+      const previewSrc = frameAsset?.dataURL || "";
+      return (
+        <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
+          <img
+            src={previewSrc}
             alt={l.name}
             style={{
               ...common,

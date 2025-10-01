@@ -1,4 +1,4 @@
-import { AnyLayer, CAProject, GroupLayer, TextLayer, CAStateOverrides, CAStateTransitions } from './types';
+import { AnyLayer, CAProject, GroupLayer, TextLayer, VideoLayer, CAStateOverrides, CAStateTransitions } from './types';
 
 const CAML_NS = 'http://www.apple.com/CoreAnimation/1.0';
 
@@ -164,6 +164,101 @@ export function parseStates(xml: string): string[] {
   }
 }
 
+function parseCAVideoLayer(el: Element): VideoLayer {
+  const id = attr(el, 'id') || crypto.randomUUID();
+  const name = attr(el, 'name') || 'Video Layer';
+  const bounds = parseNumberList(attr(el, 'bounds'));
+  const position = parseNumberList(attr(el, 'position'));
+  const anchorPt = parseNumberList(attr(el, 'anchorPoint'));
+  const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const rotationZ = attr(el, 'transform.rotation.z');
+  const rotationX = attr(el, 'transform.rotation.x');
+  const rotationY = attr(el, 'transform.rotation.y');
+  const opacity = attr(el, 'opacity') ? Number(attr(el, 'opacity')) : undefined;
+
+  const base = {
+    id,
+    name,
+    position: { x: position[0] ?? 0, y: position[1] ?? 0 },
+    size: { w: bounds[2] ?? 0, h: bounds[3] ?? 0 },
+    opacity,
+    rotation: rotationZ ? ((Number(rotationZ) * 180) / Math.PI) : undefined,
+    rotationX: rotationX ? ((Number(rotationX) * 180) / Math.PI) : undefined,
+    rotationY: rotationY ? ((Number(rotationY) * 180) / Math.PI) : undefined,
+    anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
+    geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+  };
+
+  const frameCountAttr = attr(el, 'caplayFrameCount') || attr(el, 'caplay.frameCount');
+  const fpsAttr = attr(el, 'caplayFPS') || attr(el, 'caplay.fps');
+  const durationAttr = attr(el, 'caplayDuration') || attr(el, 'caplay.duration');
+  const autoReversesAttr = attr(el, 'caplayAutoReverses') || attr(el, 'caplay.autoReverses');
+  const prefixAttr = attr(el, 'caplayFramePrefix') || attr(el, 'caplay.framePrefix');
+  const extAttr = attr(el, 'caplayFrameExtension') || attr(el, 'caplay.frameExtension');
+
+  let frameCount = frameCountAttr ? Number(frameCountAttr) : undefined;
+  let fps = fpsAttr ? Number(fpsAttr) : undefined;
+  let duration = durationAttr ? Number(durationAttr) : undefined;
+  const autoReverses = autoReversesAttr === '1' || autoReversesAttr === 'true';
+
+  const animationsEl = el.getElementsByTagNameNS(CAML_NS, 'animations')[0];
+  const animNode = animationsEl?.getElementsByTagNameNS(CAML_NS, 'animation')[0];
+  const frameRefs: string[] = [];
+  
+  if (animNode) {
+    const valuesNode = animNode.getElementsByTagNameNS(CAML_NS, 'values')[0];
+    if (valuesNode) {
+      const images = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'CGImage'));
+      for (const img of images) {
+        const src = attr(img, 'src');
+        if (src) frameRefs.push(src);
+      }
+    }
+    if (!frameCount && frameRefs.length > 0) {
+      frameCount = frameRefs.length;
+    }
+    if (!duration) {
+      const durAttr = animNode.getAttribute('duration');
+      if (durAttr) duration = Number(durAttr);
+    }
+  }
+
+  const contents = el.getElementsByTagNameNS(CAML_NS, 'contents')[0];
+  const firstFrameEl = contents?.getElementsByTagNameNS(CAML_NS, 'CGImage')[0];
+  
+  let framePrefix = prefixAttr || undefined;
+  let frameExtension = extAttr || undefined;
+
+  const firstReference = frameRefs[0] || attr(firstFrameEl, 'src');
+  if (firstReference) {
+    const fileName = firstReference.split('/').pop() || firstReference;
+    const match = fileName.match(/^(.*?)(\d+)(\.[a-z0-9]+)$/i);
+    if (match) {
+      if (!framePrefix) framePrefix = match[1];
+      if (!frameExtension) frameExtension = match[3];
+    } else {
+      if (!frameExtension && fileName.includes('.')) frameExtension = fileName.slice(fileName.lastIndexOf('.'));
+      if (!framePrefix) framePrefix = fileName.replace(frameExtension ?? '', '');
+    }
+  }
+
+  framePrefix = framePrefix || `${base.id}_frame_`;
+  frameExtension = frameExtension || '.jpg';
+
+  const layer: VideoLayer = {
+    ...base,
+    type: 'video',
+    frameCount: Math.max(0, Math.floor(frameCount ?? 0)),
+    ...(typeof fps === 'number' ? { fps } : {}),
+    ...(typeof duration === 'number' ? { duration } : {}),
+    autoReverses,
+    framePrefix,
+    frameExtension,
+  };
+
+  return layer;
+}
+
 function parseCATextLayer(el: Element): AnyLayer {
   const id = attr(el, 'id') || crypto.randomUUID();
   const name = attr(el, 'name') || 'Text Layer';
@@ -215,6 +310,11 @@ function parseCATextLayer(el: Element): AnyLayer {
 }
 
 function parseCALayer(el: Element): AnyLayer {
+  const caplayKind = attr(el, 'caplayKind') || attr(el, 'caplay.kind');
+  if (caplayKind === 'video') {
+    return parseCAVideoLayer(el);
+  }
+
   const id = attr(el, 'id') || crypto.randomUUID();
   const name = attr(el, 'name') || 'Layer';
   const bounds = parseNumberList(attr(el, 'bounds')); // x y w h
@@ -631,6 +731,60 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     el.appendChild(contents);
   }
 
+  if (layer.type === 'video') {
+    const videoLayer = layer as VideoLayer;
+    const frameCount = Math.max(0, Math.floor(videoLayer.frameCount || 0));
+    const fps = typeof videoLayer.fps === 'number' && videoLayer.fps > 0 ? videoLayer.fps : 30;
+    const duration = typeof videoLayer.duration === 'number' && videoLayer.duration > 0 ? videoLayer.duration : (frameCount / fps);
+    const autoReverses = !!videoLayer.autoReverses;
+    let framePrefix = videoLayer.framePrefix || `${layer.id}_frame_`;
+    let frameExtension = videoLayer.frameExtension || '.jpg';
+    if (!frameExtension.startsWith('.')) frameExtension = `.${frameExtension}`;
+    const framePath = (idx: number) => `assets/${framePrefix}${idx}${frameExtension}`;
+
+    setAttr(el, 'caplayKind', 'video');
+    setAttr(el, 'caplayFrameCount', frameCount);
+    setAttr(el, 'caplayFPS', fps);
+    setAttr(el, 'caplayDuration', duration);
+    setAttr(el, 'caplayAutoReverses', autoReverses ? 1 : 0);
+    setAttr(el, 'caplayFramePrefix', framePrefix);
+    setAttr(el, 'caplayFrameExtension', frameExtension);
+
+    if (frameCount > 0) {
+      const contents = doc.createElementNS(CAML_NS, 'contents');
+      contents.setAttribute('type', 'CGImage');
+      contents.setAttribute('src', framePath(0));
+      el.appendChild(contents);
+    }
+    
+    if (frameCount > 1) {
+      const animationsEl = doc.createElementNS(CAML_NS, 'animations');
+      const a = doc.createElementNS(CAML_NS, 'animation');
+      a.setAttribute('type', 'CAKeyframeAnimation');
+      a.setAttribute('calculationMode', 'linear');
+      a.setAttribute('keyPath', 'contents');
+      a.setAttribute('beginTime', '1e-100');
+      a.setAttribute('duration', String(duration));
+      a.setAttribute('removedOnCompletion', '0');
+      a.setAttribute('repeatCount', 'inf');
+      a.setAttribute('repeatDuration', '0');
+      a.setAttribute('speed', '1');
+      a.setAttribute('timeOffset', '0');
+      a.setAttribute('autoreverses', autoReverses ? '1' : '0');
+      
+      const valuesEl = doc.createElementNS(CAML_NS, 'values');
+      for (let i = 0; i < frameCount; i++) {
+        const cgImage = doc.createElementNS(CAML_NS, 'CGImage');
+        cgImage.setAttribute('src', framePath(i));
+        valuesEl.appendChild(cgImage);
+      }
+      
+      a.appendChild(valuesEl);
+      animationsEl.appendChild(a);
+      el.appendChild(animationsEl);
+    }
+  }
+
   if (layer.type === 'text') {
     const fg = hexToForegroundColor((layer as TextLayer).color || '#000000');
     setAttr(el, 'foregroundColor', fg);
@@ -667,7 +821,6 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     if (children.length) el.appendChild(sublayers);
   }
 
-  // Animations (position, position.x, position.y, transform.rotation.x, transform.rotation.y, transform.rotation.z)
   const anim = (layer as any).animations as
     | { enabled?: boolean; keyPath?: 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z'; autoreverses?: 0 | 1; values?: Array<{ x: number; y: number } | number>; durationSeconds?: number }
     | undefined;

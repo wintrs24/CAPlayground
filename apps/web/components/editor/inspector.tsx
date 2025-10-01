@@ -12,7 +12,7 @@ import { useEditor } from "./editor-context";
 import type { AnyLayer } from "@/lib/ca/types";
 import { useEffect, useMemo, useRef, useState, Fragment } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { SquareSlash, Box, Layers, Palette, Type, Image as ImageIcon, Play, PanelLeft, PanelTop, PanelRight } from "lucide-react";
+import { SquareSlash, Box, Layers, Palette, Type, Image as ImageIcon, Play, PanelLeft, PanelTop, PanelRight, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
@@ -88,7 +88,7 @@ export function Inspector() {
     return eff;
   })();
 
-  const animEnabled: boolean = !!(selectedBase as any)?.animations?.enabled;
+  const animEnabled: boolean = !!(selectedBase as any)?.animations?.enabled && (selectedBase as any)?.type !== 'video';
   
   const {
     disablePosX,
@@ -111,7 +111,7 @@ export function Inspector() {
     };
   }, [selectedBase]);
 
-  type TabId = 'geometry' | 'compositing' | 'content' | 'text' | 'image' | 'animations';
+  type TabId = 'geometry' | 'compositing' | 'content' | 'text' | 'image' | 'video' | 'animations';
   const [activeTab, setActiveTab] = useState<TabId>('geometry');
 
   const tabs = useMemo(() => {
@@ -126,16 +126,21 @@ export function Inspector() {
     if (selected?.type === 'image') {
       baseTabs.push({ id: 'image' as TabId, icon: ImageIcon, label: 'Image' });
     }
+    if (selected?.type === 'video') {
+      baseTabs.push({ id: 'video' as TabId, icon: Video, label: 'Video' });
+    }
     baseTabs.push({ id: 'animations' as TabId, icon: Play, label: 'Animations' });
     return baseTabs;
   }, [selected?.type]);
 
   useEffect(() => {
-    if (selected?.type === 'text' && activeTab === 'image') {
+    if (selected?.type === 'text' && (activeTab === 'image' || activeTab === 'video')) {
       setActiveTab('text');
-    } else if (selected?.type === 'image' && activeTab === 'text') {
+    } else if (selected?.type === 'image' && (activeTab === 'text' || activeTab === 'video')) {
       setActiveTab('image');
-    } else if (selected?.type !== 'text' && selected?.type !== 'image' && (activeTab === 'text' || activeTab === 'image')) {
+    } else if (selected?.type === 'video' && (activeTab === 'text' || activeTab === 'image')) {
+      setActiveTab('video');
+    } else if (selected?.type !== 'text' && selected?.type !== 'image' && selected?.type !== 'video' && (activeTab === 'text' || activeTab === 'image' || activeTab === 'video')) {
       setActiveTab('geometry');
     }
   }, [selected?.type, activeTab]);
@@ -706,17 +711,49 @@ export function Inspector() {
               </div>
           )}
 
+          {activeTab === 'video' && selected.type === "video" && (
+            <div className="grid grid-cols-2 gap-x-1.5 gap-y-3">
+              <div className="space-y-1 col-span-2">
+                <Label>Video Properties</Label>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div>Frames: {(selected as any).frameCount || 0}</div>
+                  <div>FPS: {(selected as any).fps || 30}</div>
+                  <div>Duration: {((selected as any).duration || 0).toFixed(2)}s</div>
+                </div>
+              </div>
+              <div className="space-y-1 col-span-2">
+                <div className="flex items-center justify-between">
+                  <Label>Auto Reverses</Label>
+                  <Switch
+                    checked={!!(selected as any).autoReverses}
+                    onCheckedChange={(checked) => updateLayer(selected.id, { autoReverses: checked } as any)}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  When enabled, the video will play forward then backward in a loop.
+                </p>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'animations' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <Label>Enable animation</Label>
+                {(selectedBase as any)?.type === 'video' && (
+                  <span className="text-xs text-muted-foreground mr-auto ml-2">
+                    Note: Animations are not supported for video layers.
+                  </span>
+                )}
                 {current?.activeState && current.activeState !== 'Base State' ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div>
                         <Switch
-                          checked={!!(selectedBase as any)?.animations?.enabled}
+                          checked={(selectedBase as any)?.type === 'video' ? false : !!(selectedBase as any)?.animations?.enabled}
+                          disabled={(selectedBase as any)?.type === 'video'}
                           onCheckedChange={(checked) => {
+                            if ((selectedBase as any)?.type === 'video') return;
                             const enabled = !!checked;
                             const currentAnim = (selectedBase as any)?.animations || {};
                             const kp = (currentAnim.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
@@ -745,8 +782,10 @@ export function Inspector() {
                   </Tooltip>
                 ) : (
                   <Switch
-                    checked={!!(selectedBase as any)?.animations?.enabled}
+                    checked={(selectedBase as any)?.type === 'video' ? false : !!(selectedBase as any)?.animations?.enabled}
+                    disabled={(selectedBase as any)?.type === 'video'}
                     onCheckedChange={(checked) => {
+                      if ((selectedBase as any)?.type === 'video') return;
                       const enabled = !!checked;
                       const currentAnim = (selectedBase as any)?.animations || {};
                       const kp = (currentAnim.keyPath ?? 'position') as 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
