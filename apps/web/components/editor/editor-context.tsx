@@ -311,6 +311,23 @@ export function EditorProvider({
       for (const key of caKeys) {
         const caFolder = key === 'floating' ? 'Floating.ca' : 'Background.ca';
         const caDoc = snapshot.docs[key];
+        const toCamlLayers = (layers: AnyLayer[], assetsMap: CADoc["assets"] | undefined): AnyLayer[] => {
+          const mapOne = (l: AnyLayer): AnyLayer => {
+            if (l.type === 'image') {
+              const asset = assetsMap ? assetsMap[l.id] : undefined;
+              if (asset && asset.filename) {
+                return { ...l, src: `assets/${asset.filename}` } as AnyLayer;
+              }
+              return l;
+            }
+            if (l.type === 'group') {
+              const g = l as GroupLayer;
+              return { ...g, children: g.children.map(mapOne) } as AnyLayer;
+            }
+            return l;
+          };
+          return layers.map(mapOne);
+        };
         
         const root: GroupLayer = {
           id: snapshot.meta.id,
@@ -320,7 +337,7 @@ export function EditorProvider({
           size: { w: snapshot.meta.width || 0, h: snapshot.meta.height || 0 },
           backgroundColor: snapshot.meta.background,
           geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
-          children: (caDoc.layers as AnyLayer[]) || [],
+          children: toCamlLayers((caDoc.layers as AnyLayer[]) || [], caDoc.assets),
         } as GroupLayer;
 
         const caml = serializeCAML(
@@ -615,7 +632,10 @@ export function EditorProvider({
     }
     
     const layerId = genId();
-    const framePrefix = `${layerId}_frame_`;
+    const rawName = file.name && typeof file.name === 'string' ? file.name : 'Video Layer';
+    const nameSansExt = rawName.replace(/\.[a-z0-9]+$/i, '');
+    const safeName = sanitizeFilename(nameSansExt) || 'Video_Layer';
+    const framePrefix = `${safeName}_`;
     const frameExtension = '.jpg';
     const frameAssets: Array<{ dataURL: string; filename: string }> = [];
     
