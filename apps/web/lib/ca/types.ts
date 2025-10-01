@@ -122,6 +122,17 @@ export type CAStateTransition = {
 
 export type CAStateTransitions = CAStateTransition[];
 
+export type GyroParallaxDictionary = {
+  axis: 'x' | 'y';
+  image: string; // always null
+  keyPath: 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
+  layerName: string;
+  mapMaxTo: number;
+  mapMinTo: number;
+  title: string;
+  view: string;
+};
+
 export type CAProjectBundle = {
   project: CAProject;
   root: AnyLayer;
@@ -129,4 +140,5 @@ export type CAProjectBundle = {
   states?: string[];
   stateOverrides?: CAStateOverrides;
   stateTransitions?: CAStateTransitions;
+  wallpaperParallaxGroups?: GyroParallaxDictionary[];
 };

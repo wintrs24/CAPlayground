@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer, VideoLayer } from "@/lib/ca/types";
+import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer, VideoLayer, GyroParallaxDictionary } from "@/lib/ca/types";
 import { serializeCAML } from "@/lib/ca/caml";
 import { getProject, listFiles, putBlobFile, putBlobFilesBatch, putTextFile } from "@/lib/idb";
 import {
@@ -23,6 +23,7 @@ type CADoc = {
   states: string[];
   stateOverrides?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>;
   activeState?: 'Base State' | 'Locked' | 'Unlock' | 'Sleep';
+  wallpaperParallaxGroups?: GyroParallaxDictionary[];
 };
 
 export type ProjectDocument = {
@@ -166,15 +167,19 @@ export function EditorProvider({
           let assets: Record<string, { filename: string; dataURL: string }> = {};
           let states: string[] = [...fixedStates];
           let stateOverrides: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
+          let wallpaperParallaxGroups: GyroParallaxDictionary[] = [];
           if (main && main.type === 'text' && typeof main.data === 'string') {
             try {
-              const { parseCAML, parseStates, parseStateOverrides } = await import("@/lib/ca/caml");
+              const { parseCAML, parseStates, parseStateOverrides, parseWallpaperParallaxGroups } = await import("@/lib/ca/caml");
               const root = parseCAML(main.data);
               if (root) {
                 const rootLayer = root as any;
                 layers = rootLayer?.type === 'group' && Array.isArray(rootLayer.children) ? rootLayer.children : [rootLayer];
                 states = parseStates(main.data);
                 stateOverrides = parseStateOverrides(main.data) as any;
+                if (caType === 'wallpaper') {
+                  wallpaperParallaxGroups = parseWallpaperParallaxGroups(main.data);
+                }
               }
             } catch {}
           }
@@ -229,6 +234,7 @@ export function EditorProvider({
             states: states.length ? states : [...fixedStates],
             activeState: 'Base State',
             stateOverrides,
+            wallpaperParallaxGroups,
           };
         };
 
@@ -366,7 +372,7 @@ export function EditorProvider({
         
         const root: GroupLayer = {
           id: snapshot.meta.id,
-          name: snapshot.meta.name,
+          name: 'Root Layer',
           type: 'group',
           position: { x: Math.round((snapshot.meta.width || 0) / 2), y: Math.round((snapshot.meta.height || 0) / 2) },
           size: { w: snapshot.meta.width || 0, h: snapshot.meta.height || 0 },
@@ -387,6 +393,8 @@ export function EditorProvider({
           } as any,
           (caDoc as any).states,
           (caDoc as any).stateOverrides,
+          undefined,
+          caDoc.wallpaperParallaxGroups,
         );
         await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, caml);
         const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;

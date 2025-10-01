@@ -1080,116 +1080,221 @@ export function Inspector() {
             </div>
           )}
 
-          {activeTab === 'gyro' && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-semibold">Gyro Dictionaries</Label>
-                  <Button size="sm" variant="outline">
-                    + Add Dictionary
-                  </Button>
+          {activeTab === 'gyro' && (() => {
+            const gyroDicts = current?.wallpaperParallaxGroups || [];
+            const layerDicts = gyroDicts.filter(d => d.layerName === selected?.name);
+            
+            const addDictionary = () => {
+              if (layerDicts.length >= 10) {
+                return;
+              }
+              const newDict = {
+                axis: 'x' as 'x' | 'y',
+                image: 'null',
+                keyPath: 'position.x' as any,
+                layerName: selected?.name || '',
+                mapMaxTo: 50,
+                mapMinTo: -50,
+                title: 'New Gyro Effect',
+                view: 'Floating',
+              };
+              setDoc((prev) => {
+                if (!prev) return prev;
+                const key = prev.activeCA;
+                const currentDicts = prev.docs[key].wallpaperParallaxGroups || [];
+                return {
+                  ...prev,
+                  docs: {
+                    ...prev.docs,
+                    [key]: {
+                      ...prev.docs[key],
+                      wallpaperParallaxGroups: [...currentDicts, newDict],
+                    },
+                  },
+                };
+              });
+            };
+            
+            const updateDictionary = (index: number, updates: Partial<typeof layerDicts[0]>) => {
+              setDoc((prev) => {
+                if (!prev) return prev;
+                const key = prev.activeCA;
+                const allDicts = prev.docs[key].wallpaperParallaxGroups || [];
+                const globalIndex = allDicts.findIndex((d, i) => d.layerName === selected?.name && layerDicts.findIndex(ld => ld === d) === index);
+                if (globalIndex === -1) return prev;
+                const updated = [...allDicts];
+                updated[globalIndex] = { ...updated[globalIndex], ...updates };
+                return {
+                  ...prev,
+                  docs: {
+                    ...prev.docs,
+                    [key]: {
+                      ...prev.docs[key],
+                      wallpaperParallaxGroups: updated,
+                    },
+                  },
+                };
+              });
+            };
+            
+            const removeDictionary = (index: number) => {
+              setDoc((prev) => {
+                if (!prev) return prev;
+                const key = prev.activeCA;
+                const allDicts = prev.docs[key].wallpaperParallaxGroups || [];
+                const globalIndex = allDicts.findIndex((d, i) => d.layerName === selected?.name && layerDicts.findIndex(ld => ld === d) === index);
+                if (globalIndex === -1) return prev;
+                const updated = allDicts.filter((_, i) => i !== globalIndex);
+                return {
+                  ...prev,
+                  docs: {
+                    ...prev.docs,
+                    [key]: {
+                      ...prev.docs[key],
+                      wallpaperParallaxGroups: updated,
+                    },
+                  },
+                };
+              });
+            };
+            
+            return (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-semibold">Gyro Dictionaries</Label>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={addDictionary}
+                      disabled={layerDicts.length >= 10}
+                    >
+                      + Add Dictionary
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Configure how this layer responds to device tilt. You can add up to 10 dictionaries (2 axes × 5 keyPaths) for this layer. ({layerDicts.length}/10)
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Configure how this layer responds to device tilt. You can add up to 10 dictionaries (2 axes × 5 keyPaths) for this layer.
-                </p>
+
+                {layerDicts.length === 0 ? (
+                  <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
+                    No gyro dictionaries yet. Click "+ Add Dictionary" to create one.
+                  </div>
+                ) : (
+                  layerDicts.map((dict, index) => (
+                    <Card key={index} className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm font-medium">{dict.title || `Dictionary ${index + 1}`}</Label>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-7 text-destructive"
+                          onClick={() => removeDictionary(index)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`gyro-title-${index}`}>Title</Label>
+                          <Input 
+                            id={`gyro-title-${index}`}
+                            type="text" 
+                            placeholder="e.g., Tilt Effect"
+                            value={dict.title}
+                            onChange={(e) => updateDictionary(index, { title: e.target.value })}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`gyro-axis-${index}`}>Axis</Label>
+                          <Select 
+                            value={dict.axis}
+                            onValueChange={(v) => updateDictionary(index, { axis: v as 'x' | 'y' })}
+                          >
+                            <SelectTrigger id={`gyro-axis-${index}`}>
+                              <SelectValue placeholder="Select axis" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="x">X (Left/Right)</SelectItem>
+                              <SelectItem value="y">Y (Up/Down)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`gyro-keypath-${index}`}>Key Path</Label>
+                          <Select 
+                            value={dict.keyPath}
+                            onValueChange={(v) => updateDictionary(index, { keyPath: v as any })}
+                          >
+                            <SelectTrigger id={`gyro-keypath-${index}`}>
+                              <SelectValue placeholder="Select property" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="position.x">position.x</SelectItem>
+                              <SelectItem value="position.y">position.y</SelectItem>
+                              <SelectItem value="transform.rotation.x">transform.rotation.x</SelectItem>
+                              <SelectItem value="transform.rotation.y">transform.rotation.y</SelectItem>
+                              <SelectItem value="transform.rotation.z">transform.rotation.z</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`gyro-min-${index}`}>Map Min To</Label>
+                            <Input 
+                              id={`gyro-min-${index}`}
+                              type="number" 
+                              step="0.01" 
+                              placeholder="e.g., -50"
+                              value={dict.mapMinTo}
+                              onChange={(e) => updateDictionary(index, { mapMinTo: Number(e.target.value) })}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Min value (radians for rotation, px for position)
+                            </p>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`gyro-max-${index}`}>Map Max To</Label>
+                            <Input 
+                              id={`gyro-max-${index}`}
+                              type="number" 
+                              step="0.01" 
+                              placeholder="e.g., 50"
+                              value={dict.mapMaxTo}
+                              onChange={(e) => updateDictionary(index, { mapMaxTo: Number(e.target.value) })}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Max value (radians for rotation, px for position)
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor={`gyro-view-${index}`}>View</Label>
+                          <Input 
+                            id={`gyro-view-${index}`}
+                            type="text" 
+                            value="Floating" 
+                            disabled
+                            className="bg-muted"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            View type is locked to Floating for gyro wallpapers
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))
+                )}
               </div>
-
-              <div className="border rounded-lg p-4 text-center text-sm text-muted-foreground">
-                No gyro dictionaries yet. Click "+ Add Dictionary" to create one.
-              </div>
-
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Tilt Effect</Label>
-                  <Button size="sm" variant="ghost" className="h-7 text-destructive">
-                    Remove
-                  </Button>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="gyro-title">Title</Label>
-                    <Input 
-                      id="gyro-title" 
-                      type="text" 
-                      placeholder="e.g., Tilt Effect"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="gyro-axis">Axis</Label>
-                    <Select defaultValue="x">
-                      <SelectTrigger id="gyro-axis">
-                        <SelectValue placeholder="Select axis" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="x">X (Left/Right)</SelectItem>
-                        <SelectItem value="y">Y (Up/Down)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="gyro-keypath">Key Path</Label>
-                    <Select defaultValue="position.x">
-                      <SelectTrigger id="gyro-keypath">
-                        <SelectValue placeholder="Select property" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="position.x">position.x</SelectItem>
-                        <SelectItem value="position.y">position.y</SelectItem>
-                        <SelectItem value="transform.rotation.x">transform.rotation.x</SelectItem>
-                        <SelectItem value="transform.rotation.y">transform.rotation.y</SelectItem>
-                        <SelectItem value="transform.rotation.z">transform.rotation.z</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="gyro-min">Map Min To</Label>
-                      <Input 
-                        id="gyro-min" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="e.g., -50"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Min value (radians for rotation, px for position)
-                      </p>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <Label htmlFor="gyro-max">Map Max To</Label>
-                      <Input 
-                        id="gyro-max" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="e.g., 50"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Max value (radians for rotation, px for position)
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="gyro-view">View</Label>
-                    <Input 
-                      id="gyro-view" 
-                      type="text" 
-                      value="Floating" 
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      View type is locked to Floating for gyro wallpapers
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
+            );
+          })()}
         </div>
         
         {sidebarPosition === 'right' && (
