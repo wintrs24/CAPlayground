@@ -54,6 +54,7 @@ export default function ProjectsPage() {
   const [rootHeight, setRootHeight] = useState<number>(844);
   const [useDeviceSelector, setUseDeviceSelector] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string>('iPhone 14');
+  const [gyroEnabled, setGyroEnabled] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const router = useRouter();
@@ -439,7 +440,7 @@ export default function ProjectsPage() {
     const id = Date.now().toString();
     const uniqueName = await ensureUniqueProjectName(name);
     const createdAt = new Date().toISOString();
-    await createProject({ id, name: uniqueName, createdAt, width: Math.round(w), height: Math.round(h) });
+    await createProject({ id, name: uniqueName, createdAt, width: Math.round(w), height: Math.round(h), gyroEnabled });
     const idbList = await listProjects();
     setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
     recordProjectCreated();
@@ -448,6 +449,7 @@ export default function ProjectsPage() {
     setRootHeight(844);
     setUseDeviceSelector(false);
     setSelectedDevice('iPhone 14');
+    setGyroEnabled(false);
     setIsCreateOpen(false);
   };
 
@@ -688,6 +690,17 @@ export default function ProjectsPage() {
                 />
                 <Label htmlFor="device-selector" className="text-sm font-medium cursor-pointer">
                   Set bounds by device
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="gyro-enabled" 
+                  checked={gyroEnabled} 
+                  onCheckedChange={(checked) => setGyroEnabled(!!checked)}
+                />
+                <Label htmlFor="gyro-enabled" className="text-sm font-medium cursor-pointer">
+                  Enable Gyro (Parallax Effect)
                 </Label>
               </div>
               

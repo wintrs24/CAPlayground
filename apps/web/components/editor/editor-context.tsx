@@ -26,19 +26,20 @@ type CADoc = {
 };
 
 export type ProjectDocument = {
-  meta: Pick<CAProject, "id" | "name" | "width" | "height" | "background" | "geometryFlipped">;
-  activeCA: 'background' | 'floating';
+  meta: Pick<CAProject, "id" | "name" | "width" | "height" | "background" | "geometryFlipped"> & { gyroEnabled?: boolean };
+  activeCA: 'background' | 'floating' | 'wallpaper';
   docs: {
     background: CADoc;
     floating: CADoc;
+    wallpaper: CADoc;
   };
 };
 
 export type EditorContextValue = {
   doc: ProjectDocument | null;
   setDoc: React.Dispatch<React.SetStateAction<ProjectDocument | null>>;
-  activeCA: 'background' | 'floating';
-  setActiveCA: (v: 'background' | 'floating') => void;
+  activeCA: 'background' | 'floating' | 'wallpaper';
+  setActiveCA: (v: 'background' | 'floating' | 'wallpaper') => void;
   savingStatus: 'idle' | 'saving' | 'saved';
   lastSavedAt?: number;
   flushPersist: () => Promise<void>;
@@ -111,6 +112,7 @@ export function EditorProvider({
     (async () => {
       try {
         const proj = await getProject(projectId);
+        const isGyro = proj?.gyroEnabled ?? false;
         const meta = {
           id: initialMeta.id,
           name: proj?.name ?? initialMeta.name,
@@ -118,29 +120,48 @@ export function EditorProvider({
           height: proj?.height ?? initialMeta.height,
           background: initialMeta.background ?? "#e5e7eb",
           geometryFlipped: 0 as 0 | 1,
+          gyroEnabled: isGyro,
         };
 
         let folder = `${(proj?.name || initialMeta.name)}.ca`;
-        let [floatingFiles, backgroundFiles] = await Promise.all([
-          listFiles(projectId, `${folder}/Floating.ca/`),
-          listFiles(projectId, `${folder}/Background.ca/`),
-        ]);
-        if ((floatingFiles.length + backgroundFiles.length) === 0) {
-          const all = await listFiles(projectId);
-          const anyMain = all.find(f => /\.ca\/(Floating|Background)\.ca\/main\.caml$/.test(f.path));
-          if (anyMain) {
-            const parts = anyMain.path.split('/');
-            folder = parts[0];
-            [floatingFiles, backgroundFiles] = [
-              all.filter(f => f.path.startsWith(`${folder}/Floating.ca/`)),
-              all.filter(f => f.path.startsWith(`${folder}/Background.ca/`)),
-            ];
+        let floatingFiles: Awaited<ReturnType<typeof listFiles>> = [];
+        let backgroundFiles: Awaited<ReturnType<typeof listFiles>> = [];
+        let wallpaperFiles: Awaited<ReturnType<typeof listFiles>> = [];
+        
+        if (isGyro) {
+          wallpaperFiles = await listFiles(projectId, `${folder}/Wallpaper.ca/`);
+          if (wallpaperFiles.length === 0) {
+            const all = await listFiles(projectId);
+            const anyMain = all.find(f => /\.ca\/Wallpaper\.ca\/main\.caml$/.test(f.path));
+            if (anyMain) {
+              const parts = anyMain.path.split('/');
+              folder = parts[0];
+              wallpaperFiles = all.filter(f => f.path.startsWith(`${folder}/Wallpaper.ca/`));
+            }
+          }
+        } else {
+          [floatingFiles, backgroundFiles] = await Promise.all([
+            listFiles(projectId, `${folder}/Floating.ca/`),
+            listFiles(projectId, `${folder}/Background.ca/`),
+          ]);
+          if ((floatingFiles.length + backgroundFiles.length) === 0) {
+            const all = await listFiles(projectId);
+            const anyMain = all.find(f => /\.ca\/(Floating|Background)\.ca\/main\.caml$/.test(f.path));
+            if (anyMain) {
+              const parts = anyMain.path.split('/');
+              folder = parts[0];
+              [floatingFiles, backgroundFiles] = [
+                all.filter(f => f.path.startsWith(`${folder}/Floating.ca/`)),
+                all.filter(f => f.path.startsWith(`${folder}/Background.ca/`)),
+              ];
+            }
           }
         }
 
-        const readDocFromFiles = async (files: Awaited<ReturnType<typeof listFiles>>): Promise<CADoc> => {
+        const readDocFromFiles = async (files: Awaited<ReturnType<typeof listFiles>>, caType: 'floating' | 'background' | 'wallpaper'): Promise<CADoc> => {
           const byPath = new Map(files.map((f) => [f.path, f]));
-          const main = byPath.get(`${folder}/Floating.ca/main.caml`) || byPath.get(`${folder}/Background.ca/main.caml`);
+          const caFolder = caType === 'floating' ? 'Floating.ca' : caType === 'wallpaper' ? 'Wallpaper.ca' : 'Background.ca';
+          const main = byPath.get(`${folder}/${caFolder}/main.caml`);
           let layers: AnyLayer[] = [];
           let assets: Record<string, { filename: string; dataURL: string }> = {};
           let states: string[] = [...fixedStates];
@@ -211,18 +232,29 @@ export function EditorProvider({
           };
         };
 
-        const floatingDoc = await readDocFromFiles(floatingFiles);
-        const backgroundDoc = await readDocFromFiles(backgroundFiles);
+        const emptyDoc: CADoc = { layers: [], selectedId: null, assets: {}, states: [...fixedStates], activeState: 'Base State', stateOverrides: {} };
+        
+        let floatingDoc: CADoc, backgroundDoc: CADoc, wallpaperDoc: CADoc;
+        if (isGyro) {
+          wallpaperDoc = await readDocFromFiles(wallpaperFiles, 'wallpaper');
+          floatingDoc = emptyDoc;
+          backgroundDoc = emptyDoc;
+        } else {
+          floatingDoc = await readDocFromFiles(floatingFiles, 'floating');
+          backgroundDoc = await readDocFromFiles(backgroundFiles, 'background');
+          wallpaperDoc = emptyDoc;
+        }
 
         const initial: ProjectDocument = {
           meta,
-          activeCA: 'floating',
-          docs: { background: backgroundDoc, floating: floatingDoc },
+          activeCA: isGyro ? 'wallpaper' : 'floating',
+          docs: { background: backgroundDoc, floating: floatingDoc, wallpaper: wallpaperDoc },
         };
         skipPersistRef.current = true;
         setDoc(initial);
       } catch {
         skipPersistRef.current = true;
+        const emptyDoc: CADoc = { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {} };
         setDoc({
           meta: {
             id: initialMeta.id,
@@ -231,11 +263,13 @@ export function EditorProvider({
             height: initialMeta.height,
             background: initialMeta.background ?? "#e5e7eb",
             geometryFlipped: 0,
+            gyroEnabled: false,
           },
           activeCA: 'floating',
           docs: {
-            background: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {} },
-            floating: { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {} },
+            background: emptyDoc,
+            floating: emptyDoc,
+            wallpaper: emptyDoc,
           },
         });
       }
@@ -307,9 +341,10 @@ export function EditorProvider({
   const writeToIndexedDB = useCallback(async (snapshot: ProjectDocument) => {
     try {
       const folder = `${snapshot.meta.name}.ca`;
-      const caKeys: Array<'background' | 'floating'> = ['background', 'floating'];
+      const isGyro = snapshot.meta.gyroEnabled ?? false;
+      const caKeys: Array<'background' | 'floating' | 'wallpaper'> = isGyro ? ['wallpaper'] : ['background', 'floating'];
       for (const key of caKeys) {
-        const caFolder = key === 'floating' ? 'Floating.ca' : 'Background.ca';
+        const caFolder = key === 'floating' ? 'Floating.ca' : key === 'wallpaper' ? 'Wallpaper.ca' : 'Background.ca';
         const caDoc = snapshot.docs[key];
         const toCamlLayers = (layers: AnyLayer[], assetsMap: CADoc["assets"] | undefined): AnyLayer[] => {
           const mapOne = (l: AnyLayer): AnyLayer => {

@@ -4,6 +4,7 @@ export type IDBProject = {
   createdAt: string;
   width: number;
   height: number;
+  gyroEnabled?: boolean;
 };
 
 export type IDBFileRecord = {
