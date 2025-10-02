@@ -1,4 +1,4 @@
-import { AnyLayer, CAProject, GroupLayer, TextLayer, VideoLayer, CAStateOverrides, CAStateTransitions } from './types';
+import { AnyLayer, CAProject, GroupLayer, TextLayer, VideoLayer, CAStateOverrides, CAStateTransitions, GyroParallaxDictionary } from './types';
 
 const CAML_NS = 'http://www.apple.com/CoreAnimation/1.0';
 
@@ -49,6 +49,49 @@ export function parseStateTransitions(xml: string): CAStateTransitions {
   } catch {
   }
   return out;
+}
+
+export function parseWallpaperParallaxGroups(xml: string): GyroParallaxDictionary[] {
+  const result: GyroParallaxDictionary[] = [];
+  try {
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const caml = doc.getElementsByTagNameNS(CAML_NS, 'caml')[0] || doc.documentElement;
+    if (!caml) return result;
+    
+    const rootLayer = caml.getElementsByTagNameNS(CAML_NS, 'CALayer')[0];
+    if (!rootLayer) return result;
+    
+    const style = rootLayer.getElementsByTagNameNS(CAML_NS, 'style')[0];
+    if (!style) return result;
+    
+    const wallpaperParallaxGroups = style.getElementsByTagNameNS(CAML_NS, 'wallpaperParallaxGroups')[0];
+    if (!wallpaperParallaxGroups) return result;
+    
+    const dicts = Array.from(wallpaperParallaxGroups.getElementsByTagNameNS(CAML_NS, 'NSDictionary'));
+    for (const dict of dicts) {
+      const axis = dict.getElementsByTagNameNS(CAML_NS, 'axis')[0]?.getAttribute('value') || 'x';
+      const image = dict.getElementsByTagNameNS(CAML_NS, 'image')[0]?.getAttribute('value') || 'null';
+      const keyPath = dict.getElementsByTagNameNS(CAML_NS, 'keyPath')[0]?.getAttribute('value') || 'position.x';
+      const layerName = dict.getElementsByTagNameNS(CAML_NS, 'layerName')[0]?.getAttribute('value') || '';
+      const mapMaxTo = Number(dict.getElementsByTagNameNS(CAML_NS, 'mapMaxTo')[0]?.getAttribute('value') || '0');
+      const mapMinTo = Number(dict.getElementsByTagNameNS(CAML_NS, 'mapMinTo')[0]?.getAttribute('value') || '0');
+      const title = dict.getElementsByTagNameNS(CAML_NS, 'title')[0]?.getAttribute('value') || '';
+      const view = dict.getElementsByTagNameNS(CAML_NS, 'view')[0]?.getAttribute('value') || 'Floating';
+      
+      result.push({
+        axis: axis as 'x' | 'y',
+        image,
+        keyPath: keyPath as any,
+        layerName,
+        mapMaxTo,
+        mapMinTo,
+        title,
+        view,
+      });
+    }
+  } catch {
+  }
+  return result;
 }
 
 export function parseStateOverrides(xml: string): CAStateOverrides {
@@ -530,11 +573,12 @@ export function serializeCAML(
   project?: CAProject,
   stateNamesInput?: string[],
   stateOverridesInput?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>,
-  stateTransitionsInput?: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }>; }>
+  stateTransitionsInput?: Array<{ fromState: string; toState: string; elements: Array<{ targetId: string; keyPath: string; animation?: any }>; }>,
+  wallpaperParallaxGroupsInput?: GyroParallaxDictionary[]
 ): string {
   const doc = document.implementation.createDocument(CAML_NS, 'caml', null);
   const caml = doc.documentElement;
-  const rootEl = serializeLayer(doc, root, project);
+  const rootEl = serializeLayer(doc, root, project, wallpaperParallaxGroupsInput);
   
   const scriptComponents = doc.createElementNS(CAML_NS, 'scriptComponents');
   const statesEl = doc.createElementNS(CAML_NS, 'states');
@@ -664,13 +708,41 @@ export function serializeCAML(
   });
 
   // Append all elements
-  rootEl.appendChild(scriptComponents);
+  const modules = doc.createElementNS(CAML_NS, 'modules');
+  rootEl.appendChild(modules);
   rootEl.appendChild(statesEl);
   rootEl.appendChild(stateTransitions);
   caml.appendChild(rootEl);
 
   const xml = new XMLSerializer().serializeToString(doc);
-  return '<?xml version="1.0" encoding="UTF-8"?>' + xml; //added this or else mica couldnt open the caml
+  const formatted = formatXML(xml);
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + formatted;
+}
+
+function formatXML(xml: string): string {
+  const PADDING = '  ';
+  const reg = /(>)(<)(\/*)/g;
+  let pad = 0;
+  
+  xml = xml.replace(reg, '$1\n$2$3');
+  
+  return xml.split('\n').map((node) => {
+    let indent = 0;
+    if (node.match(/.+<\/\w[^>]*>$/)) {
+      indent = 0;
+    } else if (node.match(/^<\/\w/) && pad > 0) {
+      pad -= 1;
+    } else if (node.match(/^<\w[^>]*[^\/]>.*$/)) {
+      indent = 1;
+    } else {
+      indent = 0;
+    }
+    
+    const padding = PADDING.repeat(pad);
+    pad += indent;
+    
+    return padding + node;
+  }).join('\n');
 }
 
 function setAttr(el: Element, name: string, value: string | number | undefined) {
@@ -678,7 +750,7 @@ function setAttr(el: Element, name: string, value: string | number | undefined) 
   el.setAttribute(name, String(value));
 }
 
-function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject): Element {
+function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, wallpaperParallaxGroupsInput?: GyroParallaxDictionary[]): Element {
   const isText = layer.type === 'text';
   const el = doc.createElementNS(CAML_NS, isText ? 'CATextLayer' : 'CALayer');
   setAttr(el, 'id', layer.id);
@@ -810,6 +882,75 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject):
     str.setAttribute('type', 'string');
     str.setAttribute('value', (layer as TextLayer).text || '');
     el.appendChild(str);
+  }
+
+  if (wallpaperParallaxGroupsInput && wallpaperParallaxGroupsInput.length > 0) {
+    const style = doc.createElementNS(CAML_NS, 'style');
+    
+    const wallpaperBackgroundAssetNames = doc.createElementNS(CAML_NS, 'wallpaperBackgroundAssetNames');
+    wallpaperBackgroundAssetNames.setAttribute('type', 'NSArray');
+    style.appendChild(wallpaperBackgroundAssetNames);
+    
+    const wallpaperFloatingAssetNames = doc.createElementNS(CAML_NS, 'wallpaperFloatingAssetNames');
+    wallpaperFloatingAssetNames.setAttribute('type', 'NSArray');
+    style.appendChild(wallpaperFloatingAssetNames);
+    
+    const wallpaperParallaxGroups = doc.createElementNS(CAML_NS, 'wallpaperParallaxGroups');
+    wallpaperParallaxGroups.setAttribute('type', 'NSArray');
+    
+    for (const dict of wallpaperParallaxGroupsInput) {
+      const nsDict = doc.createElementNS(CAML_NS, 'NSDictionary');
+      
+      const axis = doc.createElementNS(CAML_NS, 'axis');
+      axis.setAttribute('type', 'string');
+      axis.setAttribute('value', dict.axis);
+      nsDict.appendChild(axis);
+      
+      const image = doc.createElementNS(CAML_NS, 'image');
+      image.setAttribute('type', 'string');
+      image.setAttribute('value', dict.image);
+      nsDict.appendChild(image);
+      
+      const keyPath = doc.createElementNS(CAML_NS, 'keyPath');
+      keyPath.setAttribute('type', 'string');
+      keyPath.setAttribute('value', dict.keyPath);
+      nsDict.appendChild(keyPath);
+      
+      const layerName = doc.createElementNS(CAML_NS, 'layerName');
+      layerName.setAttribute('type', 'string');
+      layerName.setAttribute('value', dict.layerName);
+      nsDict.appendChild(layerName);
+      
+      const mapMaxTo = doc.createElementNS(CAML_NS, 'mapMaxTo');
+      mapMaxTo.setAttribute('type', 'integer');
+      mapMaxTo.setAttribute('value', String(dict.mapMaxTo));
+      nsDict.appendChild(mapMaxTo);
+      
+      const mapMinTo = doc.createElementNS(CAML_NS, 'mapMinTo');
+      mapMinTo.setAttribute('type', 'integer');
+      mapMinTo.setAttribute('value', String(dict.mapMinTo));
+      nsDict.appendChild(mapMinTo);
+      
+      const title = doc.createElementNS(CAML_NS, 'title');
+      title.setAttribute('type', 'string');
+      title.setAttribute('value', dict.title);
+      nsDict.appendChild(title);
+      
+      const view = doc.createElementNS(CAML_NS, 'view');
+      view.setAttribute('type', 'string');
+      view.setAttribute('value', dict.view);
+      nsDict.appendChild(view);
+      
+      wallpaperParallaxGroups.appendChild(nsDict);
+    }
+    
+    style.appendChild(wallpaperParallaxGroups);
+    
+    const wallpaperPropertyGroups = doc.createElementNS(CAML_NS, 'wallpaperPropertyGroups');
+    wallpaperPropertyGroups.setAttribute('type', 'NSArray');
+    style.appendChild(wallpaperPropertyGroups);
+    
+    el.appendChild(style);
   }
 
   if (layer.type === 'group') {

@@ -108,25 +108,47 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       const folder = `${(proj?.name || doc.meta.name) || 'Project'}.ca`;
       const allFiles = await listFiles(doc.meta.id, `${folder}/`);
       const outputZip = new JSZip();
-      const backgroundPrefix = `${folder}/Background.ca/`;
-      const floatingPrefix = `${folder}/Floating.ca/`;
-      for (const f of allFiles) {
-        let rel: string | null = null;
-        if (f.path.startsWith(backgroundPrefix)) {
-          rel = `Background.ca/${f.path.substring(backgroundPrefix.length)}`;
-        } else if (f.path.startsWith(floatingPrefix)) {
-          rel = `Floating.ca/${f.path.substring(floatingPrefix.length)}`;
-        } else {
-          rel = null;
+      const isGyro = doc.meta.gyroEnabled ?? false;
+      
+      if (isGyro) {
+        const wallpaperPrefix = `${folder}/Wallpaper.ca/`;
+        for (const f of allFiles) {
+          let rel: string | null = null;
+          if (f.path.startsWith(wallpaperPrefix)) {
+            rel = `Wallpaper.ca/${f.path.substring(wallpaperPrefix.length)}`;
+          } else {
+            rel = null;
+          }
+          if (!rel) continue;
+          if (f.type === 'text') {
+            outputZip.file(rel, String(f.data));
+          } else {
+            const buf = f.data as ArrayBuffer;
+            outputZip.file(rel, buf);
+          }
         }
-        if (!rel) continue;
-        if (f.type === 'text') {
-          outputZip.file(rel, String(f.data));
-        } else {
-          const buf = f.data as ArrayBuffer;
-          outputZip.file(rel, buf);
+      } else {
+        const backgroundPrefix = `${folder}/Background.ca/`;
+        const floatingPrefix = `${folder}/Floating.ca/`;
+        for (const f of allFiles) {
+          let rel: string | null = null;
+          if (f.path.startsWith(backgroundPrefix)) {
+            rel = `Background.ca/${f.path.substring(backgroundPrefix.length)}`;
+          } else if (f.path.startsWith(floatingPrefix)) {
+            rel = `Floating.ca/${f.path.substring(floatingPrefix.length)}`;
+          } else {
+            rel = null;
+          }
+          if (!rel) continue;
+          if (f.type === 'text') {
+            outputZip.file(rel, String(f.data));
+          } else {
+            const buf = f.data as ArrayBuffer;
+            outputZip.file(rel, buf);
+          }
         }
       }
+      
       const finalZipBlob = await outputZip.generateAsync({ type: 'blob' });
 
       const url = URL.createObjectURL(finalZipBlob);
@@ -155,8 +177,10 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       if (!doc) return;
       const proj = await getProject(doc.meta.id);
       const nameSafe = ((proj?.name || doc.meta.name) || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
+      const isGyro = doc.meta.gyroEnabled ?? false;
 
-      const templateResponse = await fetch('/api/templates/tendies', {
+      const templateEndpoint = isGyro ? '/api/templates/gyro-tendies' : '/api/templates/tendies';
+      const templateResponse = await fetch(templateEndpoint, {
         method: 'GET',
         headers: {
           'Accept': 'application/zip',
@@ -187,25 +211,42 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
       }
       const folder = `${(proj?.name || doc.meta.name) || 'Project'}.ca`;
       const allFiles = await listFiles(doc.meta.id, `${folder}/`);
-      const backgroundPrefix = `${folder}/Background.ca/`;
-      const floatingPrefix = `${folder}/Floating.ca/`;
-      const caMap: Record<'background'|'floating', Array<{ path: string; data: Uint8Array | string }>> = { background: [], floating: [] };
-      for (const f of allFiles) {
-        if (f.path.startsWith(backgroundPrefix)) {
-          caMap.background.push({ path: f.path.substring(backgroundPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
-        } else if (f.path.startsWith(floatingPrefix)) {
-          caMap.floating.push({ path: f.path.substring(floatingPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
+      
+      if (isGyro) {
+        const wallpaperPrefix = `${folder}/Wallpaper.ca/`;
+        const caMap: Array<{ path: string; data: Uint8Array | string }> = [];
+        for (const f of allFiles) {
+          if (f.path.startsWith(wallpaperPrefix)) {
+            caMap.push({ path: f.path.substring(wallpaperPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
+          }
         }
-      }
-      const caKeys = ['background','floating'] as const;
-      for (const key of caKeys) {
-        const caFolderPath = key === 'floating'
-          ? `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Floating-390w-844h@3x~iphone.ca`
-          : `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Background-390w-844h@3x~iphone.ca`;
-        for (const file of caMap[key]) {
+        const caFolderPath = `descriptors/99990000-0000-0000-0000-000000000000/versions/0/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/wallpaper.ca`;
+        for (const file of caMap) {
           const fullPath = `${caFolderPath}/${file.path}`;
           if (typeof file.data === 'string') outputZip.file(fullPath, file.data);
           else outputZip.file(fullPath, file.data);
+        }
+      } else {
+        const backgroundPrefix = `${folder}/Background.ca/`;
+        const floatingPrefix = `${folder}/Floating.ca/`;
+        const caMap: Record<'background'|'floating', Array<{ path: string; data: Uint8Array | string }>> = { background: [], floating: [] };
+        for (const f of allFiles) {
+          if (f.path.startsWith(backgroundPrefix)) {
+            caMap.background.push({ path: f.path.substring(backgroundPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
+          } else if (f.path.startsWith(floatingPrefix)) {
+            caMap.floating.push({ path: f.path.substring(floatingPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
+          }
+        }
+        const caKeys = ['background','floating'] as const;
+        for (const key of caKeys) {
+          const caFolderPath = key === 'floating'
+            ? `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Floating-390w-844h@3x~iphone.ca`
+            : `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/7400.WWDC_2022_Background-390w-844h@3x~iphone.ca`;
+          for (const file of caMap[key]) {
+            const fullPath = `${caFolderPath}/${file.path}`;
+            if (typeof file.data === 'string') outputZip.file(fullPath, file.data);
+            else outputZip.file(fullPath, file.data);
+          }
         }
       }
 
@@ -311,60 +352,70 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         {/* switch between ca files */}
         <div className="hidden md:flex flex-1 items-center justify-center">
           <div className="border rounded-md p-0.5">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-8 px-2 gap-2"
-                  aria-label={`Active CA: ${activeCA === 'floating' ? 'Floating' : 'Background'}`}
-                  aria-expanded={false}
-                  role="button"
-                >
-                  <span className="text-sm">{activeCA === 'floating' ? 'Floating' : 'Background'}</span>
-                  <ArrowUpDown className="h-4 w-4 opacity-70" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-80 p-2">
-              <DropdownMenuLabel>
-                <div className="text-sm font-medium">Choose Active CA</div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <div className="grid gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => { setActiveCA('background'); }}
-                  className={`w-full justify-start text-left py-6 ${activeCA==='background' ? 'border-primary/50' : ''}`}
-                  role="menuitemradio"
-                  aria-checked={activeCA==='background'}
-                >
-                  <div className="flex items-center gap-3">
-                    <LayersIcon className="h-4 w-4" />
-                    <div className="flex-1 text-left">
-                      <div>Background</div>
-                      <div className="text-xs text-muted-foreground">Appears behind the clock.</div>
+            {doc?.meta.gyroEnabled ? (
+              <Button
+                variant="ghost"
+                className="h-8 px-2 gap-2 cursor-default"
+                disabled
+              >
+                <span className="text-sm">Wallpaper</span>
+              </Button>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-2 gap-2"
+                    aria-label={`Active CA: ${activeCA === 'floating' ? 'Floating' : 'Background'}`}
+                    aria-expanded={false}
+                    role="button"
+                  >
+                    <span className="text-sm">{activeCA === 'floating' ? 'Floating' : 'Background'}</span>
+                    <ArrowUpDown className="h-4 w-4 opacity-70" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-80 p-2">
+                <DropdownMenuLabel>
+                  <div className="text-sm font-medium">Choose Active CA</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <div className="grid gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => { setActiveCA('background'); }}
+                    className={`w-full justify-start text-left py-6 ${activeCA==='background' ? 'border-primary/50' : ''}`}
+                    role="menuitemradio"
+                    aria-checked={activeCA==='background'}
+                  >
+                    <div className="flex items-center gap-3">
+                      <LayersIcon className="h-4 w-4" />
+                      <div className="flex-1 text-left">
+                        <div>Background</div>
+                        <div className="text-xs text-muted-foreground">Appears behind the clock.</div>
+                      </div>
+                      {activeCA==='background' && <Check className="h-4 w-4" />}
                     </div>
-                    {activeCA==='background' && <Check className="h-4 w-4" />}
-                  </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => { setActiveCA('floating'); }}
-                  className={`w-full justify-start text-left py-6 ${activeCA==='floating' ? 'border-primary/50' : ''}`}
-                  role="menuitemradio"
-                  aria-checked={activeCA==='floating'}
-                >
-                  <div className="flex items-center gap-3">
-                    <LayersIcon className="h-4 w-4" />
-                    <div className="flex-1 text-left">
-                      <div>Floating</div>
-                      <div className="text-xs text-muted-foreground">Appears over the clock.</div>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setActiveCA('floating'); }}
+                    className={`w-full justify-start text-left py-6 ${activeCA==='floating' ? 'border-primary/50' : ''}`}
+                    role="menuitemradio"
+                    aria-checked={activeCA==='floating'}
+                  >
+                    <div className="flex items-center gap-3">
+                      <LayersIcon className="h-4 w-4" />
+                      <div className="flex-1 text-left">
+                        <div>Floating</div>
+                        <div className="text-xs text-muted-foreground">Appears over the clock.</div>
+                      </div>
+                      {activeCA==='floating' && <Check className="h-4 w-4" />}
                     </div>
-                    {activeCA==='floating' && <Check className="h-4 w-4" />}
-                  </div>
-                </Button>
-              </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  </Button>
+                </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1 border rounded-md p-0.5">
