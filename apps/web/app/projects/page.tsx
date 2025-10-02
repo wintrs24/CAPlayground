@@ -693,7 +693,8 @@ export default function ProjectsPage() {
                 </Label>
               </div>
               
-              <div className="flex items-center space-x-2">
+              {/* TODO: enable when gyro feature is ready */}
+              {/* <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="gyro-enabled" 
                   checked={gyroEnabled} 
@@ -702,7 +703,7 @@ export default function ProjectsPage() {
                 <Label htmlFor="gyro-enabled" className="text-sm font-medium cursor-pointer">
                   Enable Gyro (Parallax Effect)
                 </Label>
-              </div>
+              </div> */}
               
               {useDeviceSelector ? (
                 <div className="space-y-2">
