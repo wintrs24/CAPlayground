@@ -220,7 +220,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             caMap.push({ path: f.path.substring(wallpaperPrefix.length), data: f.type === 'text' ? String(f.data) : new Uint8Array(f.data as ArrayBuffer) });
           }
         }
-        const caFolderPath = `descriptors/09E9B685-7456-4856-9C10-47DF26B76C33/versions/1/contents/wallpaper.ca`;
+        const caFolderPath = `descriptors/99990000-0000-0000-0000-000000000000/versions/0/contents/7400.WWDC_2022-390w-844h@3x~iphone.wallpaper/wallpaper.ca`;
         for (const file of caMap) {
           const fullPath = `${caFolderPath}/${file.path}`;
           if (typeof file.data === 'string') outputZip.file(fullPath, file.data);
