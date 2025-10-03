@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star, MoreVertical } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
@@ -418,7 +418,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 border rounded-md p-0.5">
+        <div className="hidden md:flex items-center gap-1 border rounded-md p-0.5">
           <Button
             variant="ghost"
             size="icon"
@@ -460,8 +460,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         <div className="border rounded-md p-0.5">
           <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 px-2 gap-2" data-tour-id="settings-button">
-                <Gear className="h-4 w-4" /> Settings
+              <Button variant="ghost" size="icon" className="h-8 w-8 p-0" aria-label="Settings" data-tour-id="settings-button">
+                <Gear className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-100 p-2">
