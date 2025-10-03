@@ -1418,32 +1418,35 @@ export function CanvasPreview() {
       onMouseDown={(e) => {
         // Middle mouse button or Shift + drag to pan around
         if (!ref.current) return;
-        if (!e.shiftKey && e.button !== 1) return;
-        e.preventDefault();
-        const startClientX = e.clientX;
-        const startClientY = e.clientY;
-        panDragRef.current = {
-          startClientX,
-          startClientY,
-          startPanX: pan.x,
-          startPanY: pan.y,
-        };
-        setIsPanning(true);
-        const onMove = (ev: MouseEvent) => {
-          const d = panDragRef.current;
-          if (!d) return;
-          const dx = ev.clientX - d.startClientX;
-          const dy = ev.clientY - d.startClientY;
-          setPan({ x: d.startPanX + dx, y: d.startPanY + dy });
-        };
-        const onUp = () => {
-          panDragRef.current = null;
-          setIsPanning(false);
-          window.removeEventListener('mousemove', onMove);
-          window.removeEventListener('mouseup', onUp);
-        };
-        window.addEventListener('mousemove', onMove);
-        window.addEventListener('mouseup', onUp);
+        if (e.shiftKey || e.button === 1) {
+          e.preventDefault();
+          const startClientX = e.clientX;
+          const startClientY = e.clientY;
+          panDragRef.current = {
+            startClientX,
+            startClientY,
+            startPanX: pan.x,
+            startPanY: pan.y,
+          };
+          setIsPanning(true);
+          const onMove = (ev: MouseEvent) => {
+            const d = panDragRef.current;
+            if (!d) return;
+            const dx = ev.clientX - d.startClientX;
+            const dy = ev.clientY - d.startClientY;
+            setPan({ x: d.startPanX + dx, y: d.startPanY + dy });
+          };
+          const onUp = () => {
+            panDragRef.current = null;
+            setIsPanning(false);
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          };
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+          return;
+        }
+        selectLayer(null);
       }}
       onKeyDown={() => {  }}
     >
