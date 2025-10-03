@@ -59,7 +59,7 @@ export function LayersPanel() {
       <div
         key={l.id}
         className={`py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'} ${dragOverId === l.id ? 'ring-1 ring-accent/60' : ''}`}
-        onClick={() => selectLayer(l.id)}
+        onClick={(e) => { e.stopPropagation(); selectLayer(l.id); }}
         onDoubleClick={() => startRename(l)}
         style={{ paddingLeft: 8 + depth * 16 }}
         draggable
@@ -213,10 +213,11 @@ export function LayersPanel() {
               if (!src) return;
               moveLayer(src, null);
             }}
+            onClick={() => selectLayer(null)}
           >
             <div
               className={`py-2 pl-2 pr-2 font-medium select-none cursor-pointer flex items-center gap-1 ${selectedId === '__root__' ? 'bg-accent/30' : 'hover:bg-muted/50'}`}
-              onClick={() => selectLayer('__root__' as any)}
+              onClick={(e) => { e.stopPropagation(); selectLayer('__root__' as any); }}
             >
               {layers.length > 0 ? (
                 <button
