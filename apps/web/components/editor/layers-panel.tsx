@@ -155,7 +155,7 @@ export function LayersPanel() {
   };
 
   return (
-    <Card className="p-0 gap-0 h-full flex flex-col" data-tour-id="layers-panel">
+    <Card className="p-0 gap-0 h-full min-h-0 flex flex-col" data-tour-id="layers-panel">
       <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
         <div className="font-medium">Layers</div>
         <DropdownMenu>
@@ -202,10 +202,10 @@ export function LayersPanel() {
         />
       </div>
 
-      <div className="flex-1 overflow-hidden p-3">
-        <div className="text-sm rounded-lg border bg-card shadow-sm flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden p-3">
+        <div className="text-sm rounded-lg border bg-card shadow-sm flex flex-col overflow-hidden min-h-0 h-full">
           <div
-            className="flex-1 overflow-auto"
+            className="flex-1 min-h-0 max-h-full overflow-y-auto overscroll-contain"
             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
             onDrop={(e) => {
               const src = e.dataTransfer.getData('text/cap-layer-id');

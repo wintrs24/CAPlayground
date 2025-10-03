@@ -67,8 +67,8 @@ export default function EditorPage() {
             {showLeft && (
               <>
                 <div className="min-h-0 flex-shrink-0" style={{ width: leftWidth }}>
-                  <div ref={leftPaneRef} className="h-full flex flex-col pr-1">
-                    <div className="min-h-[160px] overflow-auto" style={{ flex: '1 1 auto' }}>
+                  <div ref={leftPaneRef} className="h-full min-h-0 flex flex-col pr-1">
+                    <div className="flex-1 min-h-0 overflow-hidden" style={{ flex: '1 1 auto' }}>
                       <LayersPanel />
                     </div>
                     <div
