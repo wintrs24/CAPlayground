@@ -183,12 +183,15 @@ export function EditorProvider({
               }
             } catch {}
           }
-          const findAssetBinding = (layers: AnyLayer[], filename: string): string | null => {
-            const walk = (arr: AnyLayer[]): string | null => {
+          const findAssetBindings = (layers: AnyLayer[], filename: string): string[] => {
+            const matches: string[] = [];
+            const walk = (arr: AnyLayer[]) => {
               for (const layer of arr) {
                 if (layer.type === "image") {
                   const name = (layer.src || "").split("/").pop();
-                  if (name === filename || (layer.src || "").includes(filename)) return layer.id;
+                  if (name === filename || (layer.src || "").includes(filename)) {
+                    matches.push(layer.id);
+                  }
                 } else if (layer.type === "video") {
                   const video = layer as VideoLayer;
                   const prefix = video.framePrefix || `${layer.id}_frame_`;
@@ -197,16 +200,15 @@ export function EditorProvider({
                   if (filename.startsWith(prefix) && filename.endsWith(ext)) {
                     const indexPart = filename.slice(prefix.length, filename.length - ext.length);
                     const frameIndex = Number(indexPart);
-                    if (!Number.isNaN(frameIndex)) return `${layer.id}_frame_${frameIndex}`;
+                    if (!Number.isNaN(frameIndex)) matches.push(`${layer.id}_frame_${frameIndex}`);
                   }
                 } else if (layer.type === "group") {
-                  const found = walk((layer as GroupLayer).children);
-                  if (found) return found;
+                  walk((layer as GroupLayer).children);
                 }
               }
-              return null;
             };
-            return walk(layers);
+            walk(layers);
+            return matches;
           };
 
           for (const f of files) {
@@ -220,9 +222,11 @@ export function EditorProvider({
                   r.onload = () => resolve(String(r.result));
                   r.readAsDataURL(blob);
                 });
-                const bindingKey = findAssetBinding(layers, filename);
-                if (bindingKey) {
-                  assets[bindingKey] = { filename, dataURL };
+                const bindingKeys = findAssetBindings(layers, filename);
+                if (bindingKeys.length) {
+                  for (const k of bindingKeys) {
+                    assets[k] = { filename, dataURL };
+                  }
                 }
               } catch {}
             }
