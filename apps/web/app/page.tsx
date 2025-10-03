@@ -86,13 +86,13 @@ export default async function HomePage() {
                 <div className="pt-10 lg:pt-0 hidden lg:block">
                   <div className="w-full max-w-5xl min-[600px]:max-w-none rounded-xl border-8 border-zinc-200/80 dark:border-white/30 shadow-lg overflow-hidden">
                     <video
-                      src="/wallpaper-demo.mp4"
+                      src="/featured.mp4"
                       className="w-full h-auto select-none pointer-events-none"
                       autoPlay
                       muted
                       loop
                       playsInline
-                      aria-label="CAPlayground wallpaper demo"
+                      aria-label="CAPlayground featured wallpaper"
                     />
                   </div>
                 </div>
