@@ -9,7 +9,7 @@ import { useRef, useState } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 
 export function LayersPanel() {
-  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, addVideoLayerFromFile, deleteLayer, duplicateLayer, moveLayer, updateLayer } = useEditor();
+  const { doc, selectLayer, addTextLayer, addImageLayerFromFile, addShapeLayer, addVideoLayerFromFile, deleteLayer, duplicateLayer, moveLayer, moveLayerInto, updateLayer } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const key = doc?.activeCA ?? 'floating';
@@ -82,7 +82,11 @@ export function LayersPanel() {
           const src = e.dataTransfer.getData('text/cap-layer-id');
           setDragOverId(null);
           if (!src || src === l.id) return;
-          moveLayer(src, l.id);
+          if (isGroup && (e.altKey || e.ctrlKey || e.metaKey)) {
+            moveLayerInto(src, l.id);
+          } else {
+            moveLayer(src, l.id);
+          }
         }}
       >
         <div className="truncate flex-1 min-w-0 flex items-center gap-1">

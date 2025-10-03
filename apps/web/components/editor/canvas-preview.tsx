@@ -768,11 +768,20 @@ export function CanvasPreview() {
       updateLayerTransient(d.id, { position: { x: pos.x, y: pos.y } as any });
     };
 
-    const onUp = (ev: MouseEvent) => {
+    const onTouchMove = (tev: TouchEvent) => {
+      const t = tev.touches[0];
+      if (!t) return;
+      onMove({ clientX: t.clientX, clientY: t.clientY } as any as MouseEvent);
+      tev.preventDefault();
+    };
+
+    const onUp = (ev: MouseEvent | TouchEvent) => {
       const d = draggingRef.current;
       if (d) {
-        const dx = (ev.clientX - d.startClientX) / scale;
-        const dy = (ev.clientY - d.startClientY) / scale;
+        const clientX = (ev as any).clientX ?? ((ev as TouchEvent).changedTouches?.[0]?.clientX);
+        const clientY = (ev as any).clientY ?? ((ev as TouchEvent).changedTouches?.[0]?.clientY);
+        const dx = (clientX - d.startClientX) / scale;
+        const dy = (clientY - d.startClientY) / scale;
         let cssLeft = d.startX + dx;
         let cssTop = d.startY + dy;
         const w = docRef.current?.meta.width ?? 0;
@@ -824,7 +833,9 @@ export function CanvasPreview() {
       window.removeEventListener("mouseup", onUp);
     };
     window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("mouseup", onUp as any);
+    window.addEventListener("touchmove", onTouchMove as any, { passive: false } as any);
+    window.addEventListener("touchend", onUp as any, { passive: false } as any);
   };
 
   // moved helpers above
@@ -880,6 +891,12 @@ export function CanvasPreview() {
           <div
             style={{ ...common, ...bgStyleFor(l), color: l.color, fontSize: l.fontSize, textAlign: cssAlign as any, whiteSpace }}
             onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={(e) => {
+              if (e.touches.length === 1) {
+                e.preventDefault();
+                startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
+              }
+            }}
           >
             {l.text}
           </div>
@@ -903,6 +920,12 @@ export function CanvasPreview() {
             }}
             draggable={false}
             onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={(e) => {
+              if (e.touches.length === 1) {
+                e.preventDefault();
+                startDrag(l, e.touches[0] as any, containerH, useYUp);
+              }
+            }}
           />
         </LayerContextMenu>
       );
@@ -941,7 +964,16 @@ export function CanvasPreview() {
         : { ...common, background: s.fill, borderRadius };
       return (
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
-          <div style={style} onMouseDown={(e) => startDrag(l, e, containerH, useYUp)} />
+          <div
+            style={style}
+            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={(e) => {
+              if (e.touches.length === 1) {
+                e.preventDefault();
+                startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
+              }
+            }}
+          />
         </LayerContextMenu>
       );
     }
@@ -950,7 +982,15 @@ export function CanvasPreview() {
     const nextUseYUp = useYUp; // stacking future support
     return (
       <LayerContextMenu key={g.id} layer={g} siblings={siblings}>
-        <div style={{ ...common, ...bgStyleFor(g) }} onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}>
+        <div style={{ ...common, ...bgStyleFor(g) }}
+             onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}
+             onTouchStart={(e) => {
+               if (e.touches.length === 1) {
+                 e.preventDefault();
+                 startDrag(g, touchToMouseLike(e.touches[0]), containerH, useYUp);
+               }
+             }}
+        >
           {g.children.map((c) => renderLayer(c, g.size.h, nextUseYUp, g.children))}
         </div>
       </LayerContextMenu>
@@ -999,6 +1039,26 @@ export function CanvasPreview() {
         lastY: number;
         lastW: number;
         lastH: number;
+      }
+    | null
+  >(null);
+
+  const touchToMouseLike = (t: any) => ({
+    clientX: t.clientX,
+    clientY: t.clientY,
+    button: 0,
+    preventDefault() {},
+    stopPropagation() {},
+  }) as any;
+
+  const touchGestureRef = useRef<
+    | {
+        startUserScale: number;
+        startPanX: number;
+        startPanY: number;
+        startDist: number;
+        startCenterX: number;
+        startCenterY: number;
       }
     | null
   >(null);
@@ -1239,6 +1299,13 @@ export function CanvasPreview() {
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
       d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
+    const onTouchMove = (tev: TouchEvent) => {
+      const t = tev.touches[0];
+      if (!t) return;
+      // Map to MouseEvent-like
+      onMove({ clientX: t.clientX, clientY: t.clientY, shiftKey: false } as any as MouseEvent);
+      tev.preventDefault();
+    };
     const onUp = () => {
       const d = resizeDragRef.current;
       if (d) {
@@ -1247,9 +1314,13 @@ export function CanvasPreview() {
       resizeDragRef.current = null;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onTouchMove as any);
+      window.removeEventListener("touchend", onUp);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onTouchMove as any, { passive: false } as any);
+    window.addEventListener("touchend", onUp, { passive: false } as any);
   };
 
   const beginRotate = (l: AnyLayer, e: ReactMouseEvent) => {
@@ -1278,6 +1349,12 @@ export function CanvasPreview() {
       d.lastRot = rot;
       updateLayerTransient(d.id, { rotation: rot as any });
     };
+    const onTouchMove = (tev: TouchEvent) => {
+      const t = tev.touches[0];
+      if (!t) return;
+      onMove({ clientX: t.clientX, clientY: t.clientY, shiftKey: false } as any as MouseEvent);
+      tev.preventDefault();
+    };
     const onUp = () => {
       const d = rotationDragRef.current;
       if (d) {
@@ -1286,9 +1363,13 @@ export function CanvasPreview() {
       rotationDragRef.current = null;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onTouchMove as any);
+      window.removeEventListener("touchend", onUp);
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onTouchMove as any, { passive: false } as any);
+    window.addEventListener("touchend", onUp, { passive: false } as any);
   };
 
   const renderSelectionOverlay = (l: AnyLayer) => {
@@ -1312,8 +1393,8 @@ export function CanvasPreview() {
   };
   const handleStyleBase: React.CSSProperties = {
     position: "absolute",
-    width: px(8),
-    height: px(8),
+    width: px(12),
+    height: px(12),
     background: "#ffffff",
     border: `${px(1)}px solid #3b82f6`,
     borderRadius: px(2),
@@ -1363,17 +1444,53 @@ export function CanvasPreview() {
     <>
       <div style={boxStyle}>
         {/* Resize handles */}
-        {handles.map((h) => (
-          <div
-            key={h.key}
-            style={{ ...handleStyleBase, left: h.x, top: h.y, cursor: h.cursor }}
-            onMouseDown={h.h}
-          />
-        ))}
+        {handles.map((h) => {
+          const hitStyle: React.CSSProperties = {
+            position: 'absolute',
+            left: h.x as any,
+            top: h.y as any,
+            width: px(20),
+            height: px(20),
+            transform: 'translate(-50%, -50%)',
+            background: 'transparent',
+            pointerEvents: 'auto',
+            cursor: h.cursor,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          };
+          const innerStyle: React.CSSProperties = {
+            ...handleStyleBase,
+            position: 'static',
+            transform: 'none',
+            cursor: h.cursor,
+          };
+          return (
+            <div
+              key={h.key}
+              style={hitStyle}
+              onMouseDown={h.h}
+              onTouchStart={(e) => {
+                if (e.touches.length === 1) {
+                  e.preventDefault();
+                  (h.h as any)(touchToMouseLike(e.touches[0]));
+                }
+              }}
+            >
+              <div style={innerStyle} />
+            </div>
+          );
+        })}
         {/* Rotation handle */}
         <div
           style={rotationHandleStyle}
           onMouseDown={(e) => beginRotate(l, e)}
+          onTouchStart={(e) => {
+            if (e.touches.length === 1) {
+              e.preventDefault();
+              beginRotate(l, touchToMouseLike(e.touches[0]));
+            }
+          }}
         />
       </div>
     </>
@@ -1384,6 +1501,7 @@ export function CanvasPreview() {
     <Card
       ref={ref}
       className={`relative w-full h-full overflow-hidden p-0 ${isPanning ? 'cursor-grabbing' : ''}`}
+      style={{ touchAction: 'none' }}
       data-tour-id="canvas"
       onDragOver={(e) => {
         e.preventDefault();
@@ -1416,6 +1534,56 @@ export function CanvasPreview() {
           setUserScale(nextUserScale);
           setPan({ x: nextPanX, y: nextPanY });
         }
+      }}
+      onTouchStart={(e) => {
+        if (!ref.current) return;
+        if (e.touches.length >= 2) {
+          e.preventDefault();
+          const rect = ref.current.getBoundingClientRect();
+          const [t1, t2] = [e.touches[0], e.touches[1]];
+          const cx = (t1.clientX + t2.clientX) / 2 - rect.left;
+          const cy = (t1.clientY + t2.clientY) / 2 - rect.top;
+          const dx = t2.clientX - t1.clientX;
+          const dy = t2.clientY - t1.clientY;
+          const dist = Math.hypot(dx, dy);
+          touchGestureRef.current = {
+            startUserScale: userScale,
+            startPanX: pan.x,
+            startPanY: pan.y,
+            startDist: dist,
+            startCenterX: cx,
+            startCenterY: cy,
+          };
+        }
+      }}
+      onTouchMove={(e) => {
+        const g = touchGestureRef.current;
+        if (!ref.current || !g) return;
+        if (e.touches.length >= 2) {
+          e.preventDefault();
+          const rect = ref.current.getBoundingClientRect();
+          const [t1, t2] = [e.touches[0], e.touches[1]];
+          const cx = (t1.clientX + t2.clientX) / 2 - rect.left;
+          const cy = (t1.clientY + t2.clientY) / 2 - rect.top;
+          const dx = t2.clientX - t1.clientX;
+          const dy = t2.clientY - t1.clientY;
+          const dist = Math.hypot(dx, dy);
+          const factor = dist / Math.max(1, g.startDist);
+          const nextUserScale = Math.min(5, Math.max(0.2, g.startUserScale * factor));
+          const nextScale = fitScale * nextUserScale;
+          const worldX = (g.startCenterX - (baseOffsetX + g.startPanX)) / (fitScale * g.startUserScale);
+          const worldY = (g.startCenterY - (baseOffsetY + g.startPanY)) / (fitScale * g.startUserScale);
+          const nextPanX = cx - worldX * nextScale - baseOffsetX;
+          const nextPanY = cy - worldY * nextScale - baseOffsetY;
+          setUserScale(nextUserScale);
+          setPan({ x: nextPanX, y: nextPanY });
+        }
+      }}
+      onTouchEnd={() => {
+        touchGestureRef.current = null;
+      }}
+      onTouchCancel={() => {
+        touchGestureRef.current = null;
       }}
       onMouseDown={(e) => {
         // Middle mouse button or Shift + drag to pan around

@@ -13,6 +13,7 @@ import {
   insertBeforeInTree,
   deleteInTree,
   containsId,
+  insertIntoGroupInTree,
 } from "@/lib/editor/layer-utils";
 import { sanitizeFilename, dataURLToBlob } from "@/lib/editor/file-utils";
 
@@ -59,6 +60,7 @@ export type EditorContextValue = {
   pasteFromClipboard: (payload?: any) => void;
   duplicateLayer: (id?: string) => void;
   moveLayer: (sourceId: string, beforeId: string | null) => void;
+  moveLayerInto: (sourceId: string, targetGroupId: string) => void;
   persist: () => void;
   undo: () => void;
   redo: () => void;
@@ -439,6 +441,23 @@ export function EditorProvider({
       const nextDocs = { ...prev.docs, [key]: { ...prev.docs[key], selectedId: id } };
       pushHistory(prev);
       return { ...prev, docs: nextDocs } as ProjectDocument;
+    });
+  }, [pushHistory]);
+
+  const moveLayerInto = useCallback((sourceId: string, targetGroupId: string) => {
+    if (!sourceId || !targetGroupId || sourceId === targetGroupId) return;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const key = prev.activeCA;
+      const cur = prev.docs[key];
+      const removedRes = removeFromTree(cur.layers, sourceId);
+      const node = removedRes.removed;
+      if (!node) return prev;
+      const ins = insertIntoGroupInTree(removedRes.layers, targetGroupId, node);
+      const nextLayers = ins.layers;
+      pushHistory(prev);
+      const nextCur = { ...cur, layers: nextLayers } as any;
+      return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as any;
     });
   }, [pushHistory]);
 
@@ -1050,6 +1069,7 @@ export function EditorProvider({
     pasteFromClipboard,
     duplicateLayer,
     moveLayer,
+    moveLayerInto,
     persist,
     undo,
     redo,
@@ -1062,6 +1082,7 @@ export function EditorProvider({
     setAnimatedLayers,
   }), [
     doc,
+    setDoc,
     savingStatus,
     lastSavedAt,
     flushPersist,
