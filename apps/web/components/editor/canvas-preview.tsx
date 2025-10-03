@@ -53,7 +53,7 @@ export function CanvasPreview() {
     return () => ro.disconnect();
   }, []);
 
-  // clipboard copy/paste and paste
+  // clipboard copy/paste
   useEffect(() => {
     const isImageUrl = (txt: string) => /^(https?:\/\/).+\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(txt.trim());
     const isDataUrl = (txt: string) => /^data:image\//i.test(txt.trim());
@@ -829,10 +829,32 @@ export function CanvasPreview() {
 
   // moved helpers above
 
+  const hexToRgba = (hex?: string, alpha?: number): string | undefined => {
+    if (!hex) return undefined;
+    const m = hex.trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{8})$/i);
+    if (!m) return hex;
+    const h = m[1].length === 6 ? m[1] : m[1].slice(0, 6);
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    const a = (typeof alpha === 'number') ? Math.max(0, Math.min(1, alpha)) : 1;
+    if (a >= 1) return `rgb(${r}, ${g}, ${b})`;
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  };
+  const bgStyleFor = (l: AnyLayer): React.CSSProperties => {
+    const hex = (l as any).backgroundColor as string | undefined;
+    const a = (l as any).backgroundOpacity as number | undefined;
+    const css = hexToRgba(hex, a);
+    return css ? { background: css } : {};
+  };
+
   const renderLayer = (l: AnyLayer, containerH: number = (doc?.meta.height ?? 0), useYUp: boolean = getRootFlip() === 0, siblings: AnyLayer[] = renderedLayers): ReactNode => {
     const { left, top } = computeCssLT(l, containerH, useYUp);
     const a = getAnchor(l);
     const transformOriginY = useYUp ? (1 - a.y) * 100 : a.y * 100;
+    const borderStyle: React.CSSProperties = (typeof (l as any).borderWidth === 'number' && (l as any).borderWidth > 0)
+      ? { border: `${(l as any).borderWidth}px solid ${(l as any).borderColor || '#000000'}` }
+      : {};
     const common: React.CSSProperties = {
       position: "absolute",
       left,
@@ -843,7 +865,10 @@ export function CanvasPreview() {
       transformOrigin: `${a.x * 100}% ${transformOriginY}%`,
       backfaceVisibility: "visible",
       display: l.visible === false ? "none" : undefined,
+      opacity: typeof (l as any).opacity === 'number' ? Math.max(0, Math.min(1, (l as any).opacity)) : undefined,
       cursor: "move",
+      ...(borderStyle || {}),
+      ...(typeof (l as any).cornerRadius === 'number' ? { borderRadius: (l as any).cornerRadius } : {}),
     };
 
     if (l.type === "text") {
@@ -853,7 +878,7 @@ export function CanvasPreview() {
       return (
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
           <div
-            style={{ ...common, color: l.color, fontSize: l.fontSize, textAlign: cssAlign as any, whiteSpace }}
+            style={{ ...common, ...bgStyleFor(l), color: l.color, fontSize: l.fontSize, textAlign: cssAlign as any, whiteSpace }}
             onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
           >
             {l.text}
@@ -871,6 +896,7 @@ export function CanvasPreview() {
             alt={l.name}
             style={{
               ...common,
+              ...bgStyleFor(l),
               objectFit: "fill" as React.CSSProperties["objectFit"],
               maxWidth: "none",
               maxHeight: "none",
@@ -894,6 +920,7 @@ export function CanvasPreview() {
             alt={l.name}
             style={{
               ...common,
+              ...bgStyleFor(l),
               objectFit: "fill" as React.CSSProperties["objectFit"],
               maxWidth: "none",
               maxHeight: "none",
@@ -909,9 +936,12 @@ export function CanvasPreview() {
       const corner = (l as any).cornerRadius as number | undefined;
       const legacy = s.radius;
       const borderRadius = s.shape === "circle" ? 9999 : ((corner ?? legacy ?? 0));
+      const style: React.CSSProperties = (l as any).backgroundColor
+        ? { ...common, ...bgStyleFor(l), borderRadius }
+        : { ...common, background: s.fill, borderRadius };
       return (
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
-          <div style={{ ...common, background: s.fill, borderRadius }} onMouseDown={(e) => startDrag(l, e, containerH, useYUp)} />
+          <div style={style} onMouseDown={(e) => startDrag(l, e, containerH, useYUp)} />
         </LayerContextMenu>
       );
     }
@@ -920,7 +950,7 @@ export function CanvasPreview() {
     const nextUseYUp = useYUp; // stacking future support
     return (
       <LayerContextMenu key={g.id} layer={g} siblings={siblings}>
-        <div style={{ ...common, background: g.backgroundColor }} onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}>
+        <div style={{ ...common, ...bgStyleFor(g) }} onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}>
           {g.children.map((c) => renderLayer(c, g.size.h, nextUseYUp, g.children))}
         </div>
       </LayerContextMenu>

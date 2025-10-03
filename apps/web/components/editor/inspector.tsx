@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Slider } from "../ui/slider";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -501,31 +502,50 @@ export function Inspector() {
 
           {activeTab === 'compositing' && (
             <div className="grid grid-cols-2 gap-x-1.5 gap-y-3">
-        <div className="space-y-1">
-          <Label htmlFor="opacity">Opacity (%)</Label>
-          <Input
-            id="opacity"
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            value={fmt0(typeof selected.opacity === "number" ? Math.round((selected.opacity || 0) * 100) : 100)}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v === "") return;
-              const pct = Math.max(0, Math.min(100, Math.round(Number(v))));
-              const next = pct / 100;
-              updateLayer(selected.id, { opacity: Number.isFinite(next) ? next : (undefined as any) });
-            }}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label>Shadow</Label>
-          <div className="flex items-center gap-2 h-9">
-            <Checkbox disabled />
-            <span className="text-sm text-muted-foreground">(placeholder)</span>
+        <div className="space-y-1 col-span-2">
+          <Label htmlFor="opacity">Opacity</Label>
+          <div className="flex items-center gap-2 w-full">
+            <Slider
+              id="opacity"
+              value={[Math.round((typeof selected.opacity === 'number' ? selected.opacity : 1) * 100)]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={([p]) => {
+                const clamped = Math.max(0, Math.min(100, Math.round(Number(p))));
+                const val = Math.round((clamped / 100) * 100) / 100; // 2 d.p.
+                updateLayerTransient(selected.id, { opacity: val as any } as any);
+              }}
+            />
+            <Input
+              id="opacityPct"
+              className="w-24 h-8 text-right"
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={getBuf('opacityPct', String(Math.round((typeof selected.opacity === 'number' ? selected.opacity : 1) * 100)))}
+              onChange={(e) => {
+                setBuf('opacityPct', e.target.value);
+                const v = e.target.value.trim();
+                if (v === "") return;
+                const p = Math.max(0, Math.min(100, Math.round(Number(v))));
+                const val = Math.round((p / 100) * 100) / 100;
+                updateLayerTransient(selected.id, { opacity: val as any } as any);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                const p = v === "" ? undefined : Math.max(0, Math.min(100, Math.round(Number(v))));
+                const val = typeof p === 'number' ? Math.round((p / 100) * 100) / 100 : undefined;
+                updateLayer(selected.id, { opacity: (typeof val === 'number') ? val as any : (undefined as any) } as any);
+                clearBuf('opacityPct');
+              }}
+            />
+            <span className="text-xs text-muted-foreground">%</span>
           </div>
         </div>
+        
         {selected.type === "shape" && (
           <div className="space-y-1">
             <Label htmlFor="radius">Corner Radius</Label>
@@ -556,21 +576,59 @@ export function Inspector() {
 
           {activeTab === 'content' && (
             <div className="grid grid-cols-2 gap-x-1.5 gap-y-3">
-        <div className="space-y-1">
-          <Label>No background colour</Label>
-          <div className="flex items-center gap-2 h-9">
-            <Checkbox disabled />
-            <span className="text-sm text-muted-foreground">(placeholder)</span>
-          </div>
-        </div>
-        <div className="space-y-1">
+        
+        <div className="space-y-1 col-span-2">
           <Label htmlFor="backgroundColor">Background colour</Label>
           <Input
             id="backgroundColor"
             type="color"
+            className="w-full h-8"
             value={(selected as any).backgroundColor ?? "#ffffff"}
             onChange={(e) => updateLayer(selected.id, { backgroundColor: e.target.value } as any)}
           />
+        </div>
+        <div className="space-y-1 col-span-2">
+          <Label htmlFor="backgroundOpacity">Background opacity</Label>
+          <div className="flex items-center gap-2 w-full">
+            <Slider
+              id="backgroundOpacity"
+              value={[Math.round((((selected as any).backgroundOpacity ?? 1) * 100))]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={([p]) => {
+                const clamped = Math.max(0, Math.min(100, Math.round(Number(p))));
+                const val = Math.round((clamped / 100) * 100) / 100; // 2 d.p.
+                updateLayerTransient(selected.id, { backgroundOpacity: val as any } as any);
+              }}
+            />
+            <Input
+              id="backgroundOpacityPct"
+              className="w-24 h-8 text-right"
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={getBuf('backgroundOpacityPct', String(Math.round((((selected as any).backgroundOpacity ?? 1) * 100))))}
+              onChange={(e) => {
+                setBuf('backgroundOpacityPct', e.target.value);
+                const v = e.target.value.trim();
+                if (v === "") return;
+                const p = Math.max(0, Math.min(100, Math.round(Number(v))));
+                const val = Math.round((p / 100) * 100) / 100;
+                updateLayerTransient(selected.id, { backgroundOpacity: val as any } as any);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                const p = v === "" ? undefined : Math.max(0, Math.min(100, Math.round(Number(v))));
+                const val = typeof p === 'number' ? Math.round((p / 100) * 100) / 100 : undefined;
+                updateLayer(selected.id, { backgroundOpacity: (typeof val === 'number') ? val as any : (undefined as any) } as any);
+                clearBuf('backgroundOpacityPct');
+              }}
+            />
+            <span className="text-xs text-muted-foreground">%</span>
+          </div>
         </div>
         <div className="space-y-1">
           <Label htmlFor="borderColor">Border colour</Label>
@@ -586,21 +644,24 @@ export function Inspector() {
           <Input
             id="borderWidth"
             type="number"
-            step={1}
-            value={fmt0((selected as any).borderWidth)}
+            step={0.01}
+            value={getBuf('borderWidth', fmt2((selected as any).borderWidth))}
             onChange={(e) => {
-              const v = e.target.value;
-              updateLayer(selected.id, { borderWidth: v === "" ? (undefined as any) : Math.max(0, Math.round(Number(v))) } as any);
+              setBuf('borderWidth', e.target.value);
+              const v = e.target.value.trim();
+              if (v === "") return;
+              const num = round2(Number(v));
+              if (Number.isFinite(num)) updateLayerTransient(selected.id, { borderWidth: Math.max(0, num) } as any);
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); e.preventDefault(); } }}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              const num = v === "" ? undefined : round2(Number(v));
+              updateLayer(selected.id, { borderWidth: (typeof num === 'number' && Number.isFinite(num)) ? Math.max(0, num) : (undefined as any) } as any);
+              clearBuf('borderWidth');
             }}
           />
         </div>
-        {selected.type === "shape" && (
-          <div className="space-y-1">
-            <Label htmlFor="fill">Fill</Label>
-            <Input id="fill" type="color" value={(selected as any).fill}
-              onChange={(e) => updateLayer(selected.id, { fill: e.target.value } as any)} />
-          </div>
-        )}
             </div>
           )}
 

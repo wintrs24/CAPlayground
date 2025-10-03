@@ -369,9 +369,22 @@ function parseCALayer(el: Element): AnyLayer {
   const rotYAttr = attr(el, 'transform.rotation.y');
   const opacity = attr(el, 'opacity') ? Number(attr(el, 'opacity')) : undefined;
   const transformAttr = attr(el, 'transform');
-  const backgroundColor = attr(el, 'backgroundColor');
+  let backgroundColor: string | undefined = undefined;
+  let backgroundOpacity: number | undefined = undefined;
+  const bgAttr = attr(el, 'backgroundColor');
+  if (bgAttr) backgroundColor = floatsToHexColor(bgAttr) || bgAttr || undefined;
+  const bgChild = el.getElementsByTagNameNS(CAML_NS, 'backgroundColor')[0] as Element | undefined;
+  if (bgChild) {
+    const v = bgChild.getAttribute('value') || undefined;
+    const op = bgChild.getAttribute('opacity');
+    const hex = floatsToHexColor(v || '');
+    if (hex) backgroundColor = hex;
+    const opNum = typeof op === 'string' ? Number(op) : NaN;
+    if (Number.isFinite(opNum)) backgroundOpacity = opNum;
+  }
   const cornerRadius = attr(el, 'cornerRadius') ? Number(attr(el, 'cornerRadius')) : undefined;
-  const borderColor = attr(el, 'borderColor') || undefined;
+  const borderColorRaw = attr(el, 'borderColor');
+  const borderColor = floatsToHexColor(borderColorRaw) || borderColorRaw || undefined;
   const borderWidth = attr(el, 'borderWidth') ? Number(attr(el, 'borderWidth')) : undefined;
   const textValue = attr(el, 'text');
   const fontFamily = attr(el, 'fontFamily');
@@ -427,6 +440,7 @@ function parseCALayer(el: Element): AnyLayer {
     size: { w: bounds[2] ?? 0, h: bounds[3] ?? 0 },
     opacity,
     backgroundColor,
+    backgroundOpacity,
     cornerRadius,
     borderColor,
     borderWidth,
@@ -784,8 +798,20 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, 
   if (typeof rotY === 'number' && Number.isFinite(rotY)) parts.push(`rotate(${rotY}deg, 0, 1, 0)`);
   if (typeof rotX === 'number' && Number.isFinite(rotX)) parts.push(`rotate(${rotX}deg, 1, 0, 0)`);
   if (parts.length) setAttr(el, 'transform', parts.join(' '));
-  if (layer.type === 'shape') {
-    setAttr(el, 'backgroundColor', (layer as any).fill || '#ffffffff'); //fixed shape fill 🤯
+  const bgHex = (layer as any).backgroundColor as string | undefined;
+  const bgOp = (layer as any).backgroundOpacity as number | undefined;
+  if (bgHex) {
+    const floatTriplet = hexToForegroundColor(bgHex);
+    const op = typeof bgOp === 'number' ? Math.max(0, Math.min(1, bgOp)) : undefined;
+    if (typeof op === 'number' && op < 1) {
+      const bg = doc.createElementNS(CAML_NS, 'backgroundColor');
+      if (floatTriplet) bg.setAttribute('value', floatTriplet);
+      const op2 = Math.round(op * 100) / 100; // 2 d.p.
+      bg.setAttribute('opacity', String(op2));
+      el.appendChild(bg);
+    } else {
+      if (floatTriplet) setAttr(el, 'backgroundColor', floatTriplet);
+    }
   }
   setAttr(el, 'cornerRadius', layer.cornerRadius);
   setAttr(el, 'borderColor', layer.borderColor);

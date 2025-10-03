@@ -21,6 +21,7 @@ export type LayerBase = {
   rotationX?: number;
   rotationY?: number;
   backgroundColor?: string;
+  backgroundOpacity?: number;
   borderColor?: string;
   borderWidth?: number;
   cornerRadius?: number;
