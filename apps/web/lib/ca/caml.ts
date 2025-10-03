@@ -798,7 +798,9 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, 
   if (typeof rotY === 'number' && Number.isFinite(rotY)) parts.push(`rotate(${rotY}deg, 0, 1, 0)`);
   if (typeof rotX === 'number' && Number.isFinite(rotX)) parts.push(`rotate(${rotX}deg, 1, 0, 0)`);
   if (parts.length) setAttr(el, 'transform', parts.join(' '));
-  const bgHex = (layer as any).backgroundColor as string | undefined;
+  const explicitBgHex = (layer as any).backgroundColor as string | undefined;
+  const shapeFillHex = (layer as any).fill as string | undefined;
+  const bgHex = explicitBgHex ?? shapeFillHex;
   const bgOp = (layer as any).backgroundOpacity as number | undefined;
   if (bgHex) {
     const floatTriplet = hexToForegroundColor(bgHex);
