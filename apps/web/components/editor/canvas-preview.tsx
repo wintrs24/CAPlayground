@@ -1295,6 +1295,8 @@ export function CanvasPreview() {
   const useYUp = getRootFlip() === 0;
   const a = getAnchor(l);
   const transformOriginY = useYUp ? (1 - a.y) * 100 : a.y * 100;
+  const inv = 1 / Math.max(0.0001, scale);
+  const px = (n: number) => Math.max(0, n * inv);
   const boxStyle: React.CSSProperties = {
     position: "absolute",
     left: computeCssLT(l, (doc?.meta.height ?? 0), useYUp).left,
@@ -1304,18 +1306,18 @@ export function CanvasPreview() {
     transform: `rotateX(${-((l as any).rotationX ?? 0)}deg) rotateY(${-((l as any).rotationY ?? 0)}deg) rotate(${-(l.rotation ?? 0)}deg)`,
     transformOrigin: `${a.x * 100}% ${transformOriginY}%`,
     backfaceVisibility: "hidden",
-    outline: "1px solid rgba(59,130,246,0.9)",
-    boxShadow: "0 0 0 2px rgba(59,130,246,0.2) inset",
+    outline: `${px(1)}px solid rgba(59,130,246,0.9)`,
+    boxShadow: `inset 0 0 0 ${px(2)}px rgba(59,130,246,0.2)`,
     pointerEvents: "none",
   };
   const handleStyleBase: React.CSSProperties = {
     position: "absolute",
-    width: 8,
-    height: 8,
+    width: px(8),
+    height: px(8),
     background: "#ffffff",
-    border: "1px solid #3b82f6",
-    borderRadius: 2,
-    boxShadow: "0 0 0 1px rgba(0,0,0,0.05)",
+    border: `${px(1)}px solid #3b82f6`,
+    borderRadius: px(2),
+    boxShadow: `0 0 0 ${px(1)}px rgba(0,0,0,0.05)`,
     transform: "translate(-50%, -50%)",
     pointerEvents: "auto",
     cursor: "nwse-resize",
@@ -1346,11 +1348,11 @@ export function CanvasPreview() {
   const rotationHandleStyle: React.CSSProperties = {
     position: "absolute",
     left: "50%",
-    top: -20,
-    width: 10,
-    height: 10,
+    top: -px(20),
+    width: px(10),
+    height: px(10),
     background: "#fff",
-    border: "1px solid #3b82f6",
+    border: `${px(1)}px solid #3b82f6`,
     borderRadius: 9999,
     transform: "translate(-50%, -50%)",
     cursor: "grab",
