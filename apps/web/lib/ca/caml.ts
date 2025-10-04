@@ -117,7 +117,7 @@ export function parseStateOverrides(xml: string): CAStateOverrides {
           if (valueNodes && valueNodes[0]) {
             const type = valueNodes[0].getAttribute('type') || '';
             const vAttr = valueNodes[0].getAttribute('value') || '';
-            if (/^(integer|float|number)$/i.test(type)) {
+            if (/^(integer|float|real|number)$/i.test(type)) {
               const n = Number(vAttr);
               val = Number.isFinite(n) ? n : vAttr;
             } else {

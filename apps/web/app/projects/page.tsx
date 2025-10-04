@@ -31,7 +31,7 @@ import { AspectRatio } from "@/components/ui/aspect-ratio";
 import type React from "react";
 import type { AnyLayer, CAProject } from "@/lib/ca/types";
 import { unpackCA } from "@/lib/ca/ca-file";
-import { ensureUniqueProjectName, createProject, updateProject, deleteProject as idbDeleteProject, getProject, listFiles, listProjects, putBlobFile, putTextFile } from "@/lib/idb";
+import { ensureUniqueProjectName, createProject, updateProject, deleteProject, getProject, listFiles, listProjects, putBlobFile, putTextFile, isUsingOPFS } from "@/lib/storage";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
   Select,
@@ -45,6 +45,7 @@ interface Project { id: string; name: string; createdAt: string; width?: number;
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [storageFallback, setStorageFallback] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
@@ -79,6 +80,11 @@ export default function ProjectsPage() {
   useEffect(() => {
     (async () => {
       try {
+        try {
+          const using = await isUsingOPFS();
+          setStorageFallback(!using);
+        } catch {}
+
         const ls = typeof window !== 'undefined' ? localStorage.getItem('caplayground-projects') : null;
         const list: Project[] = ls ? JSON.parse(ls) : [];
         if (!list || list.length === 0) {
@@ -245,6 +251,35 @@ export default function ProjectsPage() {
               }
             } catch {}
           }
+          const toDataURL = async (buf: ArrayBuffer): Promise<string> => {
+            return await new Promise((resolve) => {
+              const blob = new Blob([buf]);
+              const r = new FileReader();
+              r.onload = () => resolve(String(r.result));
+              r.readAsDataURL(blob);
+            });
+          };
+          const filenameToDataURL: Record<string, string> = {};
+          const assetFiles = [...floating, ...background].filter(f => /\/assets\//.test(f.path) && f.type === 'blob');
+          for (const f of assetFiles) {
+            const filename = f.path.split('/assets/')[1];
+            try {
+              filenameToDataURL[filename] = await toDataURL(f.data as ArrayBuffer);
+            } catch {}
+          }
+          const applyAssetSrc = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
+            if ((l as any).type === 'group') {
+              const g = l as any;
+              return { ...g, children: applyAssetSrc(g.children || []) } as AnyLayer;
+            }
+            if (l.type === 'image') {
+              const name = (l.src || '').split('/').pop() || '';
+              const dataURL = filenameToDataURL[name];
+              if (dataURL) return { ...l, src: dataURL } as AnyLayer;
+            }
+            return l;
+          });
+          if (layers && layers.length) layers = applyAssetSrc(layers);
           map[p.id] = { bg, width, height };
           docs[p.id] = { meta: { id: p.id, name: p.name, width: width || 390, height: height || 844, background: bg }, layers };
         }
@@ -475,7 +510,7 @@ export default function ProjectsPage() {
   };
 
   const deleteProject = async (id: string) => {
-    await idbDeleteProject(id);
+    await deleteProject(id);
     const idbList = await listProjects();
     setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
   };
@@ -596,7 +631,14 @@ export default function ProjectsPage() {
                 </Button>
               </Link>
             </div>
-            <h1 className="font-sfpro text-3xl md:text-4xl font-bold">Your Projects</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-sfpro text-3xl md:text-4xl font-bold">Your Projects</h1>
+              {storageFallback && (
+                <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                  Storage: IndexedDB fallback
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground">Create and manage your CoreAnimation projects stored locally on your device.</p>
             {/* Search & filters */}
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">

@@ -3,7 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AnyLayer, CAProject, GroupLayer, ImageLayer, LayerBase, ShapeLayer, TextLayer, VideoLayer, GyroParallaxDictionary } from "@/lib/ca/types";
 import { serializeCAML } from "@/lib/ca/caml";
-import { getProject, listFiles, putBlobFile, putBlobFilesBatch, putTextFile } from "@/lib/idb";
+import { getProject, listFiles, putBlobFile, putBlobFilesBatch, putTextFile } from "@/lib/storage";
 import {
   genId,
   findById,
@@ -13,6 +13,7 @@ import {
   insertBeforeInTree,
   deleteInTree,
   containsId,
+  insertIntoGroupInTree,
 } from "@/lib/editor/layer-utils";
 import { sanitizeFilename, dataURLToBlob } from "@/lib/editor/file-utils";
 
@@ -59,6 +60,7 @@ export type EditorContextValue = {
   pasteFromClipboard: (payload?: any) => void;
   duplicateLayer: (id?: string) => void;
   moveLayer: (sourceId: string, beforeId: string | null) => void;
+  moveLayerInto: (sourceId: string, targetGroupId: string) => void;
   persist: () => void;
   undo: () => void;
   redo: () => void;
@@ -133,10 +135,8 @@ export function EditorProvider({
           wallpaperFiles = await listFiles(projectId, `${folder}/Wallpaper.ca/`);
           if (wallpaperFiles.length === 0) {
             const all = await listFiles(projectId);
-            const anyMain = all.find(f => /\.ca\/Wallpaper\.ca\/main\.caml$/.test(f.path));
+            const anyMain = all.find(f => /\.ca\/Wallpaper\.ca\/main\.caml$/i.test(f.path));
             if (anyMain) {
-              const parts = anyMain.path.split('/');
-              folder = parts[0];
               wallpaperFiles = all.filter(f => f.path.startsWith(`${folder}/Wallpaper.ca/`));
             }
           }
@@ -147,10 +147,8 @@ export function EditorProvider({
           ]);
           if ((floatingFiles.length + backgroundFiles.length) === 0) {
             const all = await listFiles(projectId);
-            const anyMain = all.find(f => /\.ca\/(Floating|Background)\.ca\/main\.caml$/.test(f.path));
+            const anyMain = all.find(f => /\.ca\/(Floating|Background)\.ca\/main\.caml$/i.test(f.path));
             if (anyMain) {
-              const parts = anyMain.path.split('/');
-              folder = parts[0];
               [floatingFiles, backgroundFiles] = [
                 all.filter(f => f.path.startsWith(`${folder}/Floating.ca/`)),
                 all.filter(f => f.path.startsWith(`${folder}/Background.ca/`)),
@@ -158,7 +156,6 @@ export function EditorProvider({
             }
           }
         }
-
         const readDocFromFiles = async (files: Awaited<ReturnType<typeof listFiles>>, caType: 'floating' | 'background' | 'wallpaper'): Promise<CADoc> => {
           const byPath = new Map(files.map((f) => [f.path, f]));
           const caFolder = caType === 'floating' ? 'Floating.ca' : caType === 'wallpaper' ? 'Wallpaper.ca' : 'Background.ca';
@@ -231,6 +228,24 @@ export function EditorProvider({
               } catch {}
             }
           }
+
+          // Replace image src with dataURL from assets so runtime <img> loads correctly
+          const applyAssetSrc = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
+            if (l.type === 'image') {
+              const a = assets[l.id];
+              if (a && a.dataURL) {
+                return { ...l, src: a.dataURL } as AnyLayer;
+              }
+              return l;
+            }
+            if ((l as any).type === 'group') {
+              const g = l as GroupLayer;
+              return { ...g, children: applyAssetSrc(g.children) } as AnyLayer;
+            }
+            return l;
+          });
+
+          layers = applyAssetSrc(layers);
           return {
             layers,
             selectedId: null,
@@ -351,6 +366,7 @@ export function EditorProvider({
   const writeToIndexedDB = useCallback(async (snapshot: ProjectDocument) => {
     try {
       const folder = `${snapshot.meta.name}.ca`;
+      const prefix = `${folder}/`;
       const isGyro = snapshot.meta.gyroEnabled ?? false;
       const caKeys: Array<'background' | 'floating' | 'wallpaper'> = isGyro ? ['wallpaper'] : ['background', 'floating'];
       for (const key of caKeys) {
@@ -400,11 +416,11 @@ export function EditorProvider({
           undefined,
           caDoc.wallpaperParallaxGroups,
         );
-        await putTextFile(projectId, `${folder}/${caFolder}/main.caml`, caml);
+        await putTextFile(projectId, `${prefix}${caFolder}/main.caml`, caml);
         const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
-        await putTextFile(projectId, `${folder}/${caFolder}/index.xml`, indexXml);
+        await putTextFile(projectId, `${prefix}${caFolder}/index.xml`, indexXml);
         const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`;
-        await putTextFile(projectId, `${folder}/${caFolder}/assetManifest.caml`, assetManifest);
+        await putTextFile(projectId, `${prefix}${caFolder}/assetManifest.caml`, assetManifest);
 
         const assets = caDoc.assets || {};
         const assetFiles: Array<{ path: string; data: Blob }> = [];
@@ -413,7 +429,7 @@ export function EditorProvider({
           try {
             const dataURL = info.dataURL;
             const blob = await dataURLToBlob(dataURL);
-            const assetPath = `${folder}/${caFolder}/assets/${info.filename}`;
+            const assetPath = `${prefix}${caFolder}/assets/${info.filename}`;
             assetFiles.push({ path: assetPath, data: blob });
           } catch (err) {
             console.error('Failed to prepare asset:', info.filename, err);
@@ -439,6 +455,23 @@ export function EditorProvider({
       const nextDocs = { ...prev.docs, [key]: { ...prev.docs[key], selectedId: id } };
       pushHistory(prev);
       return { ...prev, docs: nextDocs } as ProjectDocument;
+    });
+  }, [pushHistory]);
+
+  const moveLayerInto = useCallback((sourceId: string, targetGroupId: string) => {
+    if (!sourceId || !targetGroupId || sourceId === targetGroupId) return;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const key = prev.activeCA;
+      const cur = prev.docs[key];
+      const removedRes = removeFromTree(cur.layers, sourceId);
+      const node = removedRes.removed;
+      if (!node) return prev;
+      const ins = insertIntoGroupInTree(removedRes.layers, targetGroupId, node);
+      const nextLayers = ins.layers;
+      pushHistory(prev);
+      const nextCur = { ...cur, layers: nextLayers } as any;
+      return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as any;
     });
   }, [pushHistory]);
 
@@ -534,6 +567,15 @@ export function EditorProvider({
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+    // Eagerly write asset to storage
+    try {
+      const caFolder = (currentKey === 'floating') ? 'Floating.ca' : (currentKey === 'wallpaper') ? 'Wallpaper.ca' : 'Background.ca';
+      const projName = doc?.meta.name || initialMeta.name;
+      const folder = `${projName}.ca`;
+      const safe = sanitizeFilename(file.name) || `image-${Date.now()}.png`;
+      await putBlobFile(projectId, `${folder}/${caFolder}/assets/${safe}`, file);
+    } catch {}
+
     setDoc((prev) => {
       if (!prev) return prev;
       pushHistory(prev);
@@ -1050,6 +1092,7 @@ export function EditorProvider({
     pasteFromClipboard,
     duplicateLayer,
     moveLayer,
+    moveLayerInto,
     persist,
     undo,
     redo,
@@ -1062,6 +1105,7 @@ export function EditorProvider({
     setAnimatedLayers,
   }), [
     doc,
+    setDoc,
     savingStatus,
     lastSavedAt,
     flushPersist,

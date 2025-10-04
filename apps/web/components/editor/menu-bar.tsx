@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star, MoreVertical } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
@@ -25,7 +25,7 @@ import { useEffect, useState, JSX } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import JSZip from "jszip";
 import { Slider } from "../ui/slider";
-import { getProject, updateProject, deleteProject as idbDeleteProject, listFiles } from "@/lib/idb";
+import { getProject, updateProject, deleteProject, listFiles, isUsingOPFS } from "@/lib/storage";
  
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
@@ -63,6 +63,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [snapResizeEnabled, setSnapResizeEnabled] = useLocalStorage<boolean>("caplay_settings_snap_resize", true);
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [storageFallback, setStorageFallback] = useState(false);
   const [exportView, setExportView] = useState<'select'|'success'>("select");
 
   useEffect(() => {
@@ -71,6 +72,12 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try { setStorageFallback(!(await isUsingOPFS())); } catch {}
+    })();
   }, []);
 
   useEffect(() => {
@@ -290,7 +297,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   };
 
   const performDelete = async () => {
-    await idbDeleteProject(projectId);
+    await deleteProject(projectId);
     router.push("/projects");
   };
 
@@ -319,7 +326,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        {/* Saving status */}
+        {/* Saving status + storage badge */}
         <div onMouseEnter={() => setShowManualSave(true)} onMouseLeave={() => setShowManualSave(false)}>
           {showManualSave ? (
             <Button
@@ -332,19 +339,26 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
               Manual Save
             </Button>
           ) : (
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full border ${
-                savingStatus === 'saving'
-                  ? 'border-amber-500 text-amber-700 dark:text-amber-400'
-                  : savingStatus === 'saved'
-                  ? 'border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                  : 'border-muted text-muted-foreground'
-              }`}
-              aria-live="polite"
-              title={lastSavedAt ? `Last saved ${new Date(lastSavedAt).toLocaleTimeString()}` : undefined}
-            >
-              {savingStatus === 'saving' ? 'Saving…' : savingStatus === 'saved' ? 'Saved' : 'Idle'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full border ${
+                  savingStatus === 'saving'
+                    ? 'border-amber-500 text-amber-700 dark:text-amber-400'
+                    : savingStatus === 'saved'
+                    ? 'border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                    : 'border-muted text-muted-foreground'
+                }`}
+                aria-live="polite"
+                title={lastSavedAt ? `Last saved ${new Date(lastSavedAt).toLocaleTimeString()}` : undefined}
+              >
+                {savingStatus === 'saving' ? 'Saving…' : savingStatus === 'saved' ? 'Saved' : 'Idle'}
+              </span>
+              {storageFallback && (
+                <span className="text-[10px] md:text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200" title="OPFS not available; using IndexedDB fallback">
+                  IndexedDB fallback
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -418,7 +432,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 border rounded-md p-0.5">
+        <div className="hidden md:flex items-center gap-1 border rounded-md p-0.5">
           <Button
             variant="ghost"
             size="icon"
@@ -460,8 +474,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
         <div className="border rounded-md p-0.5">
           <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 px-2 gap-2" data-tour-id="settings-button">
-                <Gear className="h-4 w-4" /> Settings
+              <Button variant="ghost" size="icon" className="h-8 w-8 p-0" aria-label="Settings" data-tour-id="settings-button">
+                <Gear className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-100 p-2">
