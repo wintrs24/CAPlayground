@@ -182,11 +182,19 @@ export function EditorProvider({
           }
           const findAssetBindings = (layers: AnyLayer[], filename: string): string[] => {
             const matches: string[] = [];
+            const normalize = (s: string) => {
+              try { s = decodeURIComponent(s); } catch {}
+              return (s || '').trim().toLowerCase();
+            };
+            const fileNorm = normalize(filename);
             const walk = (arr: AnyLayer[]) => {
               for (const layer of arr) {
                 if (layer.type === "image") {
-                  const name = (layer.src || "").split("/").pop();
-                  if (name === filename || (layer.src || "").includes(filename)) {
+                  const src = layer.src || "";
+                  const name = src.split("/").pop() || "";
+                  const nameNorm = normalize(name);
+                  const srcNorm = normalize(src);
+                  if (nameNorm === fileNorm || srcNorm.includes(fileNorm)) {
                     matches.push(layer.id);
                   }
                 } else if (layer.type === "video") {
@@ -194,7 +202,9 @@ export function EditorProvider({
                   const prefix = video.framePrefix || `${layer.id}_frame_`;
                   let ext = video.frameExtension || ".jpg";
                   if (!ext.startsWith(".")) ext = `.${ext}`;
-                  if (filename.startsWith(prefix) && filename.endsWith(ext)) {
+                  const pNorm = normalize(prefix);
+                  const eNorm = normalize(ext);
+                  if (fileNorm.startsWith(pNorm) && fileNorm.endsWith(eNorm)) {
                     const indexPart = filename.slice(prefix.length, filename.length - ext.length);
                     const frameIndex = Number(indexPart);
                     if (!Number.isNaN(frameIndex)) matches.push(`${layer.id}_frame_${frameIndex}`);

@@ -268,11 +268,14 @@ function parseCAVideoLayer(el: Element): VideoLayer {
 
   const contents = el.getElementsByTagNameNS(CAML_NS, 'contents')[0];
   const firstFrameEl = contents?.getElementsByTagNameNS(CAML_NS, 'CGImage')[0];
+  const contentsSrcAttr = (contents && (contents.getAttribute('type') || '').toLowerCase() === 'cgimage')
+    ? (contents.getAttribute('src') || undefined)
+    : undefined;
   
   let framePrefix = prefixAttr || undefined;
   let frameExtension = extAttr || undefined;
 
-  const firstReference = frameRefs[0] || attr(firstFrameEl, 'src');
+  const firstReference = frameRefs[0] || attr(firstFrameEl, 'src') || contentsSrcAttr;
   if (firstReference) {
     const fileName = firstReference.split('/').pop() || firstReference;
     const match = fileName.match(/^(.*?)(\d+)(\.[a-z0-9]+)$/i);
@@ -394,11 +397,15 @@ function parseCALayer(el: Element): AnyLayer {
   const align = attr(el, 'align') as TextLayer['align'] | undefined;
 
   let imageSrc: string | undefined;
-  const contents = el.getElementsByTagNameNS(CAML_NS, 'contents')[0]; //was supposed to be contents :P thats why images wouldn't render in mica 
+  const contents = el.getElementsByTagNameNS(CAML_NS, 'contents')[0]; // was supposed to be contents :P thats why images wouldn't render in mica
   if (contents) {
     const images = contents.getElementsByTagNameNS(CAML_NS, 'CGImage');
     if (images && images[0]) {
       imageSrc = attr(images[0], 'src');
+    } else {
+      const t = (contents.getAttribute('type') || '').toLowerCase();
+      const s = contents.getAttribute('src') || '';
+      if (t === 'cgimage' && s) imageSrc = s;
     }
   }
 
@@ -552,6 +559,19 @@ function parseCALayer(el: Element): AnyLayer {
     for (const n of kids) {
       if (n.localName === 'CALayer') children.push(parseCALayer(n));
       else if (n.localName === 'CATextLayer') children.push(parseCATextLayer(n));
+    }
+    if (imageSrc) {
+      const imgChild: AnyLayer = {
+        ...base,
+        id: crypto.randomUUID(),
+        name: (base as any).name ? `${(base as any).name} (Contents)` : 'Contents Image',
+        type: 'image',
+        position: { x: (base as any).size.w / 2, y: (base as any).size.h / 2 },
+        size: { w: (base as any).size.w, h: (base as any).size.h },
+        src: imageSrc,
+        anchorPoint: { x: 0.5, y: 0.5 },
+      } as AnyLayer;
+      children.unshift(imgChild);
     }
     if (children.length > 0) {
       const group: GroupLayer = {

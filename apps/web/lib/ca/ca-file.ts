@@ -296,6 +296,35 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
     }
   } catch {}
 
+  try {
+    const doc = new DOMParser().parseFromString(camlStr, 'application/xml');
+    const refNames = new Set<string>();
+    // <CGImage src="assets/...">
+    const cgImgs = Array.from(doc.getElementsByTagName('CGImage')) as Element[];
+    for (const el of cgImgs) {
+      const src = el.getAttribute('src') || '';
+      if (/(^|\/)assets\//i.test(src)) {
+        const name = (src.split(/assets\//i)[1] || '').split('/').pop() || '';
+        if (name) refNames.add(name);
+      }
+    }
+    // <contents type="CGImage" src="assets/...">
+    const contentsEls = Array.from(doc.getElementsByTagName('contents')) as Element[];
+    for (const c of contentsEls) {
+      const t = (c.getAttribute('type') || '').toLowerCase();
+      const src = c.getAttribute('src') || '';
+      if (t === 'cgimage' && /(^|\/)assets\//i.test(src)) {
+        const name = (src.split(/assets\//i)[1] || '').split('/').pop() || '';
+        if (name) refNames.add(name);
+      }
+    }
+    const have = new Set(Object.keys(assets));
+    const missing = Array.from(refNames).filter(n => !have.has(n));
+    if (missing.length) {
+      try { console.warn(`[import] Missing ${missing.length} asset(s) referenced in CAML: ${missing.join(', ')}`); } catch {}
+    }
+  } catch {}
+
   const project = {
     id: crypto.randomUUID(),
     name: 'Imported Project',
