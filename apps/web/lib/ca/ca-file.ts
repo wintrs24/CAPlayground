@@ -177,29 +177,23 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
   const stateTransitions = parseStateTransitions(camlStr);
 
   const assets: CAProjectBundle['assets'] = {};
-  let assetsFolder = zip.folder('assets');
-  if (!assetsFolder) {
-    const files = Object.keys(zip.files);
-    const assetsPath = files.find(f => f.includes('/assets/') || f.startsWith('assets/'));
-    if (assetsPath) {
-      const pathParts = assetsPath.split('/');
-      const projectFolder = pathParts[0];
-      const projectZip = zip.folder(projectFolder);
-      if (projectZip) {
-        assetsFolder = projectZip.folder('assets');
-      }
-    }
-  }
-  
-  if (assetsFolder) {
-    const files = Object.keys(assetsFolder.files);
-    for (const path of files) {
-      const fileObj = assetsFolder.file(path);
+  try {
+    const allPaths = Object.keys(zip.files);
+    for (const p of allPaths) {
+      const entry = zip.files[p];
+      if (!entry || entry.dir) continue;
+      if (!/(^|\/)assets\//i.test(p)) continue;
+      const fileObj = zip.file(p);
       if (!fileObj) continue;
       const data = await fileObj.async('blob');
-      const name = path.replace(/^assets\//, '');
-      assets[name] = { path: `assets/${name}`, data };
+      const afterAssets = p.split(/assets\//i)[1] || '';
+      const filename = (afterAssets.split('/').pop() || '').trim();
+      if (!filename) continue;
+      if (data && data.size > 0 && !assets[filename]) {
+        assets[filename] = { path: `assets/${filename}`, data };
+      }
     }
+  } catch {
   }
 
   const project = {

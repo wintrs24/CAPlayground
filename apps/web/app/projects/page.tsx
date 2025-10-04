@@ -687,7 +687,7 @@ export default function ProjectsPage() {
               onChange={handleImportChange}
               className="hidden"
             />
-            <Button variant="outline" onClick={handleImportClick} className="hidden">
+            <Button variant="outline" onClick={handleImportClick}>
               <Upload className="h-4 w-4 mr-2" /> Import .ca
             </Button>
             {isSelectMode && (
