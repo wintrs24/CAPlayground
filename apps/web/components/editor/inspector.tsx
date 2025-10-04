@@ -544,6 +544,20 @@ export function Inspector() {
             />
             <span className="text-xs text-muted-foreground">%</span>
           </div>
+          <div className="col-span-2 -mt-1">
+            <p className="text-[11px] text-muted-foreground">
+              Opacity affects the entire layer (content, background, and sublayers). If you only want to fade the
+              background fill behind the content, use
+              {' '}
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-foreground"
+                onClick={() => setActiveTab('content')}
+              >
+                Content → Background opacity
+              </button>.
+            </p>
+          </div>
         </div>
         
         {selected.type === "shape" && (
@@ -628,6 +642,20 @@ export function Inspector() {
               }}
             />
             <span className="text-xs text-muted-foreground">%</span>
+          </div>
+          <div className="col-span-2 -mt-1">
+            <p className="text-[11px] text-muted-foreground">
+              Background opacity affects only this layer’s background color fill (behind the content). For overall layer opacity
+              (affects images, text, and sublayers), use
+              {' '}
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-foreground"
+                onClick={() => setActiveTab('compositing')}
+              >
+                Compositing → Opacity
+              </button>.
+            </p>
           </div>
         </div>
         <div className="space-y-1">
