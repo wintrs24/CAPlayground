@@ -15,6 +15,38 @@ export function findById(layers: AnyLayer[], id: string | null | undefined): Any
   return undefined;
 }
 
+export function insertIntoGroupInTree(
+  layers: AnyLayer[],
+  groupId: string,
+  node: AnyLayer,
+  index?: number
+): { inserted: boolean; layers: AnyLayer[] } {
+  let inserted = false;
+  const next: AnyLayer[] = [];
+  for (const l of layers) {
+    if (l.id === groupId && l.type === 'group') {
+      const g = l as GroupLayer;
+      const kids = [...g.children];
+      const i = typeof index === 'number' && index >= 0 && index <= kids.length ? index : kids.length;
+      kids.splice(i, 0, node);
+      next.push({ ...g, children: kids } as AnyLayer);
+      inserted = true;
+    } else if (l.type === 'group') {
+      const g = l as GroupLayer;
+      const res = insertIntoGroupInTree(g.children, groupId, node, index);
+      if (res.inserted) {
+        inserted = true;
+        next.push({ ...g, children: res.layers } as AnyLayer);
+      } else {
+        next.push(l);
+      }
+    } else {
+      next.push(l);
+    }
+  }
+  return { inserted, layers: next };
+}
+
 export function cloneLayerDeep(layer: AnyLayer): AnyLayer {
   const newId = genId();
   if (layer.type === 'group') {
