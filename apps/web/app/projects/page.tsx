@@ -70,7 +70,7 @@ export default function ProjectsPage() {
 
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState<"all" | "7" | "30" | "year">("all");
-  const [sortBy, setSortBy] = useState<"recent" | "name-asc" | "name-desc">("recent");
+  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "name-asc" | "name-desc">("recent");
   const PAGE_SIZE = 8;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -348,6 +348,9 @@ export default function ProjectsPage() {
       if (sortBy === "recent") {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
+      if (sortBy === "oldest") {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
       if (sortBy === "name-asc") return a.name.localeCompare(b.name);
       if (sortBy === "name-desc") return b.name.localeCompare(a.name);
       return 0;
@@ -518,7 +521,7 @@ export default function ProjectsPage() {
     setIsRenameOpen(false);
   };
 
-  const deleteProject = async (id: string) => {
+  const handleDeleteProject = async (id: string) => {
     await deleteProject(id);
     const idbList = await listProjects();
     setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
@@ -605,12 +608,17 @@ export default function ProjectsPage() {
   };
 
   const openBulkDelete = () => setIsBulkDeleteOpen(true);
-  const performBulkDelete = () => {
+  const performBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    setProjects(projectsArray.filter((p) => !selectedIds.includes(p.id)));
-    setSelectedIds([]);
-    setIsSelectMode(false);
-    setIsBulkDeleteOpen(false);
+    try {
+      await Promise.all(selectedIds.map((id) => deleteProject(id)));
+      const idbList = await listProjects();
+      setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+    } finally {
+      setSelectedIds([]);
+      setIsSelectMode(false);
+      setIsBulkDeleteOpen(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -678,6 +686,7 @@ export default function ProjectsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="recent">Newest first</SelectItem>
+                    <SelectItem value="oldest">Oldest first</SelectItem>
                     <SelectItem value="name-asc">Name A → Z</SelectItem>
                     <SelectItem value="name-desc">Name Z → A</SelectItem>
                   </SelectContent>
@@ -994,7 +1003,7 @@ export default function ProjectsPage() {
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => {
                   if (pendingDeleteId) {
-                    deleteProject(pendingDeleteId);
+                    handleDeleteProject(pendingDeleteId);
                   }
                   setPendingDeleteId(null);
                   setIsDeleteOpen(false);
