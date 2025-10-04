@@ -7,6 +7,20 @@ function attr(node: Element, name: string): string | undefined {
   return v === null ? undefined : v;
 }
 
+function directChildByTagNS(el: Element, tag: string): Element | undefined {
+  const kids = Array.from(el.children) as Element[];
+  return kids.find((c) => (c as any).namespaceURI === CAML_NS && c.localName === tag);
+}
+function directChildrenByTagNS(el: Element, tag: string): Element[] {
+  const kids = Array.from(el.children) as Element[];
+  return kids.filter((c) => (c as any).namespaceURI === CAML_NS && c.localName === tag);
+}
+
+function isTopLevelRoot(el: Element): boolean {
+  const p = el.parentElement;
+  return !!(p && (p as any).namespaceURI === CAML_NS && p.localName === 'caml');
+}
+
 export function parseStateTransitions(xml: string): CAStateTransitions {
   const out: CAStateTransitions = [];
   try {
@@ -244,7 +258,7 @@ function parseCAVideoLayer(el: Element): VideoLayer {
   let duration = durationAttr ? Number(durationAttr) : undefined;
   const autoReverses = autoReversesAttr === '1' || autoReversesAttr === 'true';
 
-  const animationsEl = el.getElementsByTagNameNS(CAML_NS, 'animations')[0];
+  const animationsEl = directChildByTagNS(el, 'animations');
   const animNode = animationsEl?.getElementsByTagNameNS(CAML_NS, 'animation')[0];
   const frameRefs: string[] = [];
   
@@ -266,7 +280,7 @@ function parseCAVideoLayer(el: Element): VideoLayer {
     }
   }
 
-  const contents = el.getElementsByTagNameNS(CAML_NS, 'contents')[0];
+  const contents = directChildByTagNS(el, 'contents');
   const firstFrameEl = contents?.getElementsByTagNameNS(CAML_NS, 'CGImage')[0];
   const contentsSrcAttr = (contents && (contents.getAttribute('type') || '').toLowerCase() === 'cgimage')
     ? (contents.getAttribute('src') || undefined)
@@ -275,7 +289,7 @@ function parseCAVideoLayer(el: Element): VideoLayer {
   let framePrefix = prefixAttr || undefined;
   let frameExtension = extAttr || undefined;
 
-  const firstReference = frameRefs[0] || attr(firstFrameEl, 'src') || contentsSrcAttr;
+  const firstReference = frameRefs[0] || (firstFrameEl ? attr(firstFrameEl, 'src') : undefined) || contentsSrcAttr;
   if (firstReference) {
     const fileName = firstReference.split('/').pop() || firstReference;
     const match = fileName.match(/^(.*?)(\d+)(\.[a-z0-9]+)$/i);
@@ -527,8 +541,8 @@ function parseCALayer(el: Element): AnyLayer {
     }
   } catch {}
 
-  const sublayersEl = el.getElementsByTagNameNS(CAML_NS, 'sublayers')[0];
-  const sublayerNodesRaw = sublayersEl ? Array.from(sublayersEl.children).filter((n) => n.namespaceURI === CAML_NS) as Element[] : [];
+  const sublayersEl = directChildByTagNS(el, 'sublayers');
+  const sublayerNodesRaw = sublayersEl ? directChildrenByTagNS(sublayersEl, 'CALayer').concat(directChildrenByTagNS(sublayersEl, 'CATextLayer')) : [];
   const sublayerNodes = sublayerNodesRaw;
 
   if (imageSrc && sublayerNodes.length === 0) {
@@ -555,12 +569,26 @@ function parseCALayer(el: Element): AnyLayer {
 
   if (sublayersEl) {
     const children: AnyLayer[] = [];
-    const kids = Array.from(sublayersEl.children).filter((n) => (n as any).namespaceURI === CAML_NS) as Element[];
+    const kids = sublayerNodes;
     for (const n of kids) {
       if (n.localName === 'CALayer') children.push(parseCALayer(n));
       else if (n.localName === 'CATextLayer') children.push(parseCATextLayer(n));
     }
-    if (imageSrc) {
+    const normalize = (s: string) => {
+      try { s = decodeURIComponent(s); } catch {}
+      return (s || '').trim().toLowerCase();
+    };
+    const imageSrcNorm = imageSrc ? normalize(imageSrc) : '';
+    const imageFileNorm = imageSrc ? normalize((imageSrc.split('/').pop() || imageSrc)) : '';
+    const hasEquivalentChild = children.some((ch) => {
+      if ((ch as any).type !== 'image') return false;
+      const cs = (ch as any).src || '';
+      const csNorm = normalize(cs);
+      const cfNorm = normalize((cs.split('/').pop() || cs));
+      return !!imageSrc && (csNorm === imageSrcNorm || cfNorm === imageFileNorm);
+    });
+
+    if (imageSrc && !isTopLevelRoot(el) && !hasEquivalentChild) {
       const imgChild: AnyLayer = {
         ...base,
         id: crypto.randomUUID(),
