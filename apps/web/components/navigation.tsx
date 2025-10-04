@@ -117,6 +117,9 @@ export function Navigation() {
             <Link href="/roadmap" className="text-foreground hover:text-accent transition-colors">
               Roadmap
             </Link>
+            <Link href="/wallpapers" className="text-foreground hover:text-accent transition-colors">
+              Wallpapers
+            </Link>
           </div>
 
           {/* Right actions */}
@@ -210,6 +213,13 @@ export function Navigation() {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Roadmap
+              </Link>
+              <Link
+                href="/wallpapers"
+                className="text-foreground hover:text-accent hover:bg-muted/50 transition-all duration-200 py-3 px-6 rounded-lg mx-2 text-4xl"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Wallpapers
               </Link>
               <Link
                 href="/contributors"
