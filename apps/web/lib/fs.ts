@@ -1,11 +1,34 @@
 // OPFS helpers
 export async function isOPFSSupported(): Promise<boolean> {
+
+  try {
+    const hasAPI = !!(navigator?.storage && (navigator.storage as any).getDirectory);
+    if (!hasAPI) return false;
+
+    const root: any = await (navigator.storage as any).getDirectory();
+    if (!root) return false;
+
+    const probeDir = '__opfs_probe__';
+    let dir: any | null = null;
     try {
-      return !!(navigator?.storage && (navigator.storage as any).getDirectory);
+      dir = await root.getDirectoryHandle(probeDir, { create: true });
+      const fh = await dir.getFileHandle('t.txt', { create: true });
+      const w = await fh.createWritable();
+      await w.write(new Blob(['ok'], { type: 'text/plain' }));
+      await w.close();
+      // cleanup
+      try { await (dir as any).removeEntry('t.txt'); } catch {}
+      try { await (root as any).removeEntry(probeDir, { recursive: true }); } catch {}
+      return true;
     } catch {
+      try { if (dir) await (dir as any).removeEntry('t.txt'); } catch {}
+      try { await (root as any).removeEntry(probeDir, { recursive: true }); } catch {}
       return false;
     }
+  } catch {
+    return false;
   }
+}
   
   async function getRoot(): Promise<FileSystemDirectoryHandle> {
     const root: FileSystemDirectoryHandle = await navigator.storage.getDirectory();

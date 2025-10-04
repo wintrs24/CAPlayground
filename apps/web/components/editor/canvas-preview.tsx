@@ -40,6 +40,8 @@ export function CanvasPreview() {
     startY: number;
     w: number;
     h: number;
+    lastX: number;
+    lastY: number;
   } | null>(null);
 
   useEffect(() => {
@@ -698,6 +700,8 @@ export function CanvasPreview() {
       startY: startLT.top,
       w: l.size.w,
       h: l.size.h,
+      lastX: (l as any).position?.x ?? 0,
+      lastY: (l as any).position?.y ?? 0,
     };
     document.body.style.userSelect = "none";
 
@@ -766,6 +770,8 @@ export function CanvasPreview() {
       }
       const pos = cssToPosition(cssLeft, cssTop, (renderedLayers.find(r=>r.id===d.id) as AnyLayer) || (l as AnyLayer), h, yUp);
       updateLayerTransient(d.id, { position: { x: pos.x, y: pos.y } as any });
+      d.lastX = pos.x;
+      d.lastY = pos.y;
     };
 
     const onTouchMove = (tev: TouchEvent) => {
@@ -775,56 +781,10 @@ export function CanvasPreview() {
       tev.preventDefault();
     };
 
-    const onUp = (ev: MouseEvent | TouchEvent) => {
+    const onUp = (_ev: MouseEvent | TouchEvent) => {
       const d = draggingRef.current;
       if (d) {
-        const clientX = (ev as any).clientX ?? ((ev as TouchEvent).changedTouches?.[0]?.clientX);
-        const clientY = (ev as any).clientY ?? ((ev as TouchEvent).changedTouches?.[0]?.clientY);
-        const dx = (clientX - d.startClientX) / scale;
-        const dy = (clientY - d.startClientY) / scale;
-        let cssLeft = d.startX + dx;
-        let cssTop = d.startY + dy;
-        const w = docRef.current?.meta.width ?? 0;
-        const h = docRef.current?.meta.height ?? 0;
-        if (w > 0 && h > 0 && (snapEdgesEnabled || snapLayersEnabled)) {
-          const th = SNAP_THRESHOLD;
-          const xPairs: Array<[number, number]> = [];
-          const yPairs: Array<[number, number]> = [];
-          if (snapEdgesEnabled) {
-            xPairs.push([0, 0], [(w - d.w) / 2, w / 2], [w - d.w, w]);
-            yPairs.push([0, 0], [(h - d.h) / 2, h / 2], [h - d.h, h]);
-          }
-          if (snapLayersEnabled) {
-            const others = (renderedLayers || []).filter((ol) => ol.id !== d.id);
-            for (const ol of others) {
-              const L = ol as any;
-              const lw = L.size?.w ?? 0;
-              const lh = L.size?.h ?? 0;
-              const lt = computeCssLT(L, h, yUp);
-              const left = lt.left;
-              const right = lt.left + lw;
-              const cx = left + lw / 2;
-              const top = lt.top;
-              const bottom = lt.top + lh;
-              const cy = top + lh / 2;
-              xPairs.push([left, left],[right, right],[right - d.w, right],[left - d.w, left],[cx - d.w / 2, cx]);
-              yPairs.push([top, top],[bottom, bottom],[bottom - d.h, bottom],[top - d.h, top],[cy - d.h / 2, cy]);
-            }
-          }
-          const nearest = (val: number, pairs: Array<[number, number]>) => {
-            let best = val;
-            let bestDist = th + 1;
-            for (const [t] of pairs) {
-              const dist = Math.abs(val - t);
-              if (dist <= th && dist < bestDist) { best = t; bestDist = dist; }
-            }
-            return best;
-          };
-          cssLeft = nearest(cssLeft, xPairs);
-          cssTop = nearest(cssTop, yPairs);
-        }
-        const pos = cssToPosition(cssLeft, cssTop, (renderedLayers.find(r=>r.id===d.id) as AnyLayer) || (l as AnyLayer), h, yUp);
-        updateLayer(d.id, { position: { x: pos.x, y: pos.y } as any });
+        updateLayer(d.id, { position: { x: d.lastX, y: d.lastY } as any });
       }
       draggingRef.current = null;
       document.body.style.userSelect = "";
