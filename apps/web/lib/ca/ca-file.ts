@@ -34,6 +34,98 @@ function formatXml(xml: string): string {
   return formatted + '\n';
 }
 
+export type DualCABundle = {
+  project: { width: number; height: number; geometryFlipped: 0|1 };
+  floating: Omit<CAProjectBundle, 'project'>;
+  background: Omit<CAProjectBundle, 'project'>;
+};
+
+// Import a .zip containing both Background.ca and Floating.ca. If both are not present, throw an error.
+export async function unpackDualCAZip(file: Blob): Promise<DualCABundle> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(file);
+
+  const paths = Object.keys(zip.files).map(p => p.replace(/\\/g, '/'));
+  const findDir = (needle: 'Floating.ca'|'Background.ca') => {
+    const nl = needle.toLowerCase();
+    // Find a path that contains a segment exactly matching needle (case-insensitive)
+    const candidate = paths.find((p) => p.toLowerCase().split('/').includes(nl));
+    if (!candidate) return null;
+    const parts = candidate.split('/');
+    const idx = parts.map(s => s.toLowerCase()).lastIndexOf(nl);
+    if (idx < 0) return null;
+    const dir = parts.slice(0, idx + 1).join('/') + '/';
+    return dir;
+  };
+  const floatingDir = findDir('Floating.ca');
+  const backgroundDir = findDir('Background.ca');
+  if (!floatingDir || !backgroundDir) {
+    throw new Error('UNSUPPORTED_ZIP_STRUCTURE: Expected Background.ca and Floating.ca');
+  }
+
+  const readDoc = async (baseDir: string) => {
+    const norm = (p: string) => p.replace(/\\/g, '/');
+    const byLower = new Map(paths.map((p) => [p.toLowerCase(), p] as const));
+    const get = (rel: string) => {
+      const full = norm(`${baseDir}${rel}`);
+      const hit = byLower.get(full.toLowerCase());
+      return zip.file(hit || full);
+    };
+    // index
+    let indexXml = await get('index.xml')?.async('string');
+    if (!indexXml) indexXml = await get('Index.xml')?.async('string');
+    const rootDoc = indexXml ? parseIndexXml(indexXml) : null;
+    const sceneName = (rootDoc || DEFAULT_SCENE).trim();
+    // main caml
+    let camlEntry = get(sceneName);
+    if (!camlEntry) {
+      const base = sceneName.split('/').pop() || sceneName;
+      const candidate = paths.find((p) => p.toLowerCase().startsWith(baseDir.toLowerCase()) && (p.split('/').pop() || '') === base);
+      if (candidate) camlEntry = zip.file(candidate);
+    }
+    if (!camlEntry) throw new Error(`Missing CAML in ${baseDir}`);
+    const camlStrOriginal = await camlEntry.async('string');
+    const { xml: camlStr, assets: inlineAssets } = await extractInlineAssetsToFiles(camlStrOriginal);
+    const root = parseCAML(camlStr);
+    const states = parseStates(camlStr);
+    const stateOverrides = parseStateOverrides(camlStr);
+    const stateTransitions = parseStateTransitions(camlStr);
+    const assets: CAProjectBundle['assets'] = {};
+    for (const p of paths) {
+      if (!p.toLowerCase().startsWith(baseDir.toLowerCase())) continue;
+      const entry = zip.files[p];
+      if (!entry || entry.dir) continue;
+      if (!/(^|\/)assets\//i.test(p)) continue;
+      const fileObj = zip.file(p);
+      if (!fileObj) continue;
+      const data = await fileObj.async('blob');
+      const afterAssets = p.split(/assets\//i)[1] || '';
+      const filename = (afterAssets.split('/').pop() || '').trim();
+      if (!filename) continue;
+      if (data && data.size > 0 && !assets[filename]) assets[filename] = { path: `assets/${filename}`, data };
+    }
+    try {
+      for (const [name, info] of Object.entries(inlineAssets || {})) {
+        if (!assets[name]) assets[name] = { path: (info as any).path, data: (info as any).data };
+      }
+    } catch {}
+    return { root, states, stateOverrides, stateTransitions, assets } as Omit<CAProjectBundle,'project'>;
+  };
+
+  const floating = await readDoc(floatingDir);
+  const background = await readDoc(backgroundDir);
+
+  const width = Math.max(0, (floating.root as AnyLayer)?.size?.w || (background.root as AnyLayer)?.size?.w || 390);
+  const height = Math.max(0, (floating.root as AnyLayer)?.size?.h || (background.root as AnyLayer)?.size?.h || 844);
+  const geom = (((floating.root as any)?.geometryFlipped ?? (background.root as any)?.geometryFlipped) ?? 0) as 0|1;
+
+  return {
+    project: { width, height, geometryFlipped: geom },
+    floating,
+    background,
+  };
+}
+
 function buildIndexXml(rootDocument: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>${rootDocument}</string>\n</dict>\n</plist>`;
 }

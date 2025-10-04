@@ -29,8 +29,8 @@ import { Label } from "@/components/ui/label";
 import { devices, getDevicesByCategory, type DeviceSpec } from "@/lib/devices";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import type React from "react";
-import type { AnyLayer, CAProject } from "@/lib/ca/types";
-import { unpackCA } from "@/lib/ca/ca-file";
+import type { AnyLayer, CAProject, CAAsset } from "@/lib/ca/types";
+import { unpackCA, unpackDualCAZip, type DualCABundle } from "@/lib/ca/ca-file";
 import { ensureUniqueProjectName, createProject, updateProject, deleteProject, getProject, listFiles, listProjects, putBlobFile, putTextFile, isUsingOPFS } from "@/lib/storage";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
@@ -552,17 +552,33 @@ export default function ProjectsPage() {
     try {
       const file = e.target.files?.[0];
       if (!file) return;
-      const bundle = await unpackCA(file);
+      const isZip = /zip$/i.test(file.type) || /\.zip$/i.test(file.name);
+      let dual: DualCABundle | null = null;
+      let bundle: any = null;
+      if (isZip) {
+        try {
+          dual = await unpackDualCAZip(file);
+        } catch (err: any) {
+          if (String(err?.message || '').startsWith('UNSUPPORTED_ZIP_STRUCTURE')) {
+            alert('Zip not supported: expected both Background.ca and Floating.ca');
+            return;
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        bundle = await unpackCA(file);
+      }
       const id = Date.now().toString();
-      const base = bundle.project.name || "Imported Project";
+      const base = (bundle?.project?.name) || "Imported Project";
       const name = await ensureUniqueProjectName(base);
-      const width = Math.round(bundle.project.width || (bundle.root?.size?.w ?? 0));
-      const height = Math.round(bundle.project.height || (bundle.root?.size?.h ?? 0));
+      const width = Math.round((dual?.project.width) ?? (bundle?.project.width || (bundle?.root?.size?.w ?? 0)));
+      const height = Math.round((dual?.project.height) ?? (bundle?.project.height || (bundle?.root?.size?.h ?? 0)));
       await createProject({ id, name, createdAt: new Date().toISOString(), width, height });
       const folder = `${name}.ca`;
       const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
       const assetManifest = `<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n<caml xmlns=\"http://www.apple.com/CoreAnimation/1.0\">\n  <MicaAssetManifest>\n    <modules type=\"NSArray\"/>\n  </MicaAssetManifest>\n</caml>`;
-      const root = bundle.root as any;
+      const root = (dual ? (dual.floating.root as any) : (bundle.root as any));
       const mkCaml = async (layers: AnyLayer[]) => {
         const { serializeCAML } = await import('@/lib/ca/caml');
         const group = {
@@ -572,23 +588,70 @@ export default function ProjectsPage() {
           position: { x: Math.round((width||0)/2), y: Math.round((height||0)/2) },
           size: { w: width||0, h: height||0 },
           backgroundColor: root?.backgroundColor ?? '#e5e7eb',
-          geometryFlipped: (bundle.project.geometryFlipped ?? 0) as 0|1,
+          geometryFlipped: ((dual?.project.geometryFlipped) ?? (bundle?.project.geometryFlipped ?? 0)) as 0|1,
           children: layers,
         } as any;
-        return serializeCAML(group, { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb', geometryFlipped: (bundle.project.geometryFlipped ?? 0) as 0|1 } as any, bundle.states as any, bundle.stateOverrides as any, bundle.stateTransitions as any);
+        const states = (dual ? dual.floating.states : bundle.states) as any;
+        const stateOverrides = (dual ? dual.floating.stateOverrides : bundle.stateOverrides) as any;
+        const stateTransitions = (dual ? dual.floating.stateTransitions : bundle.stateTransitions) as any;
+        return serializeCAML(group, { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb', geometryFlipped: ((dual?.project.geometryFlipped) ?? (bundle?.project.geometryFlipped ?? 0)) as 0|1 } as any, states, stateOverrides, stateTransitions);
       };
-      const layers = root?.type === 'group' && Array.isArray(root.children) ? root.children : (root ? [root] : []);
-      const camlFloating = await mkCaml(layers);
-      const emptyBackgroundCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`;
-      await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating);
-      await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml);
-      await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest);
-      await putTextFile(id, `${folder}/Background.ca/main.caml`, emptyBackgroundCaml);
-      await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml);
-      await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest);
+      if (dual) {
+        // Floating from dual
+        const flRoot = dual.floating.root as any;
+        const flLayers = flRoot?.type === 'group' && Array.isArray(flRoot.children) ? flRoot.children : (flRoot ? [flRoot] : []);
+        const camlFloating = await mkCaml(flLayers);
+        await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating);
+        await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest);
+        // Background from dual
+        const bgRoot = dual.background.root as any;
+        const bgLayers = bgRoot?.type === 'group' && Array.isArray(bgRoot.children) ? bgRoot.children : (bgRoot ? [bgRoot] : []);
+        const { serializeCAML } = await import('@/lib/ca/caml');
+        const bgGroup = {
+          id: `${id}-bg`,
+          name: `${name} Background`,
+          type: 'group',
+          position: { x: Math.round((width||0)/2), y: Math.round((height||0)/2) },
+          size: { w: width||0, h: height||0 },
+          backgroundColor: (bgRoot?.backgroundColor ?? '#e5e7eb'),
+          geometryFlipped: ((dual.project.geometryFlipped) as 0|1),
+          children: bgLayers,
+        } as any;
+        const camlBackground = serializeCAML(bgGroup, { id, name, width, height, background: (bgRoot?.backgroundColor ?? '#e5e7eb'), geometryFlipped: dual.project.geometryFlipped } as any, dual.background.states as any, dual.background.stateOverrides as any, dual.background.stateTransitions as any);
+        await putTextFile(id, `${folder}/Background.ca/main.caml`, camlBackground);
+        await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest);
+      } else {
+        const layers = root?.type === 'group' && Array.isArray(root.children) ? root.children : (root ? [root] : []);
+        const camlFloating = await mkCaml(layers);
+        const emptyBackgroundCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`;
+        await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating);
+        await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest);
+        await putTextFile(id, `${folder}/Background.ca/main.caml`, emptyBackgroundCaml);
+        await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest);
+      }
       // assets
-      if (bundle.assets) {
-        for (const [filename, asset] of Object.entries(bundle.assets)) {
+      if (dual) {
+        const flAssets = (dual.floating.assets || {}) as Record<string, CAAsset>;
+        for (const [filename, asset] of Object.entries(flAssets)) {
+          try {
+            const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer]);
+            await putBlobFile(id, `${folder}/Floating.ca/assets/${filename}`, data);
+          } catch {}
+        }
+        const bgAssets = (dual.background.assets || {}) as Record<string, CAAsset>;
+        for (const [filename, asset] of Object.entries(bgAssets)) {
+          try {
+            const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer]);
+            await putBlobFile(id, `${folder}/Background.ca/assets/${filename}`, data);
+          } catch {}
+        }
+      } else if (bundle?.assets) {
+        const assets = bundle.assets as Record<string, CAAsset>;
+        for (const [filename, asset] of Object.entries(assets)) {
           try {
             const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer]);
             await putBlobFile(id, `${folder}/Floating.ca/assets/${filename}`, data);
