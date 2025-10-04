@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Plus, MoreVertical, ChevronRight, ChevronDown } from "lucide-react";
 import { useEditor } from "./editor-context";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
 
 export function LayersPanel() {
@@ -22,6 +22,19 @@ export function LayersPanel() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [rootCollapsed, setRootCollapsed] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSelectMode) {
+        setIsSelectMode(false);
+        setMultiSelectedIds([]);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isSelectMode]);
 
   const toggleCollapse = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -51,16 +64,25 @@ export function LayersPanel() {
     cancelRename();
   };
 
+  const toggleMultiSelect = (id: string) => {
+    setMultiSelectedIds((prev) => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
   const renderItem = (l: AnyLayer, depth: number) => {
     const isGroup = l.type === "group";
     const hasChildren = isGroup && (l as GroupLayer).children.length > 0;
     const isCollapsed = collapsed.has(l.id);
+    const isChecked = multiSelectedIds.includes(l.id);
     
     const row = (
       <div
         key={l.id}
         className={`py-2 flex items-center justify-between cursor-pointer ${selectedId === l.id ? 'bg-accent/30' : 'hover:bg-muted/50'} ${dragOverId === l.id ? 'ring-1 ring-accent/60' : ''}`}
-        onClick={(e) => { e.stopPropagation(); selectLayer(l.id); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (isSelectMode) toggleMultiSelect(l.id);
+          else selectLayer(l.id);
+        }}
         onDoubleClick={() => startRename(l)}
         style={{ paddingLeft: 8 + depth * 16 }}
         draggable
@@ -91,19 +113,28 @@ export function LayersPanel() {
         }}
       >
         <div className="truncate flex-1 min-w-0 flex items-center gap-1">
-          {hasChildren ? (
+          {isSelectMode ? (
             <button
-              onClick={(e) => toggleCollapse(l.id, e)}
-              className="shrink-0 hover:bg-accent/50 rounded p-0.5"
-            >
-              {isCollapsed ? (
-                <ChevronRight className="h-3 w-3" />
-              ) : (
-                <ChevronDown className="h-3 w-3" />
-              )}
-            </button>
+              className={`shrink-0 h-4 w-4 rounded-full border ${isChecked ? 'bg-accent border-accent' : 'border-muted-foreground/50'} mr-1`}
+              onClick={(e) => { e.stopPropagation(); toggleMultiSelect(l.id); }}
+              aria-label={isChecked ? 'Deselect layer' : 'Select layer'}
+              title={isChecked ? 'Deselect' : 'Select'}
+            />
           ) : (
-            <div className="w-4 shrink-0" />
+            hasChildren ? (
+              <button
+                onClick={(e) => toggleCollapse(l.id, e)}
+                className="shrink-0 hover:bg-accent/50 rounded p-0.5"
+              >
+                {isCollapsed ? (
+                  <ChevronRight className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+              </button>
+            ) : (
+              <div className="w-4 shrink-0" />
+            )
           )}
           {editingId === l.id ? (
             <input
@@ -142,6 +173,7 @@ export function LayersPanel() {
               <DropdownMenuItem onClick={() => startRename(l)}>Rename</DropdownMenuItem>
               <DropdownMenuItem onClick={() => duplicateLayer(l.id)}>Duplicate</DropdownMenuItem>
               <DropdownMenuItem onClick={() => deleteLayer(l.id)} className="text-destructive focus:text-destructive">Delete</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setIsSelectMode(true); setMultiSelectedIds((prev) => prev.includes(l.id) ? prev : [...prev, l.id]); }}>Select</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -269,6 +301,52 @@ export function LayersPanel() {
           </div>
         </div>
       </div>
+
+      {isSelectMode && (
+        <div className="border-t p-2 gap-2 flex flex-col">
+          <div className="text-xs text-muted-foreground">
+            {multiSelectedIds.length} selected
+          </div>
+          <div className="flex gap-2 flex-col">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={multiSelectedIds.length === 0}
+              onClick={(e) => {
+                e.stopPropagation();
+                for (const id of multiSelectedIds) {
+                  try { duplicateLayer(id); } catch {}
+                }
+              }}
+              className="w-full"
+            >
+              Duplicate layers
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={multiSelectedIds.length === 0}
+              onClick={(e) => {
+                e.stopPropagation();
+                for (const id of multiSelectedIds) {
+                  try { deleteLayer(id); } catch {}
+                }
+                setMultiSelectedIds([]);
+              }}
+              className="w-full"
+            >
+              Delete layers
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => { setIsSelectMode(false); setMultiSelectedIds([]); }}
+              className="w-full"
+            >
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
