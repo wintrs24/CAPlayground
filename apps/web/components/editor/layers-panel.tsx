@@ -21,6 +21,7 @@ export function LayersPanel() {
   const [editingName, setEditingName] = useState<string>("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [rootCollapsed, setRootCollapsed] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   const toggleCollapse = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -162,6 +163,11 @@ export function LayersPanel() {
     <Card className="p-0 gap-0 h-full min-h-0 flex flex-col" data-tour-id="layers-panel">
       <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
         <div className="font-medium">Layers</div>
+        {uploadStatus && (
+          <div className="text-xs text-muted-foreground animate-pulse">
+            {uploadStatus}
+          </div>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost" className="h-7 px-2">
@@ -183,10 +189,15 @@ export function LayersPanel() {
           className="hidden"
           onChange={async (e) => {
             const files = Array.from(e.target.files || []);
-            for (const file of files) {
-              try { await addImageLayerFromFile(file); } catch {}
+            setUploadStatus(files.length > 1 ? `Uploading ${files.length} images...` : 'Uploading image...');
+            try {
+              for (const file of files) {
+                try { await addImageLayerFromFile(file); } catch {}
+              }
+            } finally {
+              setUploadStatus(null);
+              if (fileInputRef.current) fileInputRef.current.value = "";
             }
-            if (fileInputRef.current) fileInputRef.current.value = "";
           }}
         />
         <input
@@ -197,8 +208,13 @@ export function LayersPanel() {
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
-              try { await addVideoLayerFromFile(file); } catch (err) {
+              setUploadStatus('Uploading video...');
+              try {
+                await addVideoLayerFromFile(file);
+              } catch (err) {
                 console.error('Failed to add video layer:', err);
+              } finally {
+                setUploadStatus(null);
               }
             }
             if (videoInputRef.current) videoInputRef.current.value = "";

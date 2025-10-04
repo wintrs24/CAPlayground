@@ -693,6 +693,8 @@ export function EditorProvider({
         size: { w: 120, h: 120 },
         shape,
         fill: "#60a5fa",
+        backgroundColor: "#60a5fa",
+        backgroundOpacity: 1,
         radius: shape === "rounded-rect" ? 8 : undefined,
       };
       const key = prev.activeCA;
