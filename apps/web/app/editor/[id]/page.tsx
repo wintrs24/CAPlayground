@@ -48,6 +48,14 @@ export default function EditorPage() {
     return () => mq.removeEventListener?.('change', apply);
   }, []);
 
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1250px)');
+    if (mq.matches) {
+      setShowLeft(true);
+      setShowRight(true);
+    }
+  }, []);
+
   type PanelKey = 'layers_states' | 'inspector';
   const [mobilePanelScreen, setMobilePanelScreen] = useState<PanelKey>('layers_states');
   const [mobileView, setMobileView] = useState<'canvas' | 'panels'>('canvas');
