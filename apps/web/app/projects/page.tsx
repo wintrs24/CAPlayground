@@ -222,72 +222,7 @@ export default function ProjectsPage() {
     });
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const map: Record<string, { bg: string; width?: number; height?: number }> = {};
-        const docs: Record<string, { meta: Pick<CAProject,'id'|'name'|'width'|'height'|'background'>; layers: AnyLayer[] }> = {};
-        for (const p of projectsArray) {
-          const folder = `${p.name}.ca`;
-          const [floating, background] = await Promise.all([
-            listFiles(p.id, `${folder}/Floating.ca/`),
-            listFiles(p.id, `${folder}/Background.ca/`),
-          ]);
-          const byPath = new Map([...floating, ...background].map(f => [f.path, f] as const));
-          const main = byPath.get(`${folder}/Floating.ca/main.caml`) || byPath.get(`${folder}/Background.ca/main.caml`);
-          let bg = '#e5e7eb';
-          let width = p.width;
-          let height = p.height;
-          let layers: AnyLayer[] = [];
-          if (main && main.type === 'text' && typeof main.data === 'string') {
-            try {
-              const { parseCAML } = await import('@/lib/ca/caml');
-              const root = parseCAML(main.data) as any;
-              if (root) {
-                width = Math.round(root.size?.w || width || 390);
-                height = Math.round(root.size?.h || height || 844);
-                if (typeof root.backgroundColor === 'string') bg = root.backgroundColor;
-                layers = root?.type === 'group' ? (root.children || []) : [root];
-              }
-            } catch {}
-          }
-          const toDataURL = async (buf: ArrayBuffer): Promise<string> => {
-            return await new Promise((resolve) => {
-              const blob = new Blob([buf]);
-              const r = new FileReader();
-              r.onload = () => resolve(String(r.result));
-              r.readAsDataURL(blob);
-            });
-          };
-          const filenameToDataURL: Record<string, string> = {};
-          const assetFiles = [...floating, ...background].filter(f => /\/assets\//.test(f.path) && f.type === 'blob');
-          for (const f of assetFiles) {
-            const filename = f.path.split('/assets/')[1];
-            try {
-              filenameToDataURL[filename] = await toDataURL(f.data as ArrayBuffer);
-            } catch {}
-          }
-          const applyAssetSrc = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
-            if ((l as any).type === 'group') {
-              const g = l as any;
-              return { ...g, children: applyAssetSrc(g.children || []) } as AnyLayer;
-            }
-            if (l.type === 'image') {
-              const name = (l.src || '').split('/').pop() || '';
-              const dataURL = filenameToDataURL[name];
-              if (dataURL) return { ...l, src: dataURL } as AnyLayer;
-            }
-            return l;
-          });
-          if (layers && layers.length) layers = applyAssetSrc(layers);
-          map[p.id] = { bg, width, height };
-          docs[p.id] = { meta: { id: p.id, name: p.name, width: width || 390, height: height || 844, background: bg }, layers };
-        }
-        setPreviews(map);
-        setThumbDocs(docs);
-      } catch {}
-    })();
-  }, [projectsArray]);
+  
 
   function ProjectThumb({ doc }: { doc: { meta: Pick<CAProject, 'width'|'height'|'background'>; layers: AnyLayer[] } }) {
     const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -439,6 +374,80 @@ export default function ProjectsPage() {
     obs.observe(el);
     return () => obs.disconnect();
   }, [filteredProjects.length]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const visibleList = filteredProjects.slice(0, visibleCount);
+        const need = visibleList.filter((p) => !(previews[p.id] && thumbDocs[p.id]));
+        if (need.length === 0) return;
+
+        const nextPreviews = { ...previews } as Record<string, { bg: string; width?: number; height?: number }>;
+        const nextDocs = { ...thumbDocs } as Record<string, { meta: Pick<CAProject,'id'|'name'|'width'|'height'|'background'>; layers: AnyLayer[] }>;
+
+        for (const p of need) {
+          const folder = `${p.name}.ca`;
+          const [floating, background] = await Promise.all([
+            listFiles(p.id, `${folder}/Floating.ca/`),
+            listFiles(p.id, `${folder}/Background.ca/`),
+          ]);
+          const byPath = new Map([...floating, ...background].map(f => [f.path, f] as const));
+          const main = byPath.get(`${folder}/Floating.ca/main.caml`) || byPath.get(`${folder}/Background.ca/main.caml`);
+          let bg = '#e5e7eb';
+          let width = p.width;
+          let height = p.height;
+          let layers: AnyLayer[] = [];
+          if (main && main.type === 'text' && typeof main.data === 'string') {
+            try {
+              const { parseCAML } = await import('@/lib/ca/caml');
+              const root = parseCAML(main.data) as any;
+              if (root) {
+                width = Math.round(root.size?.w || width || 390);
+                height = Math.round(root.size?.h || height || 844);
+                if (typeof root.backgroundColor === 'string') bg = root.backgroundColor;
+                layers = root?.type === 'group' ? (root.children || []) : [root];
+              }
+            } catch {}
+          }
+          const toDataURL = async (buf: ArrayBuffer): Promise<string> => {
+            return await new Promise((resolve) => {
+              const blob = new Blob([buf]);
+              const r = new FileReader();
+              r.onload = () => resolve(String(r.result));
+              r.readAsDataURL(blob);
+            });
+          };
+          const filenameToDataURL: Record<string, string> = {};
+          const assetFiles = [...floating, ...background].filter(f => /\/assets\//.test(f.path) && f.type === 'blob');
+          for (const f of assetFiles) {
+            const filename = f.path.split('/assets/')[1];
+            try {
+              filenameToDataURL[filename] = await toDataURL(f.data as ArrayBuffer);
+            } catch {}
+          }
+          const applyAssetSrc = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
+            if ((l as any).type === 'group') {
+              const g = l as any;
+              return { ...g, children: applyAssetSrc(g.children || []) } as AnyLayer;
+            }
+            if (l.type === 'image') {
+              const name = (l.src || '').split('/').pop() || '';
+              const dataURL = filenameToDataURL[name];
+              if (dataURL) return { ...l, src: dataURL } as AnyLayer;
+            }
+            return l;
+          });
+          if (layers && layers.length) layers = applyAssetSrc(layers);
+
+          nextPreviews[p.id] = { bg, width, height };
+          nextDocs[p.id] = { meta: { id: p.id, name: p.name, width: width || 390, height: height || 844, background: bg }, layers };
+        }
+
+        setPreviews(nextPreviews);
+        setThumbDocs(nextDocs);
+      } catch {}
+    })();
+  }, [filteredProjects, visibleCount, previews, thumbDocs]);
 
   // helper to convert dataURL -> Blob
   const dataURLToBlob = async (dataURL: string): Promise<Blob> => {
@@ -928,7 +937,12 @@ export default function ProjectsPage() {
                 );
               })}
               {visibleCount < filteredProjects.length && (
-                <div ref={sentinelRef} className="col-span-full h-8" />
+                <>
+                  <div className="col-span-full flex items-center justify-center text-xs text-muted-foreground py-3">
+                    Loading more projects…
+                  </div>
+                  <div ref={sentinelRef} className="col-span-full h-8" />
+                </>
               )}
             </div>
           )}
