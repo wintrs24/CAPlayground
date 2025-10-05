@@ -19,18 +19,18 @@ CAPlayground is a web-based Core Animation editor for making stunning wallpapers
 ### Prerequisites
 
 - Node.js 20+
-- npm
+- Bun
 
 ### Install
 Install project dependencies:
 ```bash
-npm install
+bun install
 ```
 
 ### Development
 To start the dev server:
 ```bash
-npm run dev
+bun run dev
 ```
 
 Open http://localhost:3000 in your browser.
@@ -57,7 +57,7 @@ When these are missing:
 ### Build & Start
 
 ```bash
-npm run build && npm run start
+bun run build && bun run start
 ```
 
 ## Contributing

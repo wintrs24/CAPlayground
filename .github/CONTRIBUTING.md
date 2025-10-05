@@ -4,12 +4,12 @@ Thanks for your interest in contributing! This guide helps you get set up and su
 
 ## Getting Set Up
 
-- Node.js 20+ and pnpm (recommended) or npm
+- Node.js 20+ and Bun (recommended) or npm
 - Install deps:
-  - pnpm install
+  - bun install
   - or: npm install
 - Run the app:
-  - pnpm dev
+  - bun dev
   - or: npm run dev
 
 ## Project Structure
@@ -44,8 +44,8 @@ Thanks for your interest in contributing! This guide helps you get set up and su
 - [ ] Linked issue (if applicable)
 - [ ] Clear description of changes and rationale
 - [ ] Screenshots/GIFs for visual changes
-- [ ] Verified build: `npm build`
-- [ ] Verified run: `npm dev` and exercised the changed areas
+- [ ] Verified build: `bun build`
+- [ ] Verified run: `bun dev` and exercised the changed areas
 - [ ] No console errors; no type errors
 
 ## How to Submit a PR
