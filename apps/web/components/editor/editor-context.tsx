@@ -14,6 +14,7 @@ import {
   deleteInTree,
   containsId,
   insertIntoGroupInTree,
+  wrapAsGroup,
 } from "@/lib/editor/layer-utils";
 import { sanitizeFilename, dataURLToBlob } from "@/lib/editor/file-utils";
 
@@ -97,6 +98,7 @@ export function EditorProvider({
     data: AnyLayer[];
     assets?: Record<string, { filename: string; dataURL: string }>;
   } | null>(null);
+  const lastAddRef = useRef<{ key: string; ts: number } | null>(null);
   
   const [isAnimationPlaying, setIsAnimationPlaying] = useState(false);
   const [animatedLayers, setAnimatedLayers] = useState<AnyLayer[]>([]);
@@ -513,7 +515,23 @@ export function EditorProvider({
       };
       const key = prev.activeCA;
       const cur = prev.docs[key];
-      const next = { ...cur, layers: [...cur.layers, layer], selectedId: layer.id };
+      let nextLayers: AnyLayer[] = cur.layers;
+      const selId = cur.selectedId || null;
+      if (!selId || selId === '__root__') {
+        nextLayers = [...cur.layers, layer];
+      } else {
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
+      }
+      const next = { ...cur, layers: nextLayers, selectedId: layer.id };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase]);
@@ -565,7 +583,23 @@ export function EditorProvider({
       const cur = prev.docs[key];
       const assets = { ...(cur.assets || {}) };
       assets[layer.id] = { filename: sanitizeFilename(filename || `pasted-${Date.now()}.png`), dataURL };
-      const next = { ...cur, layers: [...cur.layers, layer], selectedId: layer.id, assets };
+      let nextLayers: AnyLayer[] = cur.layers;
+      const selId = cur.selectedId || null;
+      if (!selId || selId === '__root__') {
+        nextLayers = [...cur.layers, layer];
+      } else {
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
+      }
+      const next = { ...cur, layers: nextLayers, selectedId: layer.id, assets };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase]);
@@ -622,7 +656,23 @@ export function EditorProvider({
       };
       const key = prev.activeCA;
       const cur = prev.docs[key];
-      const next = { ...cur, layers: [...cur.layers, layer], selectedId: layer.id };
+      let nextLayers: AnyLayer[] = cur.layers;
+      const selId = cur.selectedId || null;
+      if (!selId || selId === '__root__') {
+        nextLayers = [...cur.layers, layer];
+      } else {
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
+      }
+      const next = { ...cur, layers: nextLayers, selectedId: layer.id };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase]);
@@ -675,7 +725,23 @@ export function EditorProvider({
       const cur = prev.docs[key];
       const assets = { ...(cur.assets || {}) };
       assets[layer.id] = { filename: sanitizeFilename(file.name) || `image-${Date.now()}.png`, dataURL };
-      const next = { ...cur, layers: [...cur.layers, layer], selectedId: layer.id, assets };
+      let nextLayers: AnyLayer[] = cur.layers;
+      const selId = cur.selectedId || null;
+      if (!selId || selId === '__root__') {
+        nextLayers = [...cur.layers, layer];
+      } else {
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
+      }
+      const next = { ...cur, layers: nextLayers, selectedId: layer.id, assets };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase]);
@@ -683,6 +749,15 @@ export function EditorProvider({
   const addShapeLayer = useCallback((shape: ShapeLayer["shape"] = "rect") => {
     setDoc((prev) => {
       if (!prev) return prev;
+      const key = prev.activeCA;
+      const cur = prev.docs[key];
+      const selId = cur.selectedId || null;
+      const sig = `shape:${shape}:${selId || '__root__'}`;
+      const now = Date.now();
+      if (lastAddRef.current && lastAddRef.current.key === sig && (now - lastAddRef.current.ts) < 400) {
+        return prev;
+      }
+      lastAddRef.current = { key: sig, ts: now };
       pushHistory(prev);
       const canvasW = prev.meta.width || 390;
       const canvasH = prev.meta.height || 844;
@@ -697,9 +772,22 @@ export function EditorProvider({
         backgroundOpacity: 1,
         radius: shape === "rounded-rect" ? 8 : undefined,
       };
-      const key = prev.activeCA;
-      const cur = prev.docs[key];
-      const next = { ...cur, layers: [...cur.layers, layer], selectedId: layer.id };
+      let nextLayers: AnyLayer[] = cur.layers;
+      if (!selId || selId === '__root__') {
+        nextLayers = [...cur.layers, layer];
+      } else {
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
+      }
+      const next = { ...cur, layers: nextLayers, selectedId: layer.id };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase]);
@@ -806,7 +894,23 @@ export function EditorProvider({
         };
       });
       
-      const next = { ...cur, layers: [...cur.layers, layer], selectedId: layer.id, assets };
+      let nextLayers: AnyLayer[] = cur.layers;
+      const selId = cur.selectedId || null;
+      if (!selId || selId === '__root__') {
+        nextLayers = [...cur.layers, layer];
+      } else {
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
+      }
+      const next = { ...cur, layers: nextLayers, selectedId: layer.id, assets };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, [addBase, pushHistory]);

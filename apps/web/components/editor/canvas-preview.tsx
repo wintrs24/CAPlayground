@@ -42,6 +42,8 @@ export function CanvasPreview() {
     h: number;
     lastX: number;
     lastY: number;
+    canvasH: number;
+    yUp: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -658,15 +660,108 @@ export function CanvasPreview() {
   const getRootFlip = () => (doc?.meta.geometryFlipped ?? 0) as 0 | 1;
   const computeCssLT = (l: AnyLayer, containerH: number, useYUp: boolean) => {
     const a = getAnchor(l);
-    const left = (l.position.x) - a.x * l.size.w;
-    const top = useYUp ? (containerH - (l.position.y + (1 - a.y) * l.size.h)) : (l.position.y - a.y * l.size.h);
-    return { left, top };
+    const CH = Number.isFinite(containerH) ? Number(containerH) : Number(doc?.meta.height ?? 0);
+    const px = Number((l as any).position?.x ?? 0);
+    const py = Number((l as any).position?.y ?? 0);
+    const w = Number((l as any).size?.w ?? 0);
+    const h = Number((l as any).size?.h ?? 0);
+    const ax = Number((a as any)?.x ?? 0.5);
+    const ay = Number((a as any)?.y ?? 0.5);
+    const left = px - ax * w;
+    const top = useYUp ? (CH - (py + (1 - ay) * h)) : (py - ay * h);
+    return {
+      left: Number.isFinite(left) ? left : 0,
+      top: Number.isFinite(top) ? top : 0,
+    };
   };
   const cssToPosition = (cssLeft: number, cssTop: number, l: AnyLayer, containerH: number, useYUp: boolean) => {
     const a = getAnchor(l);
-    const x = cssLeft + a.x * l.size.w;
-    const y = useYUp ? ((containerH - cssTop) - (1 - a.y) * l.size.h) : (cssTop + a.y * l.size.h);
-    return { x, y };
+    const CH = Number.isFinite(containerH) ? Number(containerH) : Number(doc?.meta.height ?? 0);
+    const w = Number((l as any).size?.w ?? 0);
+    const h = Number((l as any).size?.h ?? 0);
+    const ax = Number((a as any)?.x ?? 0.5);
+    const ay = Number((a as any)?.y ?? 0.5);
+    const x = Number(cssLeft) + ax * w;
+    const y = useYUp ? ((CH - Number(cssTop)) - (1 - ay) * h) : (Number(cssTop) + ay * h);
+    return {
+      x: Number.isFinite(x) ? x : 0,
+      y: Number.isFinite(y) ? y : 0,
+    };
+  };
+
+  const findPathTo = (id: string): AnyLayer[] | null => {
+    const stack: AnyLayer[] = [];
+    const dfs = (arr: AnyLayer[]): AnyLayer[] | null => {
+      for (const n of arr) {
+        stack.push(n);
+        if (n.id === id) return [...stack];
+        if ((n as any).type === 'group' && Array.isArray((n as any).children)) {
+          const p = dfs((n as GroupLayer).children);
+          if (p) return p;
+        }
+        stack.pop();
+      }
+      return null;
+    };
+    return dfs(renderedLayers || []);
+  };
+
+  const getRenderContextFor = (id: string): { containerH: number; useYUp: boolean } => {
+    let useYUp = (getRootFlip() === 0);
+    let containerH = doc?.meta.height ?? 0;
+    const path = findPathTo(id);
+    if (!path || path.length === 0) return { containerH, useYUp };
+    for (let i = 0; i < path.length - 1; i++) {
+      const node = path[i];
+      if ((node as any).type === 'group') {
+        const g = node as GroupLayer;
+        useYUp = (typeof (g as any).geometryFlipped === 'number') ? (((g as any).geometryFlipped as 0 | 1) === 0) : useYUp;
+        containerH = g.size.h;
+      }
+    }
+    return { containerH, useYUp };
+  };
+
+  const computeAbsoluteLTFor = (id: string): { left: number; top: number; useYUp: boolean; containerH: number } => {
+    const path = findPathTo(id);
+    let useYUp = (getRootFlip() === 0);
+    let containerH = doc?.meta.height ?? 0;
+    if (!path || path.length === 0) return { left: 0, top: 0, useYUp, containerH };
+    let left = 0;
+    let top = 0;
+    for (let i = 0; i < path.length; i++) {
+      const node = path[i];
+      const lt = computeCssLT(node, containerH, useYUp);
+      left += lt.left;
+      top += lt.top;
+      if (i < path.length - 1 && (node as any).type === 'group') {
+        const g = node as GroupLayer;
+        useYUp = (typeof (g as any).geometryFlipped === 'number') ? (((g as any).geometryFlipped as 0 | 1) === 0) : useYUp;
+        containerH = g.size.h;
+      }
+    }
+    return { left, top, useYUp, containerH };
+  };
+
+  const getParentAbsContextFor = (id: string): { left: number; top: number; useYUp: boolean; containerH: number } => {
+    const path = findPathTo(id);
+    let useYUp = (getRootFlip() === 0);
+    let containerH = doc?.meta.height ?? 0;
+    if (!path || path.length < 2) return { left: 0, top: 0, useYUp, containerH };
+    let left = 0;
+    let top = 0;
+    for (let i = 0; i < path.length - 1; i++) {
+      const node = path[i];
+      const lt = computeCssLT(node, containerH, useYUp);
+      left += lt.left;
+      top += lt.top;
+      if ((node as any).type === 'group') {
+        const g = node as GroupLayer;
+        useYUp = (typeof (g as any).geometryFlipped === 'number') ? (((g as any).geometryFlipped as 0 | 1) === 0) : useYUp;
+        containerH = g.size.h;
+      }
+    }
+    return { left, top, useYUp, containerH };
   };
 
   const findSiblingsOf = (layers: AnyLayer[], id: string): { siblings: AnyLayer[]; index: number } | null => {
@@ -702,6 +797,8 @@ export function CanvasPreview() {
       h: l.size.h,
       lastX: (l as any).position?.x ?? 0,
       lastY: (l as any).position?.y ?? 0,
+      canvasH,
+      yUp,
     };
     document.body.style.userSelect = "none";
 
@@ -713,7 +810,7 @@ export function CanvasPreview() {
       let cssLeft = d.startX + dx;
       let cssTop = d.startY + dy;
       const w = docRef.current?.meta.width ?? 0;
-      const h = docRef.current?.meta.height ?? 0;
+      const h = d.canvasH as number;
       if (w > 0 && h > 0 && (snapEdgesEnabled || snapLayersEnabled)) {
         const th = SNAP_THRESHOLD;
         const xPairs: Array<[number, number]> = [];
@@ -768,7 +865,7 @@ export function CanvasPreview() {
       } else {
         setSnapState({ x: null, y: null });
       }
-      const pos = cssToPosition(cssLeft, cssTop, (renderedLayers.find(r=>r.id===d.id) as AnyLayer) || (l as AnyLayer), h, yUp);
+      const pos = cssToPosition(cssLeft, cssTop, (renderedLayers.find(r=>r.id===d.id) as AnyLayer) || (l as AnyLayer), h, d.yUp as boolean);
       updateLayerTransient(d.id, { position: { x: pos.x, y: pos.y } as any });
       d.lastX = pos.x;
       d.lastY = pos.y;
@@ -939,7 +1036,9 @@ export function CanvasPreview() {
     }
     // group
     const g = l as GroupLayer;
-    const nextUseYUp = useYUp; // stacking future support
+    const nextUseYUp = (typeof (g as any).geometryFlipped === 'number')
+      ? (((g as any).geometryFlipped as 0 | 1) === 0)
+      : useYUp;
     return (
       <LayerContextMenu key={g.id} layer={g} siblings={siblings}>
         <div style={{ ...common, ...bgStyleFor(g) }}
@@ -1041,8 +1140,9 @@ export function CanvasPreview() {
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
-    const canvasH = docRef.current?.meta.height ?? 0;
-    const yUp = (getRootFlip() === 0);
+    const ctx = getRenderContextFor(l.id);
+    const canvasH = ctx.containerH;
+    const yUp = ctx.useYUp;
     const startLT = computeCssLT(l, canvasH, yUp);
     const a = getAnchor(l);
     resizeDragRef.current = {
@@ -1124,11 +1224,11 @@ export function CanvasPreview() {
             const L = ol as any;
             const lw = L.size?.w ?? 0;
             const lh = L.size?.h ?? 0;
-            const lt = computeCssLT(L, canvasH, d.yUp);
-            const left = lt.left;
-            const right = lt.left + lw;
-            const top = lt.top;
-            const bottom = lt.top + lh;
+            const ltAbs = computeAbsoluteLTFor(L.id);
+            const left = ltAbs.left;
+            const right = ltAbs.left + lw;
+            const top = ltAbs.top;
+            const bottom = ltAbs.top + lh;
             xTargets.push(left, right);
             yTargets.push(top, bottom);
           }
@@ -1254,8 +1354,12 @@ export function CanvasPreview() {
           top = d.startTop + d.startH - h;
           break;
       }
-      const x = left + d.aX * w;
-      const y = d.yUp ? ((d.canvasH - top) - (1 - d.aY) * h) : (top + d.aY * h);
+      const localLeft = left - (d as any).parentAbsLeft;
+      const localTop = top - (d as any).parentAbsTop;
+      const x = localLeft + d.aX * w;
+      const y = (d as any).parentYUp
+        ? (((d as any).parentH - localTop) - (1 - d.aY) * h)
+        : (localTop + d.aY * h);
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
       d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
     };
@@ -1288,9 +1392,10 @@ export function CanvasPreview() {
     e.preventDefault();
     e.stopPropagation();
     selectLayer(l.id);
+    const abs = computeAbsoluteLTFor(l.id);
     const canvasH = docRef.current?.meta.height ?? 0;
-    const yUp = (getRootFlip() === 0);
-    const lt = computeCssLT(l, canvasH, yUp);
+    const yUp = abs.useYUp;
+    const lt = { left: abs.left, top: abs.top };
     const a = getAnchor(l);
     const centerX = lt.left + a.x * l.size.w;
     const centerY = lt.top + a.y * l.size.h;
@@ -1333,15 +1438,15 @@ export function CanvasPreview() {
   };
 
   const renderSelectionOverlay = (l: AnyLayer) => {
-  const useYUp = getRootFlip() === 0;
+  const abs = computeAbsoluteLTFor(l.id);
   const a = getAnchor(l);
-  const transformOriginY = useYUp ? (1 - a.y) * 100 : a.y * 100;
+  const transformOriginY = abs.useYUp ? (1 - a.y) * 100 : a.y * 100;
   const inv = 1 / Math.max(0.0001, scale);
   const px = (n: number) => Math.max(0, n * inv);
   const boxStyle: React.CSSProperties = {
     position: "absolute",
-    left: computeCssLT(l, (doc?.meta.height ?? 0), useYUp).left,
-    top: computeCssLT(l, (doc?.meta.height ?? 0), useYUp).top,
+    left: abs.left,
+    top: abs.top,
     width: l.size.w,
     height: l.size.h,
     transform: `rotateX(${-((l as any).rotationX ?? 0)}deg) rotateY(${-((l as any).rotationY ?? 0)}deg) rotate(${-(l.rotation ?? 0)}deg)`,

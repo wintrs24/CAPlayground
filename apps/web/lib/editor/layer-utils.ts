@@ -143,3 +143,59 @@ export function containsId(layers: AnyLayer[], id: string): boolean {
   }
   return false;
 }
+
+export function wrapAsGroup(
+  layers: AnyLayer[],
+  targetId: string,
+): { layers: AnyLayer[]; newGroupId: string | null } {
+  let newGroupId: string | null = null;
+
+  const wrapNode = (l: AnyLayer): AnyLayer => {
+    if (l.id !== targetId) {
+      if (l.type === 'group') {
+        const g = l as GroupLayer;
+        return { ...g, children: g.children.map(wrapNode) } as AnyLayer;
+      }
+      return l;
+    }
+
+    if (l.type === 'group') {
+      return l;
+    }
+
+    const groupId = genId();
+    newGroupId = groupId;
+
+    const container: GroupLayer = {
+      id: groupId,
+      name: l.name,
+      type: 'group',
+      position: { ...l.position },
+      size: { ...l.size },
+      anchorPoint: (l as any).anchorPoint,
+      opacity: (l as any).opacity,
+      rotation: (l as any).rotation,
+      rotationX: (l as any).rotationX,
+      rotationY: (l as any).rotationY,
+      geometryFlipped: (l as any).geometryFlipped,
+      children: [],
+    } as any;
+    (container as any)._displayType = (l as any).type;
+
+    const child = JSON.parse(JSON.stringify(l)) as AnyLayer;
+    (child as any).rotation = 0;
+    (child as any).rotationX = undefined;
+    (child as any).rotationY = undefined;
+    const a = (child as any).anchorPoint;
+    if (!a || Math.abs(a.x - 0.5) > 1e-6 || Math.abs(a.y - 0.5) > 1e-6) {
+      (child as any).anchorPoint = { x: 0.5, y: 0.5 };
+    }
+    (child as any).position = { x: container.size.w / 2, y: container.size.h / 2 };
+
+    container.children = [child];
+    return container as AnyLayer;
+  };
+
+  const next = layers.map(wrapNode);
+  return { layers: next, newGroupId };
+}

@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 
 export function Inspector() {
-  const { doc, setDoc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers } = useEditor();
+  const { doc, setDoc, updateLayer, updateLayerTransient, replaceImageForLayer, isAnimationPlaying, animatedLayers, selectLayer } = useEditor();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [sidebarPosition, setSidebarPosition] = useLocalStorage<'left' | 'top' | 'right'>('caplay_inspector_tab_position', 'left');
   const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -158,7 +158,12 @@ export function Inspector() {
         <div className="px-3 py-2 border-b shrink-0">
           <div className="font-medium">Inspector</div>
         </div>
-        <div className="flex-1 overflow-y-auto p-3">
+        <div
+          className="flex-1 overflow-y-auto p-3"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) selectLayer(null);
+          }}
+        >
           <div className="grid grid-cols-2 gap-1.5">
             <div className="space-y-1">
               <Label htmlFor="root-w">Width</Label>
@@ -213,6 +218,17 @@ export function Inspector() {
       <div className="px-3 py-2 border-b shrink-0 flex items-center justify-between">
         <div className="font-medium">Inspector</div>
         <div className="flex items-center gap-1">
+          {selectedBase && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2"
+              onClick={() => selectLayer(null)}
+              title="Deselect current layer"
+            >
+              Deselect
+            </Button>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

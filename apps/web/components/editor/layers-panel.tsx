@@ -151,7 +151,10 @@ export function LayersPanel() {
             />
           ) : (
             <>
-              {l.name} <span className="text-muted-foreground">({l.type === "shape" ? "basic" : l.type === "video" ? "video" : l.type})</span>
+              {l.name}{' '}
+              <span className="text-muted-foreground">
+                ({(((l as any)._displayType || l.type) === 'shape') ? 'basic' : ((l as any)._displayType || l.type)})
+              </span>
             </>
           )}
         </div>
@@ -207,10 +210,10 @@ export function LayersPanel() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={addTextLayer}>Text Layer</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => addShapeLayer("rect")}>Basic Layer</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>Image Layer…</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => videoInputRef.current?.click()}>Video Layer…</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => addTextLayer()}>Text Layer</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => addShapeLayer("rect")}>Basic Layer</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>Image Layer…</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => videoInputRef.current?.click()}>Video Layer…</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <input
