@@ -559,10 +559,15 @@ export default function ProjectsPage() {
         try {
           dual = await unpackDualCAZip(file);
         } catch (err: any) {
-          if (String(err?.message || '').startsWith('UNSUPPORTED_ZIP_STRUCTURE')) {
-            alert('Zip not supported: expected both Background.ca and Floating.ca');
-            return;
-          } else {
+          const msg = String(err?.message || '');
+          // Fallback: treat as a single .ca package (a zip with main.caml)
+          try {
+            bundle = await unpackCA(file);
+          } catch (fallbackErr) {
+            if (msg.startsWith('UNSUPPORTED_ZIP_STRUCTURE')) {
+              alert('Zip not supported: expected both Background.ca and Floating.ca, and failed to read as a single .ca package.');
+              return;
+            }
             throw err;
           }
         }
