@@ -940,12 +940,9 @@ export function CanvasPreview() {
     // group
     const g = l as GroupLayer;
     const nextUseYUp = useYUp; // stacking future support
-    const isTopLevel = siblings === renderedLayers;
-    const suppressGroupBg = (currentKey === 'floating') && isTopLevel;
-    const groupStyle: React.CSSProperties = suppressGroupBg ? { ...common } : { ...common, ...bgStyleFor(g) };
     return (
       <LayerContextMenu key={g.id} layer={g} siblings={siblings}>
-        <div style={groupStyle}
+        <div style={{ ...common, ...bgStyleFor(g) }}
              onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}
              onTouchStart={(e) => {
                if (e.touches.length === 1) {
