@@ -406,7 +406,7 @@ export function EditorProvider({
           type: 'group',
           position: { x: Math.round((snapshot.meta.width || 0) / 2), y: Math.round((snapshot.meta.height || 0) / 2) },
           size: { w: snapshot.meta.width || 0, h: snapshot.meta.height || 0 },
-          backgroundColor: (key === 'background' || key === 'wallpaper') ? snapshot.meta.background : undefined,
+          backgroundColor: snapshot.meta.background,
           geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
           children: toCamlLayers((caDoc.layers as AnyLayer[]) || [], caDoc.assets),
         } as GroupLayer;
