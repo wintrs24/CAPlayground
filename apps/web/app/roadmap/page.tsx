@@ -66,7 +66,7 @@ export default function RoadmapPage() {
             <RoadmapItem index={1} title="Mobile Editor" status={<Badge variant="secondary" className="align-middle mx-1">In Progress</Badge>}>
               Edit wallpapers on mobile, such as your iPhone or iPad. Directly export into PocketPoster.
             </RoadmapItem>
-            <RoadmapItem index={2} title="Wallpaper Gallery" status={<Badge variant="outline">Starting Soon</Badge>}>
+            <RoadmapItem index={2} title="Wallpaper Gallery" status={<Badge variant="secondary" className="align-middle mx-1">In Progress</Badge>}>
               Wallpaper Gallery to showcase your wallpapers and browse the CAPlayground community's wallpapers.
             </RoadmapItem>
             <RoadmapItem index={3} title="Emitters Support" status={<Badge variant="outline">Not Started</Badge>}>
