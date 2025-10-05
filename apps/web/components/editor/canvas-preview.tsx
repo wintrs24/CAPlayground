@@ -1098,6 +1098,10 @@ export function CanvasPreview() {
         lastY: number;
         lastW: number;
         lastH: number;
+        parentAbsLeft: number;
+        parentAbsTop: number;
+        parentH: number;
+        parentYUp: boolean;
       }
     | null
   >(null);
@@ -1145,6 +1149,7 @@ export function CanvasPreview() {
     const yUp = ctx.useYUp;
     const startLT = computeCssLT(l, canvasH, yUp);
     const a = getAnchor(l);
+    const parentCtx = getParentAbsContextFor(l.id);
     resizeDragRef.current = {
       id: l.id,
       handle,
@@ -1164,6 +1169,10 @@ export function CanvasPreview() {
       lastY: l.position.y,
       lastW: l.size.w,
       lastH: l.size.h,
+      parentAbsLeft: parentCtx.left,
+      parentAbsTop: parentCtx.top,
+      parentH: parentCtx.containerH,
+      parentYUp: parentCtx.useYUp,
     };
     const onMove = (ev: MouseEvent) => {
       const d = resizeDragRef.current;
@@ -1354,11 +1363,11 @@ export function CanvasPreview() {
           top = d.startTop + d.startH - h;
           break;
       }
-      const localLeft = left - (d as any).parentAbsLeft;
-      const localTop = top - (d as any).parentAbsTop;
+      const localLeft = left - d.parentAbsLeft;
+      const localTop = top - d.parentAbsTop;
       const x = localLeft + d.aX * w;
-      const y = (d as any).parentYUp
-        ? (((d as any).parentH - localTop) - (1 - d.aY) * h)
+      const y = d.parentYUp
+        ? ((d.parentH - localTop) - (1 - d.aY) * h)
         : (localTop + d.aY * h);
       updateLayerTransient(d.id, { position: { x, y } as any, size: { w, h } as any });
       d.lastX = x; d.lastY = y; d.lastW = w; d.lastH = h;
