@@ -63,10 +63,10 @@ export default function RoadmapPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <RoadmapItem index={1} title="Mobile Editor" status={<Badge>Done: 6th October, 2025</Badge>}>
+            <RoadmapItem index={1} title="Mobile Editor" status={<Badge>Done: 4th October, 2025</Badge>}>
               Edit wallpapers on mobile, such as your iPhone or iPad.
             </RoadmapItem>
-            <RoadmapItem index={2} title="Wallpaper Gallery" status={<Badge>Done: 6th October, 2025</Badge>}>
+            <RoadmapItem index={2} title="Wallpaper Gallery" status={<Badge>Done: 5th October, 2025</Badge>}>
               Wallpaper Gallery to showcase your wallpapers and browse the CAPlayground community's wallpapers.
             </RoadmapItem>
             <RoadmapItem index={3} title="Emitters Support" status={<Badge variant="outline">Starting Soon</Badge>}>

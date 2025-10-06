@@ -65,6 +65,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [storageFallback, setStorageFallback] = useState(false);
   const [exportView, setExportView] = useState<'select'|'success'>("select");
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
 
   useEffect(() => {
     if (doc?.meta.name) setName(doc.meta.name);
@@ -78,6 +79,39 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     (async () => {
       try { setStorageFallback(!(await isUsingOPFS())); } catch {}
     })();
+  }, []);
+
+  useEffect(() => {
+    let aborted = false;
+    (async () => {
+      try {
+        const resp = await fetch('https://api.github.com/repos/CAPlayground/CAPlayground/tags?per_page=100', {
+          headers: { 'Accept': 'application/vnd.github+json' },
+        });
+        if (!resp.ok) throw new Error(`Failed to fetch tags: ${resp.status}`);
+        const data: Array<{ name: string }> = await resp.json();
+        const normalize = (n: string) => (n.startsWith('v') ? n.slice(1) : n);
+        const isSemverish = (n: string) => /^\d+(?:\.\d+){0,2}(?:-.+)?$/.test(n);
+        const versions = data.map(t => normalize(t.name)).filter(isSemverish);
+        if (versions.length === 0) return;
+        const toNums = (v: string) => v.split('-')[0].split('.').map(x => parseInt(x, 10));
+        versions.sort((a, b) => {
+          const A = toNums(a), B = toNums(b);
+          const len = Math.max(A.length, B.length);
+          for (let i = 0; i < len; i++) {
+            const ai = A[i] ?? 0; const bi = B[i] ?? 0;
+            if (ai !== bi) return bi - ai;
+          }
+          return 0;
+        });
+        const top = versions[0];
+        const topWithPrefix = data.find(t => normalize(t.name) === top)?.name ?? top;
+        if (!aborted) setLatestVersion(topWithPrefix);
+      } catch (e) {
+        console.warn('Failed to load latest version', e);
+      }
+    })();
+    return () => { aborted = true; };
   }, []);
 
   useEffect(() => {
@@ -568,6 +602,10 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
               }}>
                 Show onboarding
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                Version: {latestVersion ?? '...'}
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
