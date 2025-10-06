@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
+import { useSearchParams } from "next/navigation"
 
 interface WallpaperItem {
   name: string
@@ -27,7 +28,13 @@ function isVideo(src: string) {
 }
 
 export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
+  const searchParams = useSearchParams()
   const [q, setQ] = useState("")
+
+  useEffect(() => {
+    const initial = (searchParams?.get("q") || "").trim()
+    setQ(initial)
+  }, [searchParams])
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
