@@ -26,13 +26,16 @@ import {
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload, ArrowRight } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { devices, getDevicesByCategory, type DeviceSpec } from "@/lib/devices";
+type DeviceSpec = { name: string; width: number; height: number; category?: string };
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import type React from "react";
 import type { AnyLayer, CAProject, CAAsset } from "@/lib/ca/types";
-import { unpackCA, unpackDualCAZip, type DualCABundle } from "@/lib/ca/ca-file";
+type DualCABundle = {
+  project: { width: number; height: number; geometryFlipped: 0|1 };
+  floating: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any };
+  background: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any };
+};
 import { ensureUniqueProjectName, createProject, updateProject, deleteProject, getProject, listFiles, listProjects, putBlobFile, putTextFile, isUsingOPFS } from "@/lib/storage";
-import { getSupabaseBrowserClient } from "@/lib/supabase";
 import {
   Select,
   SelectContent,
@@ -55,6 +58,7 @@ export default function ProjectsPage() {
   const [rootHeight, setRootHeight] = useState<number>(844);
   const [useDeviceSelector, setUseDeviceSelector] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<string>('iPhone 14');
+  const devicesRef = useRef<DeviceSpec[] | null>(null);
   const [gyroEnabled, setGyroEnabled] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -207,19 +211,26 @@ export default function ProjectsPage() {
   };
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    supabase.auth.getSession().then(({ data }) => {
-      const hasSession = !!data.session;
-      setIsSignedIn(hasSession);
+    (async () => {
       try {
-        const accepted = localStorage.getItem("caplayground-tos-accepted") === "true";
-        if (!hasSession && !accepted) {
-          setIsTosOpen(true);
+        const { getSupabaseBrowserClient } = await import("@/lib/supabase");
+        const supabase = getSupabaseBrowserClient();
+        const { data } = await supabase.auth.getSession();
+        const hasSession = !!data.session;
+        setIsSignedIn(hasSession);
+        try {
+          const accepted = localStorage.getItem("caplayground-tos-accepted") === "true";
+          if (!hasSession && !accepted) setIsTosOpen(true);
+        } catch {
+          if (!hasSession) setIsTosOpen(true);
         }
       } catch {
-        if (!hasSession) setIsTosOpen(true);
+        try {
+          const accepted = localStorage.getItem("caplayground-tos-accepted") === "true";
+          if (!accepted) setIsTosOpen(true);
+        } catch {}
       }
-    });
+    })();
   }, []);
 
   
@@ -474,7 +485,13 @@ export default function ProjectsPage() {
     
     let w: number, h: number;
     if (useDeviceSelector) {
-      const device = devices.find(d => d.name === selectedDevice);
+      if (!devicesRef.current) {
+        try {
+          const mod = await import("@/lib/devices");
+          devicesRef.current = mod.devices as DeviceSpec[];
+        } catch { devicesRef.current = []; }
+      }
+      const device = (devicesRef.current || []).find(d => d.name === selectedDevice);
       if (!device) return;
       w = device.width;
       h = device.height;
