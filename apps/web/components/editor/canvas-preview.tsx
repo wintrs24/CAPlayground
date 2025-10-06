@@ -24,6 +24,7 @@ export function CanvasPreview() {
   const [snapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const [snapResizeEnabled] = useLocalStorage<boolean>("caplay_settings_snap_resize", true);
+  const [snapRotationEnabled] = useLocalStorage<boolean>("caplay_settings_snap_rotation", true);
   const [showEdgeGuide, setShowEdgeGuide] = useLocalStorage<boolean>("caplay_preview_edge_guide", false);
   const [clipToCanvas, setClipToCanvas] = useLocalStorage<boolean>("caplay_preview_clip", false);
   const panDragRef = useRef<{
@@ -1419,7 +1420,22 @@ export function CanvasPreview() {
       if (ev.shiftKey) {
         angle = Math.round(angle / 15) * 15;
       }
-      const rot = -(angle - d.startAngle);
+      let rot = -(angle - d.startAngle);
+      if (snapRotationEnabled) {
+        const tolerance = 6;
+        const norm = ((rot % 360) + 360) % 360;
+        const targets = [0, 90, 180, 270];
+        let snappedRot = rot;
+        for (const t of targets) {
+          let diff = norm - t;
+          diff = ((diff + 180) % 360) - 180;
+          if (Math.abs(diff) <= tolerance) {
+            snappedRot = rot - diff;
+            break;
+          }
+        }
+        rot = snappedRot;
+      }
       d.lastRot = rot;
       updateLayerTransient(d.id, { rotation: rot as any });
     };

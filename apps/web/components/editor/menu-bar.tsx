@@ -61,6 +61,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
   const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
   const [snapResizeEnabled, setSnapResizeEnabled] = useLocalStorage<boolean>("caplay_settings_snap_resize", true);
+  const [snapRotationEnabled, setSnapRotationEnabled] = useLocalStorage<boolean>("caplay_settings_snap_rotation", true);
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [storageFallback, setStorageFallback] = useState(false);
@@ -539,6 +540,10 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                 <div className="flex items-center justify-between gap-3 py-2">
                   <Label htmlFor="snap-resize" className="text-sm">Snap when resizing</Label>
                   <Switch id="snap-resize" checked={!!snapResizeEnabled} onCheckedChange={(c) => setSnapResizeEnabled(!!c)} />
+                </div>
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <Label htmlFor="snap-rotation" className="text-sm">Snap rotation (0°, 90°, 180°, 270°)</Label>
+                  <Switch id="snap-rotation" checked={!!snapRotationEnabled} onCheckedChange={(c) => setSnapRotationEnabled(!!c)} />
                 </div>
                 <div className="flex items-center justify-between gap-3 py-2">
                   <Label htmlFor="snap-threshold" className="text-sm">Sensitivity</Label>
