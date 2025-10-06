@@ -14,6 +14,7 @@ interface WallpaperItem {
   description: string
   file: string
   preview: string
+  from: string
 }
 
 interface WallpapersResponse {

@@ -13,6 +13,7 @@ interface WallpaperItem {
   description: string
   file: string
   preview: string
+  from: string
 }
 
 interface WallpapersResponse {
@@ -79,7 +80,7 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
 
               <CardHeader>
                 <CardTitle className="line-clamp-1">{item.name}</CardTitle>
-                <CardDescription className="line-clamp-2">by {item.creator}</CardDescription>
+                <CardDescription className="line-clamp-2">by {item.creator} (submitted on {item.from})</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{item.description}</p>
