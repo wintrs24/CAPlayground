@@ -48,10 +48,10 @@ export default function RoadmapPage() {
             <RoadmapItem index={2} title="Projects and Base Editor" status={<Badge>Done: 24th August, 2025</Badge>}>
               Projects page, base editor, and create .ca files.
             </RoadmapItem>
-            <RoadmapItem index={3} title="Viewing and Editing Layers" status={<Badge>Done: 5th October, 2025</Badge>}>
-              Viewing and Editing layers of a imported Core Animation file.
+            <RoadmapItem index={3} title="Viewing and Editing Layers" status={<Badge>Done: 5th September, 2025</Badge>}>
+              Viewing and Editing layers of a Core Animation file. Exporting the .ca file.
             </RoadmapItem>
-            <RoadmapItem index={4} title="Core Animation Layer Properties" status={<Badge>Done: 5th August, 2025</Badge>}>
+            <RoadmapItem index={4} title="Core Animation Layer Properties" status={<Badge>Done: 5th September, 2025</Badge>}>
               Adjusting position, bounds, opacity, rotation, and more of layers.
             </RoadmapItem>
             <RoadmapItem index={5} title="Creating Animations, Viewing and Editing States" status={<Badge>Done: 22nd September, 2025</Badge>}>
@@ -63,13 +63,13 @@ export default function RoadmapPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            <RoadmapItem index={1} title="Mobile Editor" status={<Badge variant="secondary" className="align-middle mx-1">In Progress</Badge>}>
-              Edit wallpapers on mobile, such as your iPhone or iPad. Directly export into PocketPoster.
+            <RoadmapItem index={1} title="Mobile Editor" status={<Badge>Done: 6th October, 2025</Badge>}>
+              Edit wallpapers on mobile, such as your iPhone or iPad.
             </RoadmapItem>
-            <RoadmapItem index={2} title="Wallpaper Gallery" status={<Badge variant="secondary" className="align-middle mx-1">In Progress</Badge>}>
+            <RoadmapItem index={2} title="Wallpaper Gallery" status={<Badge>Done: 6th October, 2025</Badge>}>
               Wallpaper Gallery to showcase your wallpapers and browse the CAPlayground community's wallpapers.
             </RoadmapItem>
-            <RoadmapItem index={3} title="Emitters Support" status={<Badge variant="outline">Not Started</Badge>}>
+            <RoadmapItem index={3} title="Emitters Support" status={<Badge variant="outline">Starting Soon</Badge>}>
               Support Emitters to create create emitters, I guess.
             </RoadmapItem>
             <RoadmapItem index={4} title="Parallax Effect" status={<Badge variant="outline">Not Started</Badge>}>
