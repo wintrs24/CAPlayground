@@ -58,6 +58,9 @@ export function SubmitWallpaperDialog({ open, onOpenChange, username = "Anonymou
     const file = e.target.files?.[0]
     if (file) {
       setVideoFile(file)
+      if (videoPreviewUrl) {
+        URL.revokeObjectURL(videoPreviewUrl)
+      }
       const url = URL.createObjectURL(file)
       setVideoPreviewUrl(url)
     }
@@ -243,7 +246,7 @@ export function SubmitWallpaperDialog({ open, onOpenChange, username = "Anonymou
                     {videoFile ? videoFile.name : "Choose video file"}
                   </Button>
                 </div>
-                {videoPreviewUrl && (
+                {videoPreviewUrl && videoPreviewUrl.startsWith('blob:') && (
                   <div className="mt-2 rounded-md border overflow-hidden">
                     <video
                       src={videoPreviewUrl}
@@ -293,7 +296,7 @@ export function SubmitWallpaperDialog({ open, onOpenChange, username = "Anonymou
                 <div className="pt-0 px-5">
                   <div className="mb-3 overflow-hidden rounded-md border bg-background">
                     <AspectRatio ratio={1} className="flex items-center justify-center">
-                      {videoPreviewUrl && (
+                      {videoPreviewUrl && videoPreviewUrl.startsWith('blob:') && (
                         <video
                           src={videoPreviewUrl}
                           className="w-full h-full object-contain"
