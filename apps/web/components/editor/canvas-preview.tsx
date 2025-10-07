@@ -490,7 +490,7 @@ export function CanvasPreview() {
   };
 
   useEffect(() => {
-    const frame = JSON.parse(JSON.stringify(appliedLayers)) as AnyLayer[];
+    const frame = JSON.parse(JSON.stringify(combinedLayers)) as AnyLayer[];
     const walk = (arr: AnyLayer[]) => {
       for (const l of arr) {
         evalLayerAnimation(l, timeSec);
@@ -502,7 +502,7 @@ export function CanvasPreview() {
     walk(frame);
     setRenderedLayers(frame);
     setAnimatedLayers(frame);
-  }, [timeSec, appliedLayers, setAnimatedLayers]);
+  }, [timeSec, combinedLayers, setAnimatedLayers]);
 
   const hasAnyEnabledAnimation = useMemo(() => {
     const check = (arr: AnyLayer[]): boolean => {
@@ -1554,6 +1554,7 @@ export function CanvasPreview() {
     outline: `${px(1)}px solid rgba(59,130,246,0.9)`,
     boxShadow: `inset 0 0 0 ${px(2)}px rgba(59,130,246,0.2)`,
     pointerEvents: "none",
+    zIndex: 10000,
   };
   const handleStyleBase: React.CSSProperties = {
     position: "absolute",
@@ -1810,14 +1811,15 @@ export function CanvasPreview() {
           selectLayer(null);
         }}
       >
-        <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-          {currentKey === 'floating' && showBackground 
-            ? backgroundLayers.map((l) => renderLayer(l))
-            : currentKey === 'background' 
-              ? appliedLayers.map((l) => renderLayer(l))
-              : null
-          }
-        </div>
+        {currentKey === 'floating' && showBackground ? (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+            {renderedLayers.slice(0, backgroundLayers.length).map((l) => renderLayer(l))}
+          </div>
+        ) : currentKey === 'background' ? (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+            {renderedLayers.map((l) => renderLayer(l))}
+          </div>
+        ) : null}
         {showClockOverlay && (() => {
           const w = doc?.meta.width ?? 0;
           const h = doc?.meta.height ?? 0;
@@ -1845,7 +1847,10 @@ export function CanvasPreview() {
         })()}
         {currentKey === 'floating' && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 1000 }}>
-            {appliedLayers.map((l) => renderLayer(l))}
+            {showBackground 
+              ? renderedLayers.slice(backgroundLayers.length).map((l) => renderLayer(l))
+              : renderedLayers.map((l) => renderLayer(l))
+            }
           </div>
         )}
         {/* Edge guide overlay */}
