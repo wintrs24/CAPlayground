@@ -69,10 +69,13 @@ export default function RoadmapPage() {
             <RoadmapItem index={2} title="Wallpaper Gallery" status={<Badge>Done: 5th October, 2025</Badge>}>
               Wallpaper Gallery to showcase your wallpapers and browse the CAPlayground community's wallpapers.
             </RoadmapItem>
-            <RoadmapItem index={3} title="Emitters Support" status={<Badge variant="outline">Starting Soon</Badge>}>
+            <RoadmapItem index={3} title="Gradient Layers" status={<Badge>Done: 7th October, 2025</Badge>}>
+              CAGradientLayer support to create cool gradients.
+            </RoadmapItem>
+            <RoadmapItem index={4} title="Emitters Support" status={<Badge variant="outline">Starting Soon</Badge>}>
               Support Emitters to create create emitters, I guess.
             </RoadmapItem>
-            <RoadmapItem index={4} title="Parallax Effect" status={<Badge variant="outline">Not Started</Badge>}>
+            <RoadmapItem index={5} title="Parallax Effect" status={<Badge variant="outline">Not Started</Badge>}>
               Create wallpapers with Parallax Effect (Gyroscope) for iOS 26. Will need to make sublayers support because of this.
             </RoadmapItem>
           </div>

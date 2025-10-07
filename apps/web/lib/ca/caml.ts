@@ -369,6 +369,75 @@ function parseCATextLayer(el: Element): AnyLayer {
   return layer;
 }
 
+function parseCAGradientLayer(el: Element): AnyLayer {
+  const id = attr(el, 'id') || crypto.randomUUID();
+  const name = attr(el, 'name') || 'Gradient Layer';
+  const bounds = parseNumberList(attr(el, 'bounds'));
+  const position = parseNumberList(attr(el, 'position'));
+  const anchorPt = parseNumberList(attr(el, 'anchorPoint'));
+  const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const rotationZ = attr(el, 'transform.rotation.z');
+  const rotationX = attr(el, 'transform.rotation.x');
+  const rotationY = attr(el, 'transform.rotation.y');
+  const opacityAttr = attr(el, 'opacity');
+  
+  const startPointAttr = parseNumberList(attr(el, 'startPoint'));
+  const endPointAttr = parseNumberList(attr(el, 'endPoint'));
+  
+  const startPoint = { x: startPointAttr[0] ?? 0, y: startPointAttr[1] ?? 0 };
+  const endPoint = { x: endPointAttr[0] ?? 1, y: endPointAttr[1] ?? 1 };
+  
+  // Parse colors
+  const colors: any[] = [];
+  const colorsEl = el.getElementsByTagNameNS(CAML_NS, 'colors')[0] as Element | undefined;
+  if (colorsEl) {
+    const cgColors = directChildrenByTagNS(colorsEl, 'CGColor');
+    for (const cgColor of cgColors) {
+      const value = cgColor.getAttribute('value');
+      const opacity = cgColor.getAttribute('opacity');
+      const colorHex = floatsToHexColor(value || '');
+      colors.push({
+        color: colorHex || '#000000',
+        opacity: opacity ? Number(opacity) : 1,
+      });
+    }
+  }
+  
+  // Parse gradient type
+  let gradientType: 'axial' | 'radial' | 'conic' = 'axial';
+  const typeEl = el.getElementsByTagNameNS(CAML_NS, 'type')[0] as Element | undefined;
+  if (typeEl) {
+    const typeValue = typeEl.getAttribute('value');
+    if (typeValue === 'radial' || typeValue === 'conic') {
+      gradientType = typeValue;
+    }
+  }
+  
+  const base = {
+    id,
+    name,
+    position: { x: position[0] ?? 0, y: position[1] ?? 0 },
+    size: { w: bounds[2] ?? 0, h: bounds[3] ?? 0 },
+    opacity: opacityAttr ? Number(opacityAttr) : undefined,
+    rotation: rotationZ ? ((Number(rotationZ) * 180) / Math.PI) : undefined,
+    rotationX: rotationX ? ((Number(rotationX) * 180) / Math.PI) : undefined,
+    rotationY: rotationY ? ((Number(rotationY) * 180) / Math.PI) : undefined,
+    anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
+    geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+  } as const;
+
+  const layer: AnyLayer = {
+    ...base,
+    type: 'gradient',
+    gradientType,
+    startPoint,
+    endPoint,
+    colors,
+  } as AnyLayer;
+  
+  return layer;
+}
+
 function parseCALayer(el: Element): AnyLayer {
   const caplayKind = attr(el, 'caplayKind') || attr(el, 'caplay.kind');
   if (caplayKind === 'video') {
@@ -542,7 +611,7 @@ function parseCALayer(el: Element): AnyLayer {
   } catch {}
 
   const sublayersEl = directChildByTagNS(el, 'sublayers');
-  const sublayerNodesRaw = sublayersEl ? directChildrenByTagNS(sublayersEl, 'CALayer').concat(directChildrenByTagNS(sublayersEl, 'CATextLayer')) : [];
+  const sublayerNodesRaw = sublayersEl ? directChildrenByTagNS(sublayersEl, 'CALayer').concat(directChildrenByTagNS(sublayersEl, 'CATextLayer')).concat(directChildrenByTagNS(sublayersEl, 'CAGradientLayer')) : [];
   const sublayerNodes = sublayerNodesRaw;
 
   if (imageSrc && sublayerNodes.length === 0) {
@@ -573,6 +642,7 @@ function parseCALayer(el: Element): AnyLayer {
     for (const n of kids) {
       if (n.localName === 'CALayer') children.push(parseCALayer(n));
       else if (n.localName === 'CATextLayer') children.push(parseCATextLayer(n));
+      else if (n.localName === 'CAGradientLayer') children.push(parseCAGradientLayer(n));
     }
     const normalize = (s: string) => {
       try { s = decodeURIComponent(s); } catch {}
@@ -814,7 +884,9 @@ function setAttr(el: Element, name: string, value: string | number | undefined) 
 
 function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, wallpaperParallaxGroupsInput?: GyroParallaxDictionary[]): Element {
   const isText = layer.type === 'text';
-  const el = doc.createElementNS(CAML_NS, isText ? 'CATextLayer' : 'CALayer');
+  const isGradient = layer.type === 'gradient';
+  const elementType = isText ? 'CATextLayer' : isGradient ? 'CAGradientLayer' : 'CALayer';
+  const el = doc.createElementNS(CAML_NS, elementType);
   setAttr(el, 'id', layer.id);
   setAttr(el, 'name', layer.name);
   setAttr(el, 'bounds', `0 0 ${Math.max(0, layer.size.w)} ${Math.max(0, layer.size.h)}`);
@@ -958,6 +1030,38 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, 
     str.setAttribute('type', 'string');
     str.setAttribute('value', (layer as TextLayer).text || '');
     el.appendChild(str);
+  }
+
+  if (layer.type === 'gradient') {
+    const gradLayer = layer as any;
+    const startX = gradLayer.startPoint?.x ?? 0;
+    const startY = gradLayer.startPoint?.y ?? 0;
+    const endX = gradLayer.endPoint?.x ?? 1;
+    const endY = gradLayer.endPoint?.y ?? 1;
+    
+    setAttr(el, 'startPoint', `${startX} ${startY}`);
+    setAttr(el, 'endPoint', `${endX} ${endY}`);
+    
+    if (gradLayer.colors && gradLayer.colors.length > 0) {
+      const colorsEl = doc.createElementNS(CAML_NS, 'colors');
+      for (const gradColor of gradLayer.colors) {
+        const cgColor = doc.createElementNS(CAML_NS, 'CGColor');
+        const colorValue = hexToForegroundColor(gradColor.color);
+        if (colorValue) {
+          cgColor.setAttribute('value', colorValue);
+        }
+        if (gradColor.opacity < 1) {
+          const op = Math.round(gradColor.opacity * 100) / 100;
+          cgColor.setAttribute('opacity', String(op));
+        }
+        colorsEl.appendChild(cgColor);
+      }
+      el.appendChild(colorsEl);
+    }
+    
+    const typeEl = doc.createElementNS(CAML_NS, 'type');
+    typeEl.setAttribute('value', gradLayer.gradientType || 'axial');
+    el.appendChild(typeEl);
   }
 
   if (wallpaperParallaxGroupsInput && wallpaperParallaxGroupsInput.length > 0) {

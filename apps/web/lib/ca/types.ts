@@ -84,7 +84,20 @@ export type VideoLayer = LayerBase & {
   frameExtension?: string;
 };
 
-export type AnyLayer = ImageLayer | TextLayer | ShapeLayer | GroupLayer | VideoLayer;
+export type GradientColor = {
+  color: string;
+  opacity: number;
+};
+
+export type GradientLayer = LayerBase & {
+  type: 'gradient';
+  gradientType: 'axial' | 'radial' | 'conic';
+  startPoint: { x: number; y: number };
+  endPoint: { x: number; y: number };
+  colors: GradientColor[];
+};
+
+export type AnyLayer = ImageLayer | TextLayer | ShapeLayer | GroupLayer | VideoLayer | GradientLayer;
 
 export type CAAsset = {
   path: string;
