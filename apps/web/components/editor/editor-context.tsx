@@ -26,6 +26,7 @@ type CADoc = {
   stateOverrides?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>;
   activeState?: 'Base State' | 'Locked' | 'Unlock' | 'Sleep';
   wallpaperParallaxGroups?: GyroParallaxDictionary[];
+  camlHeaderComments?: string;
 };
 
 export type ProjectDocument = {
@@ -167,10 +168,19 @@ export function EditorProvider({
           let states: string[] = [...fixedStates];
           let stateOverrides: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
           let wallpaperParallaxGroups: GyroParallaxDictionary[] = [];
+          let camlHeaderComments: string | undefined = undefined;
           if (main && main.type === 'text' && typeof main.data === 'string') {
             try {
+              const camlContent = main.data as string;
+              const xmlDeclMatch = camlContent.match(/^<\?xml[^>]+\?>/);
+              const xmlDecl = xmlDeclMatch ? xmlDeclMatch[0] : '';
+              const afterXmlDecl = xmlDecl ? camlContent.substring(xmlDecl.length) : camlContent;
+              const commentMatch = afterXmlDecl.match(/^\s*(<!--[\s\S]*?-->\s*)/);
+              if (commentMatch) {
+                camlHeaderComments = commentMatch[1].trim();
+              }
               const { parseCAML, parseStates, parseStateOverrides, parseWallpaperParallaxGroups } = await import("@/lib/ca/caml");
-              const root = parseCAML(main.data);
+              const root = parseCAML(camlContent);
               if (root) {
                 const rootLayer = root as any;
                 layers = rootLayer?.type === 'group' && Array.isArray(rootLayer.children) ? rootLayer.children : [rootLayer];
@@ -266,6 +276,7 @@ export function EditorProvider({
             activeState: 'Base State',
             stateOverrides,
             wallpaperParallaxGroups,
+            camlHeaderComments,
           };
         };
 
@@ -413,7 +424,7 @@ export function EditorProvider({
           children: toCamlLayers((caDoc.layers as AnyLayer[]) || [], caDoc.assets),
         } as GroupLayer;
 
-        const caml = serializeCAML(
+        let caml = serializeCAML(
           root,
           {
             id: snapshot.meta.id,
@@ -428,6 +439,9 @@ export function EditorProvider({
           undefined,
           caDoc.wallpaperParallaxGroups,
         );
+        if (caDoc.camlHeaderComments) {
+          caml = caml.replace('<?xml version="1.0" encoding="UTF-8"?>', `<?xml version="1.0" encoding="UTF-8"?>\n${caDoc.camlHeaderComments}`);
+        }
         await putTextFile(projectId, `${prefix}${caFolder}/main.caml`, caml);
         const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
         await putTextFile(projectId, `${prefix}${caFolder}/index.xml`, indexXml);

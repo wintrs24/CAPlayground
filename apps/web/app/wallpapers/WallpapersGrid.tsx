@@ -127,10 +127,13 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
         return serializeCAML(group, { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb', geometryFlipped: tendies.project.geometryFlipped } as any, doc.states as any, doc.stateOverrides as any, doc.stateTransitions as any)
       }
 
+      const creditComment = `<!--\n  Original wallpaper: ${item.name}\n  Created by: ${item.creator}\n  Imported from CAPlayground Gallery\n-->\n`
+      
       const floatingDoc = tendies.wallpaper || tendies.floating
       if (floatingDoc) {
         const camlFloating = await mkCaml(floatingDoc, 'Floating')
-        await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating)
+        const camlWithCredit = camlFloating.replace('<?xml version="1.0" encoding="UTF-8"?>', `<?xml version="1.0" encoding="UTF-8"?>\n${creditComment}`)
+        await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlWithCredit)
         await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml)
         await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest)
 
@@ -150,7 +153,8 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
       
       if (tendies.background) {
         const camlBackground = await mkCaml(tendies.background, 'Background')
-        await putTextFile(id, `${folder}/Background.ca/main.caml`, camlBackground)
+        const camlBackgroundWithCredit = camlBackground.replace('<?xml version="1.0" encoding="UTF-8"?>', `<?xml version="1.0" encoding="UTF-8"?>\n${creditComment}`)
+        await putTextFile(id, `${folder}/Background.ca/main.caml`, camlBackgroundWithCredit)
         await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml)
         await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest)
         
