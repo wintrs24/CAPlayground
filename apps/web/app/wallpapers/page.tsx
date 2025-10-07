@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
 import { WallpapersGrid } from "./WallpapersGrid"
@@ -69,7 +70,11 @@ export default async function WallpapersPage() {
                 </div>
               )}
 
-              {data && <WallpapersGrid data={data} />}
+              {data && (
+                <Suspense fallback={<div className="text-center text-muted-foreground">Loading...</div>}>
+                  <WallpapersGrid data={data} />
+                </Suspense>
+              )}
             </div>
           </section>
         </main>
