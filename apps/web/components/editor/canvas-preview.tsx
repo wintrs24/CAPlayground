@@ -1173,6 +1173,8 @@ export function CanvasPreview() {
         startClientY: number;
         startLeft: number;
         startTop: number;
+        startAbsLeft: number;
+        startAbsTop: number;
         canvasH: number;
         yUp: boolean;
         aX: number;
@@ -1244,6 +1246,8 @@ export function CanvasPreview() {
       startClientY: e.clientY,
       startLeft: startLT.left,
       startTop: startLT.top,
+      startAbsLeft: parentCtx.left + startLT.left,
+      startAbsTop: parentCtx.top + startLT.top,
       canvasH,
       yUp,
       aX: a.x,
@@ -1300,9 +1304,10 @@ export function CanvasPreview() {
             testTop = d.startTop + d.startH - h;
             break;
         }
-        
-        const testRight = testLeft + w;
-        const testBottom = testTop + h;  
+        const testLeftAbs = testLeft + d.parentAbsLeft;
+        const testTopAbs = testTop + d.parentAbsTop;
+        const testRightAbs = testLeftAbs + w;
+        const testBottomAbs = testTopAbs + h;  
         const xTargets: number[] = [];
         const yTargets: number[] = [];
         
@@ -1334,14 +1339,15 @@ export function CanvasPreview() {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of xTargets) {
-              const dist = Math.abs(testLeft - target);
+              const dist = Math.abs(testLeftAbs - target);
               if (dist <= th && dist < bestDist) {
                 bestDist = dist;
                 bestTarget = target;
               }
             }
             if (bestTarget !== null) {
-              w = d.startLeft + d.startW - bestTarget;
+              const startRightAbs = d.startAbsLeft + d.startW;
+              w = startRightAbs - bestTarget;
             }
           }
           
@@ -1349,14 +1355,14 @@ export function CanvasPreview() {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of xTargets) {
-              const dist = Math.abs(testRight - target);
+              const dist = Math.abs(testRightAbs - target);
               if (dist <= th && dist < bestDist) {
                 bestDist = dist;
                 bestTarget = target;
               }
             }
             if (bestTarget !== null) {
-              w = bestTarget - testLeft;
+              w = bestTarget - testLeftAbs;
             }
           }
         }
@@ -1369,14 +1375,15 @@ export function CanvasPreview() {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of yTargets) {
-              const dist = Math.abs(testTop - target);
+              const dist = Math.abs(testTopAbs - target);
               if (dist <= th && dist < bestDist) {
                 bestDist = dist;
                 bestTarget = target;
               }
             }
             if (bestTarget !== null) {
-              h = d.startTop + d.startH - bestTarget;
+              const startBottomAbs = d.startAbsTop + d.startH;
+              h = startBottomAbs - bestTarget;
             }
           }
           
@@ -1384,14 +1391,14 @@ export function CanvasPreview() {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of yTargets) {
-              const dist = Math.abs(testBottom - target);
+              const dist = Math.abs(testBottomAbs - target);
               if (dist <= th && dist < bestDist) {
                 bestDist = dist;
                 bestTarget = target;
               }
             }
             if (bestTarget !== null) {
-              h = bestTarget - testTop;
+              h = bestTarget - testTopAbs;
             }
           }
         }
@@ -1446,8 +1453,8 @@ export function CanvasPreview() {
           top = d.startTop + d.startH - h;
           break;
       }
-      const localLeft = left - d.parentAbsLeft;
-      const localTop = top - d.parentAbsTop;
+      const localLeft = left;
+      const localTop = top;
       const x = localLeft + d.aX * w;
       const y = d.parentYUp
         ? ((d.parentH - localTop) - (1 - d.aY) * h)
