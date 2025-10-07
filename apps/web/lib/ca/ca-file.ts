@@ -40,6 +40,13 @@ export type DualCABundle = {
   background: Omit<CAProjectBundle, 'project'>;
 };
 
+export type TendiesBundle = {
+  project: { width: number; height: number; geometryFlipped: 0|1 };
+  floating?: Omit<CAProjectBundle, 'project'>;
+  background?: Omit<CAProjectBundle, 'project'>;
+  wallpaper?: Omit<CAProjectBundle, 'project'>;
+};
+
 // Import a .zip containing both Background.ca and Floating.ca. If both are not present, throw an error.
 export async function unpackDualCAZip(file: Blob): Promise<DualCABundle> {
   const JSZip = (await import('jszip')).default;
@@ -426,4 +433,115 @@ export async function unpackCA(file: Blob): Promise<CAProjectBundle> {
   };
 
   return { project, root, assets, states, stateOverrides, stateTransitions };
+}
+
+export async function unpackTendies(file: Blob): Promise<TendiesBundle> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(file);
+
+  const paths = Object.keys(zip.files).map(p => p.replace(/\\/g, '/'));
+  
+  const findCAPath = (pattern: 'floating' | 'background' | 'wallpaper.ca'): string | null => {
+    if (pattern === 'wallpaper.ca') {
+      const candidate = paths.find((p) => {
+        const segments = p.toLowerCase().split('/');
+        return segments.some(seg => seg === 'wallpaper.ca');
+      });
+      if (!candidate) return null;
+      const parts = candidate.split('/');
+      const idx = parts.map(s => s.toLowerCase()).lastIndexOf('wallpaper.ca');
+      if (idx < 0) return null;
+      return parts.slice(0, idx + 1).join('/') + '/';
+    } else {
+      const candidate = paths.find((p) => {
+        const segments = p.toLowerCase().split('/');
+        return segments.some(seg => seg.includes(pattern) && seg.endsWith('.ca'));
+      });
+      if (!candidate) return null;
+      const parts = candidate.split('/');
+      const idx = parts.findIndex(seg => seg.toLowerCase().includes(pattern) && seg.toLowerCase().endsWith('.ca'));
+      if (idx < 0) return null;
+      return parts.slice(0, idx + 1).join('/') + '/';
+    }
+  };
+
+  const floatingPath = findCAPath('floating');
+  const backgroundPath = findCAPath('background');
+  const wallpaperPath = findCAPath('wallpaper.ca');
+
+  if (!floatingPath && !backgroundPath && !wallpaperPath) {
+    throw new Error('TENDIES_MISSING_CA_FILES: No floating.ca, background.ca, or wallpaper.ca found');
+  }
+
+  const readCADir = async (baseDir: string): Promise<Omit<CAProjectBundle, 'project'>> => {
+    const norm = (p: string) => p.replace(/\\/g, '/');
+    const byLower = new Map(paths.map((p) => [p.toLowerCase(), p] as const));
+    const get = (rel: string) => {
+      const full = norm(`${baseDir}${rel}`);
+      const hit = byLower.get(full.toLowerCase());
+      return zip.file(hit || full);
+    };
+
+    let indexXml = await get('index.xml')?.async('string');
+    if (!indexXml) indexXml = await get('Index.xml')?.async('string');
+    const rootDoc = indexXml ? parseIndexXml(indexXml) : null;
+    const sceneName = (rootDoc || DEFAULT_SCENE).trim();
+
+    let camlEntry = get(sceneName);
+    if (!camlEntry) {
+      const base = sceneName.split('/').pop() || sceneName;
+      const candidate = paths.find((p) => p.toLowerCase().startsWith(baseDir.toLowerCase()) && (p.split('/').pop() || '') === base);
+      if (candidate) camlEntry = zip.file(candidate);
+    }
+    if (!camlEntry) throw new Error(`Missing CAML in ${baseDir}`);
+    
+    const camlStrOriginal = await camlEntry.async('string');
+    const { xml: camlStr, assets: inlineAssets } = await extractInlineAssetsToFiles(camlStrOriginal);
+    const root = parseCAML(camlStr);
+    if (!root) throw new Error(`Failed to parse CAML in ${baseDir}`);
+    const states = parseStates(camlStr);
+    const stateOverrides = parseStateOverrides(camlStr);
+    const stateTransitions = parseStateTransitions(camlStr);
+
+    const assets: CAProjectBundle['assets'] = {};
+    for (const p of paths) {
+      if (!p.toLowerCase().startsWith(baseDir.toLowerCase())) continue;
+      const entry = zip.files[p];
+      if (!entry || entry.dir) continue;
+      if (!/(^|\/)assets\//i.test(p)) continue;
+      const fileObj = zip.file(p);
+      if (!fileObj) continue;
+      const data = await fileObj.async('blob');
+      const afterAssets = p.split(/assets\//i)[1] || '';
+      const filename = (afterAssets.split('/').pop() || '').trim();
+      if (!filename) continue;
+      if (data && data.size > 0 && !assets[filename]) {
+        assets[filename] = { path: `assets/${filename}`, data };
+      }
+    }
+
+    try {
+      for (const [name, info] of Object.entries(inlineAssets || {})) {
+        if (!assets[name]) assets[name] = { path: (info as any).path, data: (info as any).data };
+      }
+    } catch {}
+
+    return { root, states, stateOverrides, stateTransitions, assets };
+  };
+
+  const floating = floatingPath ? await readCADir(floatingPath) : undefined;
+  const background = backgroundPath ? await readCADir(backgroundPath) : undefined;
+  const wallpaper = wallpaperPath ? await readCADir(wallpaperPath) : undefined;
+
+  const anyRoot = (floating?.root || background?.root || wallpaper?.root) as AnyLayer | undefined;
+  const width = Math.max(0, anyRoot?.size?.w || 390);
+  const height = Math.max(0, anyRoot?.size?.h || 844);
+  const geom = (((anyRoot as any)?.geometryFlipped) ?? 0) as 0|1;
+
+  return {
+    project: { width, height, geometryFlipped: geom },
+    floating,
+    background,
+    wallpaper,
+  };
 }

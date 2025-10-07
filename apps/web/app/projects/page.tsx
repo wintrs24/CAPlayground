@@ -36,6 +36,12 @@ type DualCABundle = {
   floating: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any };
   background: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any };
 };
+type TendiesBundle = {
+  project: { width: number; height: number; geometryFlipped: 0|1 };
+  floating?: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any };
+  background?: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any };
+  wallpaper?: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any };
+};
 import { ensureUniqueProjectName, createProject, updateProject, deleteProject, getProject, listFiles, listProjects, putBlobFile, putTextFile, isUsingOPFS } from "@/lib/storage";
 import {
   Select,
@@ -68,6 +74,8 @@ export default function ProjectsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const importTendiesInputRef = useRef<HTMLInputElement | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isTosOpen, setIsTosOpen] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [previews, setPreviews] = useState<Record<string, { bg: string; width?: number; height?: number }>>({});
@@ -564,7 +572,15 @@ export default function ProjectsPage() {
     );
   };
 
-  const handleImportClick = () => importInputRef.current?.click();
+  const handleImportClick = () => setIsImportDialogOpen(true);
+  const handleImportCAClick = () => {
+    setIsImportDialogOpen(false);
+    importInputRef.current?.click();
+  };
+  const handleImportTendiesClick = () => {
+    setIsImportDialogOpen(false);
+    importTendiesInputRef.current?.click();
+  };
 
   const handleImportChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
     try {
@@ -575,11 +591,13 @@ export default function ProjectsPage() {
       let bundle: any = null;
       if (isZip) {
         try {
+          const { unpackDualCAZip } = await import('@/lib/ca/ca-file');
           dual = await unpackDualCAZip(file);
         } catch (err: any) {
           const msg = String(err?.message || '');
           // Fallback: treat as a single .ca package (a zip with main.caml)
           try {
+            const { unpackCA } = await import('@/lib/ca/ca-file');
             bundle = await unpackCA(file);
           } catch (fallbackErr) {
             if (msg.startsWith('UNSUPPORTED_ZIP_STRUCTURE')) {
@@ -590,6 +608,7 @@ export default function ProjectsPage() {
           }
         }
       } else {
+        const { unpackCA } = await import('@/lib/ca/ca-file');
         bundle = await unpackCA(file);
       }
       const id = Date.now().toString();
@@ -693,6 +712,95 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleImportTendiesChange: React.ChangeEventHandler<HTMLInputElement> = async (e) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      const { unpackTendies } = await import('@/lib/ca/ca-file');
+      const tendies = await unpackTendies(file);
+      
+      const id = Date.now().toString();
+      const name = await ensureUniqueProjectName("Imported Tendies");
+      const width = Math.round(tendies.project.width);
+      const height = Math.round(tendies.project.height);
+      await createProject({ id, name, createdAt: new Date().toISOString(), width, height });
+      const folder = `${name}.ca`;
+      const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`;
+      const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`;
+      
+      const { serializeCAML } = await import('@/lib/ca/caml');
+      
+      const mkCaml = async (doc: { root: AnyLayer; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any }, docName: string) => {
+        const root = doc.root as any;
+        const layers = root?.type === 'group' && Array.isArray(root.children) ? root.children : (root ? [root] : []);
+        const group = {
+          id: `${id}-${docName}`,
+          name: `${name} ${docName}`,
+          type: 'group',
+          position: { x: Math.round(width/2), y: Math.round(height/2) },
+          size: { w: width, h: height },
+          backgroundColor: root?.backgroundColor ?? '#e5e7eb',
+          geometryFlipped: tendies.project.geometryFlipped,
+          children: layers,
+        } as any;
+        return serializeCAML(group, { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb', geometryFlipped: tendies.project.geometryFlipped } as any, doc.states as any, doc.stateOverrides as any, doc.stateTransitions as any);
+      };
+
+      const floatingDoc = tendies.wallpaper || tendies.floating;
+      if (floatingDoc) {
+        const camlFloating = await mkCaml(floatingDoc, 'Floating');
+        await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating);
+        await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest);
+
+        const flAssets = (floatingDoc.assets || {}) as Record<string, CAAsset>;
+        for (const [filename, asset] of Object.entries(flAssets)) {
+          try {
+            const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer]);
+            await putBlobFile(id, `${folder}/Floating.ca/assets/${filename}`, data);
+          } catch {}
+        }
+      } else {
+        const emptyFloatingCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`;
+        await putTextFile(id, `${folder}/Floating.ca/main.caml`, emptyFloatingCaml);
+        await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest);
+      }
+      
+      if (tendies.background) {
+        const camlBackground = await mkCaml(tendies.background, 'Background');
+        await putTextFile(id, `${folder}/Background.ca/main.caml`, camlBackground);
+        await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest);
+        
+        const bgAssets = (tendies.background.assets || {}) as Record<string, CAAsset>;
+        for (const [filename, asset] of Object.entries(bgAssets)) {
+          try {
+            const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer]);
+            await putBlobFile(id, `${folder}/Background.ca/assets/${filename}`, data);
+          } catch {}
+        }
+      } else {
+        const emptyBackgroundCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`;
+        await putTextFile(id, `${folder}/Background.ca/main.caml`, emptyBackgroundCaml);
+        await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml);
+        await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest);
+      }
+      
+      const idbList = await listProjects();
+      setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+      recordProjectCreated();
+      
+      router.push(`/editor/${id}`);
+    } catch (err) {
+      console.error('Tendies import failed', err);
+      alert(`Failed to import tendies file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      if (importTendiesInputRef.current) importTendiesInputRef.current.value = '';
+    }
+  };
+
   const openBulkDelete = () => setIsBulkDeleteOpen(true);
   const performBulkDelete = async () => {
     if (selectedIds.length === 0) return;
@@ -791,8 +899,15 @@ export default function ProjectsPage() {
               onChange={handleImportChange}
               className="hidden"
             />
+            <input
+              ref={importTendiesInputRef}
+              type="file"
+              accept=".tendies"
+              onChange={handleImportTendiesChange}
+              className="hidden"
+            />
             <Button variant="outline" onClick={handleImportClick}>
-              <Upload className="h-4 w-4 mr-2" /> Import .ca
+              <Upload className="h-4 w-4 mr-2" /> Import
             </Button>
             {isSelectMode && (
               <Button
@@ -1061,6 +1176,49 @@ export default function ProjectsPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => { setIsRenameOpen(false); setEditingProjectId(null); setEditingName(""); }}>Cancel</Button>
               <Button onClick={saveEdit} disabled={!editingName.trim()}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Import type */}
+        <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Import Project</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Choose the type of file you want to import:
+              </p>
+              <div className="grid gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleImportCAClick}
+                  className="w-full justify-start text-left py-8"
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-medium">Import .ca file</span>
+                    <span className="text-xs text-muted-foreground">
+                      Import a CoreAnimation package or zip file
+                    </span>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleImportTendiesClick}
+                  className="w-full justify-start text-left py-8"
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-medium">Import .tendies file</span>
+                    <span className="text-xs text-muted-foreground">
+                      Import a tendies wallpaper file
+                    </span>
+                  </div>
+                </Button>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>Cancel</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

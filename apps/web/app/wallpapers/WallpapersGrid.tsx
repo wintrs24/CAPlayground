@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
-import { useSearchParams } from "next/navigation"
-import { Upload } from "lucide-react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { Upload, Edit } from "lucide-react"
 import { SubmitWallpaperDialog } from "./SubmitWallpaperDialog"
 import { getSupabaseBrowserClient } from "@/lib/supabase"
+import type { CAAsset } from "@/lib/ca/types"
+import { ensureUniqueProjectName, createProject, listProjects, putBlobFile, putTextFile } from "@/lib/storage"
 
 interface WallpaperItem {
   name: string
@@ -33,11 +35,13 @@ function isVideo(src: string) {
 export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
   const supabase = getSupabaseBrowserClient()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [q, setQ] = useState("")
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false)
   const [username, setUsername] = useState<string>("")
   const [displayName, setDisplayName] = useState<string>("")
   const [isSignedIn, setIsSignedIn] = useState(false)
+  const [importingWallpaper, setImportingWallpaper] = useState<string | null>(null)
 
   useEffect(() => {
     const initial = (searchParams?.get("q") || "").trim()
@@ -83,6 +87,95 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
       return name.includes(t) || creator.includes(t) || desc.includes(t)
     })
   }, [q, data.wallpapers])
+
+  const handleOpenInEditor = async (item: WallpaperItem) => {
+    try {
+      setImportingWallpaper(item.name)
+      const fileUrl = `${data.base_url}${item.file}`
+      
+      const response = await fetch(fileUrl)
+      if (!response.ok) throw new Error('Failed to download wallpaper')
+      const blob = await response.blob()
+      
+      const { unpackTendies } = await import('@/lib/ca/ca-file')
+      const tendies = await unpackTendies(blob)
+      
+      const id = Date.now().toString()
+      const name = await ensureUniqueProjectName(item.name || "Imported Wallpaper")
+      const width = Math.round(tendies.project.width)
+      const height = Math.round(tendies.project.height)
+      await createProject({ id, name, createdAt: new Date().toISOString(), width, height })
+      const folder = `${name}.ca`
+      const indexXml = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>rootDocument</key>\n  <string>main.caml</string>\n</dict>\n</plist>`
+      const assetManifest = `<?xml version="1.0" encoding="UTF-8"?>\n\n<caml xmlns="http://www.apple.com/CoreAnimation/1.0">\n  <MicaAssetManifest>\n    <modules type="NSArray"/>\n  </MicaAssetManifest>\n</caml>`
+      
+      const { serializeCAML } = await import('@/lib/ca/caml')
+      
+      const mkCaml = async (doc: { root: any; assets?: Record<string, CAAsset>; states?: string[]; stateOverrides?: any; stateTransitions?: any }, docName: string) => {
+        const root = doc.root as any
+        const layers = root?.type === 'group' && Array.isArray(root.children) ? root.children : (root ? [root] : [])
+        const group = {
+          id: `${id}-${docName}`,
+          name: `${name} ${docName}`,
+          type: 'group',
+          position: { x: Math.round(width/2), y: Math.round(height/2) },
+          size: { w: width, h: height },
+          backgroundColor: root?.backgroundColor ?? '#e5e7eb',
+          geometryFlipped: tendies.project.geometryFlipped,
+          children: layers,
+        } as any
+        return serializeCAML(group, { id, name, width, height, background: root?.backgroundColor ?? '#e5e7eb', geometryFlipped: tendies.project.geometryFlipped } as any, doc.states as any, doc.stateOverrides as any, doc.stateTransitions as any)
+      }
+
+      const floatingDoc = tendies.wallpaper || tendies.floating
+      if (floatingDoc) {
+        const camlFloating = await mkCaml(floatingDoc, 'Floating')
+        await putTextFile(id, `${folder}/Floating.ca/main.caml`, camlFloating)
+        await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml)
+        await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest)
+
+        const flAssets = (floatingDoc.assets || {}) as Record<string, CAAsset>
+        for (const [filename, asset] of Object.entries(flAssets)) {
+          try {
+            const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer])
+            await putBlobFile(id, `${folder}/Floating.ca/assets/${filename}`, data)
+          } catch {}
+        }
+      } else {
+        const emptyFloatingCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`
+        await putTextFile(id, `${folder}/Floating.ca/main.caml`, emptyFloatingCaml)
+        await putTextFile(id, `${folder}/Floating.ca/index.xml`, indexXml)
+        await putTextFile(id, `${folder}/Floating.ca/assetManifest.caml`, assetManifest)
+      }
+      
+      if (tendies.background) {
+        const camlBackground = await mkCaml(tendies.background, 'Background')
+        await putTextFile(id, `${folder}/Background.ca/main.caml`, camlBackground)
+        await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml)
+        await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest)
+        
+        const bgAssets = (tendies.background.assets || {}) as Record<string, CAAsset>
+        for (const [filename, asset] of Object.entries(bgAssets)) {
+          try {
+            const data = asset.data instanceof Blob ? asset.data : new Blob([asset.data as ArrayBuffer])
+            await putBlobFile(id, `${folder}/Background.ca/assets/${filename}`, data)
+          } catch {}
+        }
+      } else {
+        const emptyBackgroundCaml = `<?xml version="1.0" encoding="UTF-8"?><caml xmlns="http://www.apple.com/CoreAnimation/1.0"/>`
+        await putTextFile(id, `${folder}/Background.ca/main.caml`, emptyBackgroundCaml)
+        await putTextFile(id, `${folder}/Background.ca/index.xml`, indexXml)
+        await putTextFile(id, `${folder}/Background.ca/assetManifest.caml`, assetManifest)
+      }
+      
+      router.push(`/editor/${id}`)
+    } catch (err) {
+      console.error('Failed to open wallpaper in editor', err)
+      alert(`Failed to open wallpaper in editor: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setImportingWallpaper(null)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -138,8 +231,16 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{item.description}</p>
                 <div className="flex flex-col gap-2">
+                  <Button 
+                    onClick={() => handleOpenInEditor(item)}
+                    disabled={importingWallpaper === item.name}
+                    className="w-full"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {importingWallpaper === item.name ? 'Opening...' : 'Open in Editor'}
+                  </Button>
                   <Link href={fileUrl} target="_blank" rel="noopener noreferrer">
-                    <Button className="w-full bg-accent hover:bg-accent/90 text-white">Download .tendies</Button>
+                    <Button variant="outline" className="w-full">Download .tendies</Button>
                   </Link>
                 </div>
               </CardContent>
