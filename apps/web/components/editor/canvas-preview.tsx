@@ -931,7 +931,13 @@ export function CanvasPreview() {
     return css ? { background: css } : {};
   };
 
-  const renderLayer = (l: AnyLayer, containerH: number = (doc?.meta.height ?? 0), useYUp: boolean = getRootFlip() === 0, siblings: AnyLayer[] = renderedLayers): ReactNode => {
+  const renderLayer = (
+    l: AnyLayer,
+    containerH: number = (doc?.meta.height ?? 0),
+    useYUp: boolean = getRootFlip() === 0,
+    siblings: AnyLayer[] = renderedLayers,
+    assets?: Record<string, { dataURL?: string }>
+  ): ReactNode => {
     const { left, top } = computeCssLT(l, containerH, useYUp);
     const a = getAnchor(l);
     const transformOriginY = useYUp ? (1 - a.y) * 100 : a.y * 100;
@@ -976,7 +982,8 @@ export function CanvasPreview() {
       );
     }
     if (l.type === "image") {
-      const imgAsset = (current?.assets || {})[l.id];
+      const assetsMap = assets || (current?.assets || {});
+      const imgAsset = assetsMap[l.id];
       const previewSrc = imgAsset?.dataURL || l.src;
       return (
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
@@ -1006,7 +1013,8 @@ export function CanvasPreview() {
       const v = l as any;
       const frameIndex = v.currentFrameIndex ?? 0;
       const frameAssetId = `${l.id}_frame_${frameIndex}`;
-      const frameAsset = (current?.assets || {})[frameAssetId];
+      const assetsMap = assets || (current?.assets || {});
+      const frameAsset = assetsMap[frameAssetId];
       const previewSrc = frameAsset?.dataURL || "";
       return (
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
@@ -1813,11 +1821,11 @@ export function CanvasPreview() {
       >
         {currentKey === 'floating' && showBackground ? (
           <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-            {renderedLayers.slice(0, backgroundLayers.length).map((l) => renderLayer(l))}
+            {renderedLayers.slice(0, backgroundLayers.length).map((l) => renderLayer(l, undefined as any, undefined as any, undefined as any, other?.assets))}
           </div>
         ) : currentKey === 'background' ? (
           <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-            {renderedLayers.map((l) => renderLayer(l))}
+            {renderedLayers.map((l) => renderLayer(l, undefined as any, undefined as any, undefined as any, current?.assets))}
           </div>
         ) : null}
         {showClockOverlay && (() => {
@@ -1848,8 +1856,8 @@ export function CanvasPreview() {
         {currentKey === 'floating' && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 1000 }}>
             {showBackground 
-              ? renderedLayers.slice(backgroundLayers.length).map((l) => renderLayer(l))
-              : renderedLayers.map((l) => renderLayer(l))
+              ? renderedLayers.slice(backgroundLayers.length).map((l) => renderLayer(l, undefined as any, undefined as any, undefined as any, current?.assets))
+              : renderedLayers.map((l) => renderLayer(l, undefined as any, undefined as any, undefined as any, current?.assets))
             }
           </div>
         )}
