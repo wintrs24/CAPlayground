@@ -26,6 +26,7 @@ import {
 import { Trash2, Edit3, Plus, Folder, ArrowLeft, Check, Upload, ArrowRight } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { getDevicesByCategory } from "@/lib/devices";
 type DeviceSpec = { name: string; width: number; height: number; category?: string };
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import type React from "react";
