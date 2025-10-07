@@ -680,7 +680,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                   <div className="w-1/2 px-0">
                     <div className="py-6 flex flex-col items-center text-center gap-3">
                       <div className="text-2xl font-semibold">Thank you for using CAPlayground!</div>
-                      <div className="text-sm text-muted-foreground">Got a minute? Please consider starring the GitHub repo.</div>
+                      <div className="text-sm text-muted-foreground">PLEASE STAR THE GITHUB REPO (You'll make my day)</div>
                       <a
                         href="https://github.com/CAPlayground/CAPlayground"
                         target="_blank"

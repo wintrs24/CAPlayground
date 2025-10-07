@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Fragment } from "react";
+import { Slider } from "@/components/ui/slider";
+import { Fragment, useState } from "react";
 import type { InspectorTabProps } from "../types";
 
 interface GeometryTabProps extends InspectorTabProps {
@@ -32,6 +33,14 @@ export function GeometryTab({
   disableRotY,
   disableRotZ,
 }: GeometryTabProps) {
+  const selAx = (selected as any).anchorPoint?.x ?? 0.5;
+  const selAy = (selected as any).anchorPoint?.y ?? 0.5;
+  
+  const standardValues = [0, 0.5, 1];
+  const isStandardAnchor = standardValues.includes(selAx) && standardValues.includes(selAy);
+  
+  const [useCustomAnchor, setUseCustomAnchor] = useState(!isStandardAnchor);
+  
   return (
     <div>
       {(disablePosX || disablePosY || disableRotX || disableRotY || disableRotZ) && (
@@ -205,22 +214,86 @@ export function GeometryTab({
         </div>
         <div className="space-y-1 col-span-2">
           <Label>Anchor Point</Label>
-          <div className="grid grid-cols-3 gap-1">
-            {([1,0.5,0] as number[]).map((ay, rowIdx) => (
-              <Fragment key={`row-${rowIdx}`}>
-                {([0,0.5,1] as number[]).map((ax, colIdx) => {
-                  const selAx = (selected as any).anchorPoint?.x ?? 0.5;
-                  const selAy = (selected as any).anchorPoint?.y ?? 0.5;
-                  const isActive = Math.abs(selAx - ax) < 1e-6 && Math.abs(selAy - ay) < 1e-6;
-                  return (
-                    <Button key={`ap-${rowIdx}-${colIdx}`} type="button" variant={isActive ? 'default' : 'outline'} size="sm"
-                      onClick={()=> updateLayer(selected.id, { anchorPoint: { x: ax, y: ay } as any })}>
-                      {ax},{ay}
-                    </Button>
+          {!useCustomAnchor ? (
+            <div className="grid grid-cols-3 gap-1">
+              {([1,0.5,0] as number[]).map((ay, rowIdx) => (
+                <Fragment key={`row-${rowIdx}`}>
+                  {([0,0.5,1] as number[]).map((ax, colIdx) => {
+                    const isActive = Math.abs(selAx - ax) < 1e-6 && Math.abs(selAy - ay) < 1e-6;
+                    return (
+                      <Button key={`ap-${rowIdx}-${colIdx}`} type="button" variant={isActive ? 'default' : 'outline'} size="sm"
+                        onClick={()=> updateLayer(selected.id, { anchorPoint: { x: ax, y: ay } as any })}>
+                        {ax},{ay}
+                      </Button>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="anchor-x" className="text-xs">X ({Math.round(selAx * 100)}%)</Label>
+                </div>
+                <Slider
+                  id="anchor-x"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={[Math.round(selAx * 100)]}
+                  onValueChange={([val]) => {
+                    const newX = val / 100;
+                    updateLayerTransient(selected.id, { anchorPoint: { x: newX, y: selAy } as any });
+                  }}
+                  onValueCommit={([val]) => {
+                    const newX = val / 100;
+                    updateLayer(selected.id, { anchorPoint: { x: newX, y: selAy } as any });
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="anchor-y" className="text-xs">Y ({Math.round(selAy * 100)}%)</Label>
+                </div>
+                <Slider
+                  id="anchor-y"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={[Math.round(selAy * 100)]}
+                  onValueChange={([val]) => {
+                    const newY = val / 100;
+                    updateLayerTransient(selected.id, { anchorPoint: { x: selAx, y: newY } as any });
+                  }}
+                  onValueCommit={([val]) => {
+                    const newY = val / 100;
+                    updateLayer(selected.id, { anchorPoint: { x: selAx, y: newY } as any });
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-2 mt-2">
+            <Switch
+              id="custom-anchor"
+              checked={useCustomAnchor}
+              onCheckedChange={(checked) => {
+                setUseCustomAnchor(checked);
+                if (!checked) {
+                  const nearestX = standardValues.reduce((prev, curr) => 
+                    Math.abs(curr - selAx) < Math.abs(prev - selAx) ? curr : prev
                   );
-                })}
-              </Fragment>
-            ))}
+                  const nearestY = standardValues.reduce((prev, curr) => 
+                    Math.abs(curr - selAy) < Math.abs(prev - selAy) ? curr : prev
+                  );
+                  updateLayer(selected.id, { anchorPoint: { x: nearestX, y: nearestY } as any });
+                }
+              }}
+            />
+            <Label htmlFor="custom-anchor" className="text-xs text-muted-foreground cursor-pointer">
+              Use custom anchor point
+            </Label>
           </div>
         </div>
         <div className="space-y-1 col-span-2">
