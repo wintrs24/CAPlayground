@@ -551,6 +551,18 @@ export default function ProjectsPage() {
     await deleteProject(id);
     const idbList = await listProjects();
     setProjects(idbList.map(p => ({ id: p.id, name: p.name, createdAt: p.createdAt, width: p.width, height: p.height })));
+    
+    setPreviews(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setThumbDocs(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setVisibleCount(PAGE_SIZE);
   };
 
   const confirmDelete = (id: string) => {

@@ -413,16 +413,19 @@ export function EditorProvider({
           return layers.map(mapOne);
         };
         
-        const root: GroupLayer = {
+        const rootBase = {
           id: snapshot.meta.id,
           name: 'Root Layer',
           type: 'group',
           position: { x: Math.round((snapshot.meta.width || 0) / 2), y: Math.round((snapshot.meta.height || 0) / 2) },
           size: { w: snapshot.meta.width || 0, h: snapshot.meta.height || 0 },
-          backgroundColor: snapshot.meta.background,
           geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
           children: toCamlLayers((caDoc.layers as AnyLayer[]) || [], caDoc.assets),
-        } as GroupLayer;
+        };
+        
+        const root: GroupLayer = key === 'floating' 
+          ? rootBase as GroupLayer
+          : { ...rootBase, backgroundColor: snapshot.meta.background } as GroupLayer;
 
         let caml = serializeCAML(
           root,
