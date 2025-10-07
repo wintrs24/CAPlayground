@@ -294,6 +294,52 @@ export default function ProjectsPage() {
         const im = l as any;
         return <img key={l.id} src={im.src} alt={im.name} draggable={false} style={{ ...common, objectFit: 'fill' as const, maxWidth: 'none', maxHeight: 'none' }} />;
       }
+      if (l.type === 'gradient') {
+        const grad = l as any;
+        const gradType = grad.gradientType || 'axial';
+        const startX = (grad.startPoint?.x ?? 0) * 100;
+        const startY = (grad.startPoint?.y ?? 0) * 100;
+        const endX = (grad.endPoint?.x ?? 1) * 100;
+        const endY = (grad.endPoint?.y ?? 1) * 100;
+        
+        const colors = (grad.colors || []).map((c: any) => {
+          const opacity = c.opacity ?? 1;
+          const hex = c.color || '#000000';
+          const r = parseInt(hex.slice(1, 3), 16);
+          const g = parseInt(hex.slice(3, 5), 16);
+          const b = parseInt(hex.slice(5, 7), 16);
+          return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+        }).join(', ');
+        
+        let background = '';
+        const isSamePoint = Math.abs(startX - endX) < 0.01 && Math.abs(startY - endY) < 0.01;
+        
+        if (isSamePoint) {
+          const firstColor = (grad.colors || [])[0];
+          if (firstColor) {
+            const opacity = firstColor.opacity ?? 1;
+            const hex = firstColor.color || '#000000';
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            background = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+          }
+        } else if (gradType === 'axial') {
+          const dx = endX - startX;
+          const dy = -(endY - startY);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+          background = `linear-gradient(${angle}deg, ${colors})`;
+        } else if (gradType === 'radial') {
+          background = `radial-gradient(circle at ${startX}% ${100 - startY}%, ${colors})`;
+        } else if (gradType === 'conic') {
+          const dx = endX - startX;
+          const dy = -(endY - startY);
+          const angle = Math.atan2(dy, dx) + Math.PI / 2;
+          background = `conic-gradient(from ${angle}rad at ${startX}% ${100 - startY}%, ${colors})`;
+        }
+        
+        return <div key={l.id} style={{ ...common, background }} />;
+      }
       if (l.type === 'shape') {
         const s = l as any;
         const corner = (s.cornerRadius ?? s.radius) ?? 0;
