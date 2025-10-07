@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
+export const runtime = 'edge'
+
 /**
 Put DISCORD_WALLPAPER_WEBHOOK_URL in .env.local
  */
@@ -84,8 +86,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Submission service not configured" }, { status: 500 })
     }
 
-    const tendiesBuffer = Buffer.from(await tendiesFile.arrayBuffer())
-    const videoBuffer = Buffer.from(await videoFile.arrayBuffer())
+    const tendiesArrayBuffer = await tendiesFile.arrayBuffer()
+    const videoArrayBuffer = await videoFile.arrayBuffer()
 
     const embed = {
       title: `Wallpaper Submission: ${name}`,
@@ -100,8 +102,8 @@ export async function POST(request: NextRequest) {
 
     const discordFormData = new FormData()
     discordFormData.append("payload_json", JSON.stringify({ embeds: [embed] }))
-    discordFormData.append("files[0]", new Blob([tendiesBuffer]), tendiesFile.name)
-    discordFormData.append("files[1]", new Blob([videoBuffer]), videoFile.name)
+    discordFormData.append("files[0]", new Blob([tendiesArrayBuffer]), tendiesFile.name)
+    discordFormData.append("files[1]", new Blob([videoArrayBuffer]), videoFile.name)
 
     const discordResponse = await fetch(DISCORD_WEBHOOK_URL, {
       method: "POST",
