@@ -53,6 +53,7 @@ export type EditorContextValue = {
   addImageLayerFromBlob: (blob: Blob, filename?: string) => Promise<void>;
   replaceImageForLayer: (layerId: string, file: File) => Promise<void>;
   addShapeLayer: (shape?: ShapeLayer["shape"]) => void;
+  addGradientLayer: () => void;
   addVideoLayerFromFile: (file: File) => Promise<void>;
   updateLayer: (id: string, patch: Partial<AnyLayer>) => void;
   updateLayerTransient: (id: string, patch: Partial<AnyLayer>) => void;
@@ -763,6 +764,59 @@ export function EditorProvider({
     });
   }, [addBase]);
 
+  const addGradientLayer = useCallback(() => {
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const key = prev.activeCA;
+      const cur = prev.docs[key];
+      const selId = cur.selectedId || null;
+      const sig = `gradient:${selId || '__root__'}`;
+      const now = Date.now();
+      if (lastAddRef.current && lastAddRef.current.key === sig && (now - lastAddRef.current.ts) < 400) {
+        return prev;
+      }
+      lastAddRef.current = { key: sig, ts: now };
+      pushHistory(prev);
+      const canvasW = prev.meta.width || 390;
+      const canvasH = prev.meta.height || 844;
+      const layer: any = {
+        ...addBase("Gradient Layer"),
+        type: "gradient",
+        position: { x: canvasW / 2, y: canvasH / 2 },
+        size: { w: 200, h: 200 },
+        gradientType: "axial",
+        startPoint: { x: 0, y: 0 },
+        endPoint: { x: 1, y: 1 },
+        colors: [
+          { color: "#ffffff", opacity: 1 },
+          { color: "#000000", opacity: 1 },
+        ],
+      };
+      let nextLayers: AnyLayer[] = cur.layers;
+      if (!selId || selId === '__root__') {
+        nextLayers = [...cur.layers, layer];
+      } else {
+        const insertInto = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
+          if (l.id === selId && (l as any).type === 'group') {
+            return { ...l, children: [...(l as any).children, layer] } as AnyLayer;
+          }
+          if ((l as any).type === 'group') {
+            return { ...l, children: insertInto((l as any).children) } as AnyLayer;
+          }
+          return l;
+        });
+        nextLayers = insertInto(cur.layers);
+      }
+      return {
+        ...prev,
+        docs: {
+          ...prev.docs,
+          [key]: { ...cur, layers: nextLayers, selectedId: layer.id },
+        },
+      };
+    });
+  }, [addBase]);
+
   const addShapeLayer = useCallback((shape: ShapeLayer["shape"] = "rect") => {
     setDoc((prev) => {
       if (!prev) return prev;
@@ -1216,6 +1270,7 @@ export function EditorProvider({
     addImageLayerFromBlob,
     replaceImageForLayer,
     addShapeLayer,
+    addGradientLayer,
     addVideoLayerFromFile,
     updateLayer,
     updateLayerTransient,
@@ -1248,6 +1303,7 @@ export function EditorProvider({
     addImageLayerFromBlob,
     replaceImageForLayer,
     addShapeLayer,
+    addGradientLayer,
     addVideoLayerFromFile,
     updateLayer,
     updateLayerTransient,
