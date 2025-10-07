@@ -10,6 +10,7 @@ const WALLPAPERS_JSON_URL =
 export const revalidate = 1800
 
 interface WallpaperItem {
+  id: string
   name: string
   creator: string
   description: string
