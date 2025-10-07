@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase"
+import { SubmitWallpaperDialog } from "@/app/wallpapers/SubmitWallpaperDialog"
 
 export default function DashboardPage() {
   const supabase = getSupabaseBrowserClient()
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const [displayName, setDisplayName] = useState<string>("")
   const [username, setUsername] = useState<string>("")
   const [loading, setLoading] = useState(false)
+  const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -75,7 +77,7 @@ export default function DashboardPage() {
                 Submit a wallpaper to the wallpaper gallery.
               </p>
               <div className="flex flex-wrap gap-3">
-                <Button onClick={() => { }}>Submit</Button>
+                <Button onClick={() => setIsSubmitDialogOpen(true)}>Submit</Button>
                 <Link href="/wallpapers">
                   <Button variant="outline">Go to gallery</Button>
                 </Link>
@@ -109,6 +111,13 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
+
+      <SubmitWallpaperDialog
+        open={isSubmitDialogOpen}
+        onOpenChange={setIsSubmitDialogOpen}
+        username={username || displayName || "Anonymous"}
+        isSignedIn={true}
+      />
     </main>
   )
 }

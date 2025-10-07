@@ -7,6 +7,9 @@ import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import { useSearchParams } from "next/navigation"
+import { Upload } from "lucide-react"
+import { SubmitWallpaperDialog } from "./SubmitWallpaperDialog"
+import { getSupabaseBrowserClient } from "@/lib/supabase"
 
 interface WallpaperItem {
   name: string
@@ -28,13 +31,47 @@ function isVideo(src: string) {
 }
 
 export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
+  const supabase = getSupabaseBrowserClient()
   const searchParams = useSearchParams()
   const [q, setQ] = useState("")
+  const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false)
+  const [username, setUsername] = useState<string>("")
+  const [displayName, setDisplayName] = useState<string>("")
+  const [isSignedIn, setIsSignedIn] = useState(false)
 
   useEffect(() => {
     const initial = (searchParams?.get("q") || "").trim()
     setQ(initial)
   }, [searchParams])
+
+  useEffect(() => {
+    let mounted = true
+    async function loadUser() {
+      try {
+        const { data } = await supabase.auth.getUser()
+        const user = data.user
+        if (!user) {
+          if (mounted) setIsSignedIn(false)
+          return
+        }
+        
+        if (mounted) setIsSignedIn(true)
+        
+        const meta: any = user.user_metadata || {}
+        const name = meta.full_name || meta.name || meta.username || user.email || ""
+        if (mounted) setDisplayName(name as string)
+        
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username")
+          .eq("id", user.id)
+          .maybeSingle()
+        if (mounted && profile?.username) setUsername(profile.username as string)
+      } catch {}
+    }
+    loadUser()
+    return () => { mounted = false }
+  }, [supabase])
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -49,13 +86,19 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
 
   return (
     <div className="space-y-6">
-      <div className="max-w-xl mx-auto w-full">
+      <div className="max-w-xl mx-auto w-full space-y-3">
         <div className="bg-background border rounded-md shadow-sm p-0">
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search wallpapers by name, creator, or description..."
           />
+        </div>
+        <div className="flex justify-center">
+          <Button onClick={() => setIsSubmitDialogOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" />
+            Submit Wallpaper
+          </Button>
         </div>
       </div>
 
@@ -101,6 +144,13 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
           )
         })}
       </div>
+
+      <SubmitWallpaperDialog
+        open={isSubmitDialogOpen}
+        onOpenChange={setIsSubmitDialogOpen}
+        username={username || displayName || "Anonymous"}
+        isSignedIn={isSignedIn}
+      />
     </div>
   )
 }

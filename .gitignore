@@ -30,3 +30,7 @@ next-env.d.ts
 # macOS RUBBISH
 .DS_Store
 **/.DS_Store
+
+# environment variables
+.env.local
+**/.env.local
