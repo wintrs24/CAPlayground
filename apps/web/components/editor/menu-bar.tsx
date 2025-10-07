@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star, MoreVertical } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star, MoreVertical, Eye, EyeOff } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
@@ -64,6 +64,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [snapRotationEnabled, setSnapRotationEnabled] = useLocalStorage<boolean>("caplay_settings_snap_rotation", true);
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showBackground, setShowBackground] = useLocalStorage<boolean>("caplay_preview_show_background", true);
   const [storageFallback, setStorageFallback] = useState(false);
   const [exportView, setExportView] = useState<'select'|'success'>("select");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -428,6 +429,17 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                   <div className="text-sm font-medium">Choose Active CA</div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {activeCA === 'floating' && (
+                  <>
+                    <div className="px-2 py-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <Label htmlFor="show-background" className="text-sm">Show background</Label>
+                        <Switch id="show-background" checked={showBackground} onCheckedChange={setShowBackground} />
+                      </div>
+                    </div>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <div className="grid gap-2">
                   <Button
                     variant="outline"

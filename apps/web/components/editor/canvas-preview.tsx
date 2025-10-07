@@ -2,7 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Minus, Plus, Crosshair, Square, Crop } from "lucide-react";
+import { Minus, Plus, Crosshair, Square, Crop, Clock } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
@@ -27,6 +27,8 @@ export function CanvasPreview() {
   const [snapRotationEnabled] = useLocalStorage<boolean>("caplay_settings_snap_rotation", true);
   const [showEdgeGuide, setShowEdgeGuide] = useLocalStorage<boolean>("caplay_preview_edge_guide", false);
   const [clipToCanvas, setClipToCanvas] = useLocalStorage<boolean>("caplay_preview_clip", false);
+  const [showBackground] = useLocalStorage<boolean>("caplay_preview_show_background", true);
+  const [showClockOverlay, setShowClockOverlay] = useLocalStorage<boolean>("caplay_preview_clock_overlay", false);
   const panDragRef = useRef<{
     startClientX: number;
     startClientY: number;
@@ -331,8 +333,20 @@ export function CanvasPreview() {
     return applyOverrides(current.layers, current.stateOverrides, current.activeState);
   }, [current?.layers, current?.stateOverrides, current?.activeState]);
 
-  const [renderedLayers, setRenderedLayers] = useState<AnyLayer[]>(appliedLayers);
-  useEffect(() => { setRenderedLayers(appliedLayers); }, []);
+  const backgroundLayers = useMemo(() => {
+    if (!other || currentKey !== 'floating' || !showBackground) return [] as AnyLayer[];
+    return applyOverrides(other.layers, other.stateOverrides, other.activeState);
+  }, [other?.layers, other?.stateOverrides, other?.activeState, currentKey, showBackground]);
+
+  const combinedLayers = useMemo(() => {
+    if (currentKey === 'floating' && showBackground && backgroundLayers.length > 0) {
+      return [...backgroundLayers, ...appliedLayers];
+    }
+    return appliedLayers;
+  }, [appliedLayers, backgroundLayers, currentKey, showBackground]);
+
+  const [renderedLayers, setRenderedLayers] = useState<AnyLayer[]>(combinedLayers);
+  useEffect(() => { setRenderedLayers(combinedLayers); }, [combinedLayers]);
 
   const prevStateRef = useRef<string | undefined>(current?.activeState);
   const animRef = useRef<number | null>(null);
@@ -514,7 +528,7 @@ export function CanvasPreview() {
     const nextState = current?.activeState;
     if (!doc) return;
     if (prevState === nextState) {
-      setRenderedLayers(appliedLayers);
+      setRenderedLayers(combinedLayers);
       return;
     }
 
@@ -553,13 +567,13 @@ export function CanvasPreview() {
     const transitions = gens as any;
 
     if (!transitions.length) {
-      setRenderedLayers(appliedLayers);
+      setRenderedLayers(combinedLayers);
       prevStateRef.current = nextState;
       return;
     }
 
-    const startMap = indexById(renderedLayers.length ? renderedLayers : appliedLayers);
-    const endMap = indexById(appliedLayers);
+    const startMap = indexById(renderedLayers.length ? renderedLayers : combinedLayers);
+    const endMap = indexById(combinedLayers);
     type Track = { id: string; key: string; from: number; to: number; duration: number };
     const tracks: Track[] = [];
 
@@ -584,7 +598,7 @@ export function CanvasPreview() {
     }
 
     if (!tracks.length) {
-      setRenderedLayers(appliedLayers);
+      setRenderedLayers(combinedLayers);
       prevStateRef.current = nextState;
       return;
     }
@@ -1796,8 +1810,44 @@ export function CanvasPreview() {
           selectLayer(null);
         }}
       >
-        {/* overlay removed */}
-        {renderedLayers.map((l) => renderLayer(l))}
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+          {currentKey === 'floating' && showBackground 
+            ? backgroundLayers.map((l) => renderLayer(l))
+            : currentKey === 'background' 
+              ? appliedLayers.map((l) => renderLayer(l))
+              : null
+          }
+        </div>
+        {showClockOverlay && (() => {
+          const w = doc?.meta.width ?? 0;
+          const h = doc?.meta.height ?? 0;
+          const targetRatio = 1170 / 2532;
+          const currentRatio = w / h;
+          const isMatchingAspectRatio = Math.abs(currentRatio - targetRatio) < 0.01;
+          
+          if (isMatchingAspectRatio) {
+            return (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  pointerEvents: 'none',
+                  backgroundImage: 'url(/clock.png)',
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  zIndex: 500,
+                }}
+              />
+            );
+          }
+          return null;
+        })()}
+        {currentKey === 'floating' && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1000 }}>
+            {appliedLayers.map((l) => renderLayer(l))}
+          </div>
+        )}
         {/* Edge guide overlay */}
         {showEdgeGuide && (
           <div
@@ -1837,6 +1887,31 @@ export function CanvasPreview() {
 
       {/* Preview toggles (bottom-right) */}
       <div className="absolute bottom-2 right-2 z-10 flex items-center gap-2 bg-white/80 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1 shadow-sm">
+        {(() => {
+          const w = doc?.meta.width ?? 0;
+          const h = doc?.meta.height ?? 0;
+          const targetRatio = 1170 / 2532;
+          const currentRatio = w / h;
+          const isMatchingAspectRatio = Math.abs(currentRatio - targetRatio) < 0.01;
+          
+          if (isMatchingAspectRatio) {
+            return (
+              <Button
+                type="button"
+                size="icon"
+                variant={showClockOverlay ? "default" : "outline"}
+                aria-pressed={showClockOverlay}
+                aria-label="Toggle clock overlay"
+                title="Clock"
+                onClick={() => setShowClockOverlay((v: boolean) => !v)}
+                className={`h-8 w-8 ${showClockOverlay ? '' : 'hover:text-primary hover:border-primary/50 hover:bg-primary/10'}`}
+              >
+                <Clock className="h-4 w-4" />
+              </Button>
+            );
+          }
+          return null;
+        })()}
         <Button
           type="button"
           size="icon"
