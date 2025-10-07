@@ -4,16 +4,18 @@ import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import { useSearchParams, useRouter } from "next/navigation"
-import { Upload, Edit } from "lucide-react"
+import { Upload, Edit, Download } from "lucide-react"
 import { SubmitWallpaperDialog } from "./SubmitWallpaperDialog"
 import { getSupabaseBrowserClient } from "@/lib/supabase"
 import type { CAAsset } from "@/lib/ca/types"
 import { ensureUniqueProjectName, createProject, listProjects, putBlobFile, putTextFile } from "@/lib/storage"
 
 interface WallpaperItem {
+  id: string
   name: string
   creator: string
   description: string
@@ -33,6 +35,7 @@ function isVideo(src: string) {
 }
 
 export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
+  console.log('WallpapersGrid loaded with data:', data.wallpapers.map(w => ({ name: w.name, id: w.id })))
   const supabase = getSupabaseBrowserClient()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -42,11 +45,29 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
   const [displayName, setDisplayName] = useState<string>("")
   const [isSignedIn, setIsSignedIn] = useState(false)
   const [importingWallpaper, setImportingWallpaper] = useState<string | null>(null)
+  const [downloadStats, setDownloadStats] = useState<Record<string, number>>({})
+  const [sortBy, setSortBy] = useState<'default' | 'downloads'>('downloads')
 
   useEffect(() => {
     const initial = (searchParams?.get("q") || "").trim()
     setQ(initial)
   }, [searchParams])
+
+  useEffect(() => {
+    console.log('Fetching download stats...')
+    fetch('/api/wallpapers/stats')
+      .then(res => res.json())
+      .then((stats: Array<{ id: string; downloads: number }>) => {
+        console.log('Download stats received:', stats)
+        const statsMap = stats.reduce((acc, stat) => {
+          acc[stat.id] = stat.downloads
+          return acc
+        }, {} as Record<string, number>)
+        console.log('Stats map:', statsMap)
+        setDownloadStats(statsMap)
+      })
+      .catch(err => console.error('Failed to fetch download stats:', err))
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -79,18 +100,53 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
-    if (!t) return data.wallpapers
-    return data.wallpapers.filter((w) => {
-      const name = (w?.name || "").toString().toLowerCase()
-      const creator = (w?.creator || "").toString().toLowerCase()
-      const desc = (w?.description || "").toString().toLowerCase()
-      return name.includes(t) || creator.includes(t) || desc.includes(t)
+    let result = data.wallpapers
+    
+    if (t) {
+      result = result.filter((w) => {
+        const name = (w?.name || "").toString().toLowerCase()
+        const creator = (w?.creator || "").toString().toLowerCase()
+        const desc = (w?.description || "").toString().toLowerCase()
+        return name.includes(t) || creator.includes(t) || desc.includes(t)
+      })
+    }
+  
+    if (sortBy === 'downloads') {
+      result = [...result].sort((a, b) => {
+        const aDownloads = downloadStats[a.id] || 0
+        const bDownloads = downloadStats[b.id] || 0
+        return bDownloads - aDownloads
+      })
+    }
+    
+    return result
+  }, [q, data.wallpapers, sortBy, downloadStats])
+
+  const trackDownload = (wallpaperId: string, wallpaperName: string) => {
+    console.log('Tracking download for wallpaper:', wallpaperId, wallpaperName)
+    fetch('/api/wallpapers/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wallpaperId }),
     })
-  }, [q, data.wallpapers])
+      .then(res => {
+        console.log('Download tracking response:', res.status, res.statusText)
+        return res.json()
+      })
+      .then(data => {
+        console.log('Download tracking result:', data)
+        if (data.counted === false) {
+          console.warn('Download not counted due to rate limit')
+        }
+      })
+      .catch(err => console.error('Failed to track download:', err))
+  }
 
   const handleOpenInEditor = async (item: WallpaperItem) => {
     try {
       setImportingWallpaper(item.name)
+      trackDownload(item.id, item.name)
+      
       const fileUrl = `${data.base_url}${item.file}`
       
       const response = await fetch(fileUrl)
@@ -184,12 +240,23 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
   return (
     <div className="space-y-6">
       <div className="max-w-xl mx-auto w-full space-y-3">
-        <div className="bg-background border rounded-md shadow-sm p-0">
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search wallpapers by name, creator, or description..."
-          />
+        <div className="flex gap-3">
+          <div className="flex-1 bg-background border rounded-md shadow-sm p-0">
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search wallpapers by name, creator, or description..."
+            />
+          </div>
+          <Select value={sortBy} onValueChange={(value: 'default' | 'downloads') => setSortBy(value)}>
+            <SelectTrigger className="w-[180px] bg-background border shadow-sm">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default Order</SelectItem>
+              <SelectItem value="downloads">Most Downloads</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         {/* Submit button (hidden) */}
         <div className="hidden">
@@ -230,7 +297,16 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
 
               <CardHeader>
                 <CardTitle className="line-clamp-1">{item.name}</CardTitle>
-                <CardDescription className="line-clamp-2">by {item.creator} (submitted on {item.from})</CardDescription>
+                <CardDescription className="line-clamp-2">
+                  by {item.creator} (submitted on {item.from})
+                </CardDescription>
+                {downloadStats[item.id] > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2">
+                    <Download className="h-3.5 w-3.5" />
+                    <span>{downloadStats[item.id]}</span>
+                    <span>{downloadStats[item.id] === 1 ? 'Download' : 'Downloads'}</span>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{item.description}</p>
@@ -243,9 +319,16 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
                     <Edit className="h-4 w-4 mr-2" />
                     {importingWallpaper === item.name ? 'Opening...' : 'Open in Editor'}
                   </Button>
-                  <Link href={fileUrl} target="_blank" rel="noopener noreferrer">
-                    <Button variant="outline" className="w-full">Download .tendies</Button>
-                  </Link>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => {
+                      trackDownload(item.id, item.name)
+                      window.open(fileUrl, '_blank')
+                    }}
+                  >
+                    Download .tendies
+                  </Button>
                 </div>
               </CardContent>
             </Card>
