@@ -94,11 +94,14 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
             placeholder="Search wallpapers by name, creator, or description..."
           />
         </div>
-        <div className="flex justify-center">
-          <Button onClick={() => setIsSubmitDialogOpen(true)} className="gap-2">
-            <Upload className="h-4 w-4" />
-            Submit Wallpaper
-          </Button>
+        {/* Submit button (hidden) */}
+        <div className="hidden">
+          <div className="flex justify-center">
+            <Button onClick={() => setIsSubmitDialogOpen(true)} className="gap-2">
+              <Upload className="h-4 w-4" />
+              Submit Wallpaper
+            </Button>
+          </div>
         </div>
       </div>
 

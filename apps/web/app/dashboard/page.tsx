@@ -67,29 +67,31 @@ export default function DashboardPage() {
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">Welcome back{displayName ? `, ${displayName}` : ""}!</h1>
         <p className="mt-6 text-muted-foreground text-lg">More coming soon.</p>
         <div className="mt-8 space-y-6">
-          {/* Submit Wallpaper */}
-          <Card className="border-border/80">
-            <CardHeader>
-              <CardTitle>Submit Wallpaper</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Submit a wallpaper to the wallpaper gallery.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={() => setIsSubmitDialogOpen(true)}>Submit</Button>
-                <Link href="/wallpapers">
-                  <Button variant="outline">Go to gallery</Button>
-                </Link>
-                <Link href={username
-                  ? `/wallpapers?q=${encodeURIComponent(username)}`
-                  : (displayName ? `/wallpapers?q=${encodeURIComponent(displayName)}` : "/wallpapers")
-                }>
-                  <Button variant="secondary">View my wallpapers</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Submit Wallpaper (hidden) */}
+          <div className="hidden">
+            <Card className="border-border/80">
+              <CardHeader>
+                <CardTitle>Submit Wallpaper</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Submit a wallpaper to the wallpaper gallery.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={() => setIsSubmitDialogOpen(true)}>Submit</Button>
+                  <Link href="/wallpapers">
+                    <Button variant="outline">Go to gallery</Button>
+                  </Link>
+                  <Link href={username
+                    ? `/wallpapers?q=${encodeURIComponent(username)}`
+                    : (displayName ? `/wallpapers?q=${encodeURIComponent(displayName)}` : "/wallpapers")
+                  }>
+                    <Button variant="secondary">View my wallpapers</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card className="border-border/80">
             <CardHeader>

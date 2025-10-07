@@ -23,6 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import Link from "next/link"
+import { getSupabaseBrowserClient } from "@/lib/supabase"
 
 interface SubmitWallpaperDialogProps {
   open: boolean
@@ -40,6 +41,8 @@ export function SubmitWallpaperDialog({ open, onOpenChange, username = "Anonymou
   const [tendiesFile, setTendiesFile] = useState<File | null>(null)
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   
   const tendiesInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -84,16 +87,49 @@ export function SubmitWallpaperDialog({ open, onOpenChange, username = "Anonymou
     onOpenChange(false)
   }
 
-  const handleSubmit = () => {
-    // TODO: Implement actual submission logic
-    console.log("Submitting wallpaper:", {
-      name,
-      description,
-      tendiesFile,
-      videoFile,
-      username,
-    })
-    handleCancel()
+  const handleSubmit = async () => {
+    if (!tendiesFile || !videoFile) return
+
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      const supabase = getSupabaseBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error("Not authenticated")
+      }
+
+      const formData = new FormData()
+      formData.append("name", name)
+      formData.append("description", description)
+      formData.append("tendiesFile", tendiesFile)
+      formData.append("videoFile", videoFile)
+
+      const response = await fetch("/api/wallpapers/submit", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to submit wallpaper")
+      }
+
+      // Success! Close dialog and reset
+      handleCancel()
+      alert("Submission sent for review!")
+    } catch (error) {
+      console.error("Submission error:", error)
+      setSubmitError(error instanceof Error ? error.message : "Failed to submit wallpaper")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const isFormValid = name.trim() && description.trim() && tendiesFile && videoFile
@@ -299,13 +335,20 @@ export function SubmitWallpaperDialog({ open, onOpenChange, username = "Anonymou
                 </CardContent>
               </Card>
             </div>
+
+            {submitError && (
+              <div className="px-4 py-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive">{submitError}</p>
+              </div>
+            )}
+
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={handleBack}>
+              <Button variant="outline" onClick={handleBack} disabled={isSubmitting}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
-              <Button onClick={handleSubmit}>
-                Submit Wallpaper
+              <Button onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? "Submitting..." : "Submit Wallpaper"}
               </Button>
             </DialogFooter>
           </>
