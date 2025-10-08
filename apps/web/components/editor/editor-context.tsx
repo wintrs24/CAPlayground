@@ -526,7 +526,7 @@ export function EditorProvider({
         text: "Text Layer",
         color: "#111827",
         fontSize: 16,
-        align: "left",
+        align: "center",
         fontFamily: "SFProText-Regular",
         wrapped: 1,
       };
