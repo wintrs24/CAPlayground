@@ -65,6 +65,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showBackground, setShowBackground] = useLocalStorage<boolean>("caplay_preview_show_background", true);
+  const [showAnchorPoint, setShowAnchorPoint] = useLocalStorage<boolean>("caplay_preview_anchor_point", false);
   const [storageFallback, setStorageFallback] = useState(false);
   const [exportView, setExportView] = useState<'select'|'success'>("select");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -561,6 +562,14 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
                   <Label htmlFor="snap-threshold" className="text-sm">Sensitivity</Label>
                   <Slider id="snap-threshold" value={[SNAP_THRESHOLD]} min={3} max={25} onValueChange={([c]) => setSnapThreshold(c)} />
                   <Button onClick={()=>{setSnapThreshold(12)}}>Reset</Button>
+                </div>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Preview</DropdownMenuLabel>
+              <div className="px-2 py-1.5 space-y-1">
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <Label htmlFor="show-anchor-point" className="text-sm">Show anchor point</Label>
+                  <Switch id="show-anchor-point" checked={!!showAnchorPoint} onCheckedChange={(c) => setShowAnchorPoint(!!c)} />
                 </div>
               </div>
               <DropdownMenuSeparator />

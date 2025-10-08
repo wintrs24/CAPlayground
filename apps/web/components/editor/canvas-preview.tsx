@@ -29,6 +29,7 @@ export function CanvasPreview() {
   const [clipToCanvas, setClipToCanvas] = useLocalStorage<boolean>("caplay_preview_clip", false);
   const [showBackground] = useLocalStorage<boolean>("caplay_preview_show_background", true);
   const [showClockOverlay, setShowClockOverlay] = useLocalStorage<boolean>("caplay_preview_clock_overlay", false);
+  const [showAnchorPoint, setShowAnchorPoint] = useLocalStorage<boolean>("caplay_preview_anchor_point", false);
   const panDragRef = useRef<{
     startClientX: number;
     startClientY: number;
@@ -1672,6 +1673,25 @@ export function CanvasPreview() {
             }
           }}
         />
+        {/* Anchor point indicator */}
+        {showAnchorPoint && (
+          <div
+            style={{
+              position: "absolute",
+              left: `${a.x * 100}%`,
+              top: `${transformOriginY}%`,
+              width: px(8),
+              height: px(8),
+              background: "#ef4444",
+              border: `${px(1.5)}px solid #ffffff`,
+              borderRadius: 9999,
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "none",
+              boxShadow: `0 0 0 ${px(1)}px rgba(0,0,0,0.2)`,
+              zIndex: 1,
+            }}
+          />
+        )}
       </div>
     </>
   );
