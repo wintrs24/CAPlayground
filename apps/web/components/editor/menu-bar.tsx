@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star, MoreVertical, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sun, Moon, Keyboard, PanelLeft, PanelRight, Settings as Gear, ArrowUpDown, Layers as LayersIcon, Check, X, Star, MoreVertical, Eye, EyeOff, Undo2, Redo2 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEditor } from "./editor-context";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
@@ -365,6 +365,29 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        {/* Undo/Redo controls */}
+        <div className="border rounded-md p-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 p-0"
+            aria-label="Undo"
+            title={`${typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Z`}
+            onClick={() => undo()}
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 p-0"
+            aria-label="Redo"
+            title={`${typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Z`}
+            onClick={() => redo()}
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+        </div>
         {/* Saving status + storage badge */}
         <div onMouseEnter={() => setShowManualSave(true)} onMouseLeave={() => setShowManualSave(false)}>
           {showManualSave ? (

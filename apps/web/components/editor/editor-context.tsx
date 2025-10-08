@@ -483,10 +483,9 @@ export function EditorProvider({
       if (!prev) return prev;
       const key = prev.activeCA;
       const nextDocs = { ...prev.docs, [key]: { ...prev.docs[key], selectedId: id } };
-      pushHistory(prev);
       return { ...prev, docs: nextDocs } as ProjectDocument;
     });
-  }, [pushHistory]);
+  }, []);
 
   const moveLayerInto = useCallback((sourceId: string, targetGroupId: string) => {
     if (!sourceId || !targetGroupId || sourceId === targetGroupId) return;
