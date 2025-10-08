@@ -1033,7 +1033,7 @@ export function CanvasPreview() {
             onTouchStart={(e) => {
               if (e.touches.length === 1) {
                 e.preventDefault();
-                startDrag(l, e.touches[0] as any, containerH, useYUp);
+                startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
               }
             }}
           />
@@ -1061,6 +1061,12 @@ export function CanvasPreview() {
             }}
             draggable={false}
             onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={(e) => {
+              if (e.touches.length === 1) {
+                e.preventDefault();
+                startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
+              }
+            }}
           />
         </LayerContextMenu>
       );
