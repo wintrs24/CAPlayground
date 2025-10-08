@@ -56,7 +56,7 @@ export function ImageTab({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg,image/jpg,image/webp,image/bmp,image/svg+xml"
             className="hidden"
             onChange={async (e) => {
               const file = e.target.files?.[0];

@@ -555,6 +555,10 @@ export function EditorProvider({
   }, [addBase]);
 
   const addImageLayerFromBlob = useCallback(async (blob: Blob, filename?: string) => {
+    const isGif = /image\/gif/i.test((blob as any)?.type || '') || /\.gif$/i.test(filename || '');
+    if (isGif) {
+      throw new Error('GIFs must be imported via Video Layer');
+    }
     const dataURL = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -623,6 +627,9 @@ export function EditorProvider({
   }, [addBase]);
 
   const replaceImageForLayer = useCallback(async (layerId: string, file: File) => {
+    if (/image\/gif/i.test(file.type || '') || /\.gif$/i.test(file.name || '')) {
+      throw new Error('Cannot replace image with a GIF. Please use Video Layer to import GIFs.');
+    }
     const dataURL = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -696,6 +703,9 @@ export function EditorProvider({
   }, [addBase]);
 
   const addImageLayerFromFile = useCallback(async (file: File) => {
+    if (/image\/gif/i.test(file.type || '') || /\.gif$/i.test(file.name || '')) {
+      throw new Error('GIFs must be imported via Video Layer');
+    }
     const dataURL = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));
@@ -864,33 +874,7 @@ export function EditorProvider({
   }, [addBase]);
 
   const addVideoLayerFromFile = useCallback(async (file: File) => {
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    
-    const videoURL = URL.createObjectURL(file);
-    video.src = videoURL;
-    
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = reject;
-    });
-    
-    const duration = video.duration;
-    const fps = 30;
-    const maxDuration = 12;
-    const actualDuration = Math.min(duration, maxDuration);
-    const frameCount = Math.floor(actualDuration * fps);
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      URL.revokeObjectURL(videoURL);
-      throw new Error('Failed to get canvas context');
-    }
-    
+    const isGif = /image\/gif/i.test(file.type || '') || /\.gif$/i.test(file.name || '');
     const layerId = genId();
     const rawName = file.name && typeof file.name === 'string' ? file.name : 'Video Layer';
     const nameSansExt = rawName.replace(/\.[a-z0-9]+$/i, '');
@@ -898,7 +882,126 @@ export function EditorProvider({
     const framePrefix = `${safeName}_`;
     const frameExtension = '.jpg';
     const frameAssets: Array<{ dataURL: string; filename: string }> = [];
+
+    if (isGif) {
+      const AnyWin: any = window as any;
+      if (!AnyWin.ImageDecoder) {
+        throw new Error('Importing GIFs as video requires a browser with ImageDecoder (WebCodecs) support.');
+      }
+      const buf = await file.arrayBuffer();
+      const decoder: any = new AnyWin.ImageDecoder({ data: new Uint8Array(buf), type: 'image/gif' });
+      let track: any = null;
+      try { track = decoder.tracks?.selectedTrack || decoder.tracks?.[0] || null; } catch {}
+      let gifFrameCount: number = Number(track?.frameCount ?? 0);
+      if (!Number.isFinite(gifFrameCount) || gifFrameCount <= 0) {
+        gifFrameCount = 0;
+        for (let i = 0; i < 300; i++) {
+          try { await decoder.decode({ frameIndex: i }); gifFrameCount++; } catch { break; }
+        }
+      }
+      const first = await decoder.decode({ frameIndex: 0 });
+      const firstImage: any = (first as any).image;
+      const width = Number(firstImage?.displayWidth ?? firstImage?.codedWidth ?? firstImage?.width ?? 0);
+      const height = Number(firstImage?.displayHeight ?? firstImage?.codedHeight ?? firstImage?.height ?? 0);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to get canvas context');
+      const maxDuration = 12;
+      const assumedFps = 15;
+      const maxFrames = Math.min(gifFrameCount || 300, Math.floor(maxDuration * assumedFps));
+      for (let i = 0; i < maxFrames; i++) {
+        try {
+          const res = await decoder.decode({ frameIndex: i });
+          const img: any = (res as any).image;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          (ctx as any).drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+          const filename = `${framePrefix}${i}${frameExtension}`;
+          frameAssets.push({ dataURL, filename });
+          try { img.close?.(); } catch {}
+        } catch { break; }
+      }
+      const fps = assumedFps;
+      const frameCount = frameAssets.length;
+      const duration = frameCount > 0 ? (frameCount / fps) : 0;
+
+      setDoc((prev) => {
+        if (!prev) return prev;
+        pushHistory(prev);
+        const canvasW = prev.meta.width || 390;
+        const canvasH = prev.meta.height || 844;
+        let w = width;
+        let h = height;
+        if (w > canvasW || h > canvasH) {
+          const scaleW = canvasW / width;
+          const scaleH = canvasH / height;
+          const scale = Math.min(scaleW, scaleH);
+          w = width * scale;
+          h = height * scale;
+        }
+        const x = canvasW / 2;
+        const y = canvasH / 2;
+        const layer: VideoLayer = {
+          ...addBase(file.name || 'Video Layer'),
+          id: layerId,
+          type: 'video',
+          position: { x, y },
+          size: { w, h },
+          frameCount,
+          fps,
+          duration,
+          autoReverses: false,
+          framePrefix,
+          frameExtension,
+        };
+        const key = prev.activeCA;
+        const cur = prev.docs[key];
+        const assets = { ...(cur.assets || {}) };
+        frameAssets.forEach((frame, idx) => {
+          const frameId = `${layer.id}_frame_${idx}`;
+          assets[frameId] = { filename: `${framePrefix}${idx}${frameExtension}`, dataURL: frame.dataURL };
+        });
+        let nextLayers: AnyLayer[] = cur.layers;
+        const selId = cur.selectedId || null;
+        if (!selId || selId === '__root__') nextLayers = [...cur.layers, layer];
+        else {
+          const target = findById(cur.layers, selId);
+          if (target && (target as any).type === 'group') nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+          else if (target) {
+            const wrapped = wrapAsGroup(cur.layers, selId);
+            const groupId = wrapped.newGroupId || selId;
+            nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+          } else nextLayers = [...cur.layers, layer];
+        }
+        const next = { ...cur, layers: nextLayers, selectedId: layer.id, assets };
+        return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
+      });
+      return;
+    }
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    const videoURL = URL.createObjectURL(file);
+    video.src = videoURL;
     
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = reject;
+    });
+    const duration = video.duration;
+    const fps = 30;
+    const maxDuration = 12;
+    const actualDuration = Math.min(duration, maxDuration);
+    const frameCount = Math.floor(actualDuration * fps);
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      URL.revokeObjectURL(videoURL);
+      throw new Error('Failed to get canvas context');
+    }
     for (let i = 0; i < frameCount; i++) {
       const time = (i / fps);
       video.currentTime = time;
@@ -913,21 +1016,16 @@ export function EditorProvider({
         };
       });
     }
-    
     URL.revokeObjectURL(videoURL);
-    
     setDoc((prev) => {
       if (!prev) return prev;
       pushHistory(prev);
-      
       const canvasW = prev.meta.width || 390;
       const canvasH = prev.meta.height || 844;
       const videoW = video.videoWidth;
       const videoH = video.videoHeight;
-      
       let w = videoW;
       let h = videoH;
-      
       if (w > canvasW || h > canvasH) {
         const scaleW = canvasW / videoW;
         const scaleH = canvasH / videoH;
@@ -935,14 +1033,12 @@ export function EditorProvider({
         w = videoW * scale;
         h = videoH * scale;
       }
-      
       const x = canvasW / 2;
       const y = canvasH / 2;
-      
       const layer: VideoLayer = {
-        ...addBase(file.name || "Video Layer"),
+        ...addBase(file.name || 'Video Layer'),
         id: layerId,
-        type: "video",
+        type: 'video',
         position: { x, y },
         size: { w, h },
         frameCount,
@@ -952,34 +1048,24 @@ export function EditorProvider({
         framePrefix,
         frameExtension,
       };
-      
       const key = prev.activeCA;
       const cur = prev.docs[key];
-      
       const assets = { ...(cur.assets || {}) };
       frameAssets.forEach((frame, idx) => {
         const frameId = `${layer.id}_frame_${idx}`;
-        assets[frameId] = { 
-          filename: `${framePrefix}${idx}${frameExtension}`, 
-          dataURL: frame.dataURL 
-        };
+        assets[frameId] = { filename: `${framePrefix}${idx}${frameExtension}`, dataURL: frame.dataURL };
       });
-      
       let nextLayers: AnyLayer[] = cur.layers;
       const selId = cur.selectedId || null;
-      if (!selId || selId === '__root__') {
-        nextLayers = [...cur.layers, layer];
-      } else {
+      if (!selId || selId === '__root__') nextLayers = [...cur.layers, layer];
+      else {
         const target = findById(cur.layers, selId);
-        if (target && (target as any).type === 'group') {
-          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
-        } else if (target) {
+        if (target && (target as any).type === 'group') nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        else if (target) {
           const wrapped = wrapAsGroup(cur.layers, selId);
           const groupId = wrapped.newGroupId || selId;
           nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
-        } else {
-          nextLayers = [...cur.layers, layer];
-        }
+        } else nextLayers = [...cur.layers, layer];
       }
       const next = { ...cur, layers: nextLayers, selectedId: layer.id, assets };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;

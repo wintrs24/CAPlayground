@@ -12,7 +12,7 @@ import type { AnyLayer, GroupLayer, ShapeLayer } from "@/lib/ca/types";
 
 export function CanvasPreview() {
   const ref = useRef<HTMLDivElement | null>(null);
-  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile, isAnimationPlaying, setIsAnimationPlaying, animatedLayers, setAnimatedLayers, moveLayer, deleteLayer } = useEditor();
+  const { doc, updateLayer, updateLayerTransient, selectLayer, copySelectedLayer, pasteFromClipboard, addImageLayerFromBlob, addImageLayerFromFile, addVideoLayerFromFile, isAnimationPlaying, setIsAnimationPlaying, animatedLayers, setAnimatedLayers, moveLayer, deleteLayer } = useEditor();
   const docRef = useRef<typeof doc>(doc);
   useEffect(() => { docRef.current = doc; }, [doc]);
   const [size, setSize] = useState({ w: 600, h: 400 });
@@ -64,6 +64,7 @@ export function CanvasPreview() {
   // clipboard copy/paste
   useEffect(() => {
     const isImageUrl = (txt: string) => /^(https?:\/\/).+\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(txt.trim());
+    const isGifUrl = (txt: string) => /^(https?:\/\/).+\.(gif)(\?.*)?$/i.test(txt.trim());
     const isDataUrl = (txt: string) => /^data:image\//i.test(txt.trim());
     const getFilenameFromUrl = (u: string) => {
       try {
@@ -117,7 +118,12 @@ export function CanvasPreview() {
               const imgType = types.find((t: string) => /image\//i.test(t));
               if (imgType) {
                 const blob = await item.getType(imgType);
-                await addImageLayerFromBlob(blob);
+                const isGif = /image\/gif/i.test(imgType);
+                if (isGif) {
+                  try { await addVideoLayerFromFile(new File([blob], 'pasted.gif', { type: 'image/gif' })); } catch {}
+                } else {
+                  await addImageLayerFromBlob(blob);
+                }
                 return;
               }
               const txtType = types.find((t: string) => /text\/(uri-list|plain)/i.test(t));
@@ -127,12 +133,19 @@ export function CanvasPreview() {
                   const text = await t.text();
                   const line = (text || '').trim().split(/\r?\n/).find(Boolean) || '';
                   if (isDataUrl(line)) {
+                    const isGif = /^data:image\/gif/i.test(line);
                     const resp = await fetch(line);
                     const blob = await resp.blob();
-                    await addImageLayerFromBlob(blob);
+                    if (isGif) { try { await addVideoLayerFromFile(new File([blob], 'pasted.gif', { type: 'image/gif' })); } catch {} }
+                    else { await addImageLayerFromBlob(blob); }
                     return;
                   }
                   if (isImageUrl(line)) {
+                    if (isGifUrl(line)) {
+                      const got = await fetchToBlob(line);
+                      if (got) { try { await addVideoLayerFromFile(new File([got.blob], got.filename || 'image.gif', { type: 'image/gif' })); } catch {} }
+                      return;
+                    }
                     const got = await fetchToBlob(line);
                     if (got) { await addImageLayerFromBlob(got.blob, getFilenameFromUrl(line)); return; }
                   }
@@ -151,9 +164,15 @@ export function CanvasPreview() {
             } catch {}
             const firstLine = txt.trim().split(/\r?\n/).find(Boolean) || '';
             if (isDataUrl(firstLine)) {
-              try { const resp = await fetch(firstLine); const blob = await resp.blob(); await addImageLayerFromBlob(blob); return; } catch {}
+              const isGif = /^data:image\/gif/i.test(firstLine);
+              try { const resp = await fetch(firstLine); const blob = await resp.blob(); if (isGif) { try { await addVideoLayerFromFile(new File([blob], 'pasted.gif', { type: 'image/gif' })); } catch {} } else { await addImageLayerFromBlob(blob); } return; } catch {}
             }
             if (isImageUrl(firstLine)) {
+              if (isGifUrl(firstLine)) {
+                const got = await fetchToBlob(firstLine);
+                if (got) { try { await addVideoLayerFromFile(new File([got.blob], got.filename || 'image.gif', { type: 'image/gif' })); } catch {} }
+                return;
+              }
               const got = await fetchToBlob(firstLine);
               if (got) { await addImageLayerFromBlob(got.blob, getFilenameFromUrl(firstLine)); return; }
             }
@@ -168,7 +187,13 @@ export function CanvasPreview() {
       if (fileItem) {
         e.preventDefault();
         const blob = fileItem.getAsFile();
-        if (blob) await addImageLayerFromBlob(blob);
+        if (blob) {
+          if (/image\/gif/i.test(blob.type || '')) {
+            try { await addVideoLayerFromFile(new File([blob], 'pasted.gif', { type: 'image/gif' })); } catch {}
+          } else {
+            await addImageLayerFromBlob(blob);
+          }
+        }
         return;
       }
       const textItem = items.find((it) => it.kind === 'string');
@@ -188,10 +213,15 @@ export function CanvasPreview() {
       const candidate = (uriList || plain || '').trim().split(/\r?\n/).find(Boolean) || '';
       if (candidate) {
         if (isDataUrl(candidate)) {
-          try { e.preventDefault(); const resp = await fetch(candidate); const blob = await resp.blob(); await addImageLayerFromBlob(blob); return; } catch {}
+          const isGif = /^data:image\/gif/i.test(candidate);
+          try { e.preventDefault(); const resp = await fetch(candidate); const blob = await resp.blob(); if (isGif) { try { await addVideoLayerFromFile(new File([blob], 'pasted.gif', { type: 'image/gif' })); } catch {} } else { await addImageLayerFromBlob(blob); } return; } catch {}
         }
         if (/^file:\/\//i.test(candidate)) {
         } else if (isImageUrl(candidate)) {
+          if (isGifUrl(candidate)) {
+            const got = await fetchToBlob(candidate);
+            if (got) { e.preventDefault(); try { await addVideoLayerFromFile(new File([got.blob], got.filename || 'image.gif', { type: 'image/gif' })); } catch {} return; }
+          }
           const got = await fetchToBlob(candidate);
           if (got) { e.preventDefault(); await addImageLayerFromBlob(got.blob, getFilenameFromUrl(candidate)); return; }
         }

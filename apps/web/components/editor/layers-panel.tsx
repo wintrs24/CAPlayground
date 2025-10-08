@@ -220,14 +220,21 @@ export function LayersPanel() {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/png,image/jpeg,image/jpg,image/webp,image/bmp,image/svg+xml"
           multiple
           className="hidden"
           onChange={async (e) => {
             const files = Array.from(e.target.files || []);
-            setUploadStatus(files.length > 1 ? `Uploading ${files.length} images...` : 'Uploading image...');
+            if (!files.length) return;
+            const hasGif = files.some(f => /image\/gif/i.test(f.type) || /\.gif$/i.test(f.name || ''));
+            if (hasGif) {
+              setUploadStatus('GIFs must be imported via Video Layer…');
+              setTimeout(() => setUploadStatus(null), 2000);
+            }
+            const imageFiles = files.filter(f => !(/image\/gif/i.test(f.type) || /\.gif$/i.test(f.name || '')));
+            if (imageFiles.length) setUploadStatus(imageFiles.length > 1 ? `Uploading ${imageFiles.length} images...` : 'Uploading image...');
             try {
-              for (const file of files) {
+              for (const file of imageFiles) {
                 try { await addImageLayerFromFile(file); } catch {}
               }
             } finally {
@@ -239,12 +246,13 @@ export function LayersPanel() {
         <input
           ref={videoInputRef}
           type="file"
-          accept="video/*"
+          accept="video/*,image/gif"
           className="hidden"
           onChange={async (e) => {
             const file = e.target.files?.[0];
             if (file) {
-              setUploadStatus('Uploading video...');
+              const isGif = /image\/gif/i.test(file.type || '') || /\.gif$/i.test(file.name || '');
+              setUploadStatus(isGif ? 'Importing GIF as video...' : 'Uploading video...');
               try {
                 await addVideoLayerFromFile(file);
               } catch (err) {
