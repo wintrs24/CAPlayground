@@ -878,20 +878,24 @@ export function CanvasPreview() {
             const top = lt.top;
             const bottom = lt.top + lh;
             const cy = top + lh / 2;
-            xPairs.push(
-              [left, left],
-              [right, right],
-              [right - d.w, right],
-              [left - d.w, left],
-              [cx - d.w / 2, cx],
-            );
-            yPairs.push(
-              [top, top],
-              [bottom, bottom],
-              [bottom - d.h, bottom],
-              [top - d.h, top],
-              [cy - d.h / 2, cy],
-            );
+            const pushIfNotCanvasEdgeX = (t: number, g: number) => {
+              if (!snapEdgesEnabled && (g === 0 || g === w)) return;
+              xPairs.push([t, g]);
+            };
+            const pushIfNotCanvasEdgeY = (t: number, g: number) => {
+              if (!snapEdgesEnabled && (g === 0 || g === h)) return;
+              yPairs.push([t, g]);
+            };
+            pushIfNotCanvasEdgeX(left, left);
+            pushIfNotCanvasEdgeX(right, right);
+            pushIfNotCanvasEdgeX(right - d.w, right);
+            pushIfNotCanvasEdgeX(left - d.w, left);
+            pushIfNotCanvasEdgeX(cx - d.w / 2, cx);
+            pushIfNotCanvasEdgeY(top, top);
+            pushIfNotCanvasEdgeY(bottom, bottom);
+            pushIfNotCanvasEdgeY(bottom - d.h, bottom);
+            pushIfNotCanvasEdgeY(top - d.h, top);
+            pushIfNotCanvasEdgeY(cy - d.h / 2, cy);
           }
         }
         const nearestPair = (val: number, pairs: Array<[number, number]>) => {
@@ -1363,8 +1367,12 @@ export function CanvasPreview() {
             const right = ltAbs.left + lw;
             const top = ltAbs.top;
             const bottom = ltAbs.top + lh;
-            xTargets.push(left, right);
-            yTargets.push(top, bottom);
+            const pushX = (v: number) => { if (!snapEdgesEnabled && (v === 0 || v === canvasW)) return; xTargets.push(v); };
+            const pushY = (v: number) => { if (!snapEdgesEnabled && (v === 0 || v === canvasH)) return; yTargets.push(v); };
+            pushX(left);
+            pushX(right);
+            pushY(top);
+            pushY(bottom);
           }
         }
         

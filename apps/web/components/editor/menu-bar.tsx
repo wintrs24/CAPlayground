@@ -24,8 +24,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, JSX } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import JSZip from "jszip";
-import { Slider } from "../ui/slider";
 import { getProject, updateProject, deleteProject, listFiles, isUsingOPFS } from "@/lib/storage";
+import { SettingsPanel } from "./settings-panel";
  
 
 interface ProjectMeta { id: string; name: string; width?: number; height?: number; createdAt?: string }
@@ -58,14 +58,8 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const [exportOpen, setExportOpen] = useState(false);
   const [exportingTendies, setExportingTendies] = useState(false);
   const [showManualSave, setShowManualSave] = useState(false);
-  const [snapEdgesEnabled, setSnapEdgesEnabled] = useLocalStorage<boolean>("caplay_settings_snap_edges", true);
-  const [snapLayersEnabled, setSnapLayersEnabled] = useLocalStorage<boolean>("caplay_settings_snap_layers", true);
-  const [snapResizeEnabled, setSnapResizeEnabled] = useLocalStorage<boolean>("caplay_settings_snap_resize", true);
-  const [snapRotationEnabled, setSnapRotationEnabled] = useLocalStorage<boolean>("caplay_settings_snap_rotation", true);
-  const [SNAP_THRESHOLD, setSnapThreshold] = useLocalStorage<number>("caplay_settings_snap_threshold", 12);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showBackground, setShowBackground] = useLocalStorage<boolean>("caplay_preview_show_background", true);
-  const [showAnchorPoint, setShowAnchorPoint] = useLocalStorage<boolean>("caplay_preview_anchor_point", false);
   const [storageFallback, setStorageFallback] = useState(false);
   const [exportView, setExportView] = useState<'select'|'success'>("select");
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -120,7 +114,14 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey;
-      if (!isMod) return;
+      if (!isMod) {
+        if (e.key === 'Escape' && settingsOpen) {
+          e.preventDefault();
+          setSettingsOpen(false);
+          return;
+        }
+        return;
+      }
       const key = e.key.toLowerCase();
       if (key === 'z') {
         e.preventDefault();
@@ -142,7 +143,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [undo, redo, toggleLeft, toggleRight]);
+  }, [undo, redo, toggleLeft, toggleRight, settingsOpen]);
 
   const exportCA = async (): Promise<boolean> => {
     try {
@@ -543,122 +544,18 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
             )}
           </Button>
         </div>
-        {/* Settings dropdown */}
+        {/* Settings button */}
         <div className="border rounded-md p-0.5">
-          <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 p-0" aria-label="Settings" data-tour-id="settings-button">
-                <Gear className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-100 p-2">
-              <div className="flex items-center justify-between gap-2 px-1 pb-1">
-                <DropdownMenuLabel className="p-0 m-0">Settings</DropdownMenuLabel>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 -mr-1"
-                  aria-label="Close settings"
-                  onClick={() => setSettingsOpen(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Snapping</DropdownMenuLabel>
-              <div className="px-2 py-1.5 space-y-1">
-                <div className="flex items-center justify-between gap-3 py-2">
-                  <Label htmlFor="snap-edges" className="text-sm">Snap to canvas edges</Label>
-                  <Switch id="snap-edges" checked={!!snapEdgesEnabled} onCheckedChange={(c) => setSnapEdgesEnabled(!!c)} />
-                </div>
-                <div className="flex items-center justify-between gap-3 py-2">
-                  <Label htmlFor="snap-layers" className="text-sm">Snap to other layers</Label>
-                  <Switch id="snap-layers" checked={!!snapLayersEnabled} onCheckedChange={(c) => setSnapLayersEnabled(!!c)} />
-                </div>
-                <div className="flex items-center justify-between gap-3 py-2">
-                  <Label htmlFor="snap-resize" className="text-sm">Snap when resizing</Label>
-                  <Switch id="snap-resize" checked={!!snapResizeEnabled} onCheckedChange={(c) => setSnapResizeEnabled(!!c)} />
-                </div>
-                <div className="flex items-center justify-between gap-3 py-2">
-                  <Label htmlFor="snap-rotation" className="text-sm">Snap rotation (0°, 90°, 180°, 270°)</Label>
-                  <Switch id="snap-rotation" checked={!!snapRotationEnabled} onCheckedChange={(c) => setSnapRotationEnabled(!!c)} />
-                </div>
-                <div className="flex items-center justify-between gap-3 py-2">
-                  <Label htmlFor="snap-threshold" className="text-sm">Sensitivity</Label>
-                  <Slider id="snap-threshold" value={[SNAP_THRESHOLD]} min={3} max={25} onValueChange={([c]) => setSnapThreshold(c)} />
-                  <Button onClick={()=>{setSnapThreshold(12)}}>Reset</Button>
-                </div>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Preview</DropdownMenuLabel>
-              <div className="px-2 py-1.5 space-y-1">
-                <div className="flex items-center justify-between gap-3 py-2">
-                  <Label htmlFor="show-anchor-point" className="text-sm">Show anchor point</Label>
-                  <Switch id="show-anchor-point" checked={!!showAnchorPoint} onCheckedChange={(c) => setShowAnchorPoint(!!c)} />
-                </div>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Keyboard Shortcuts</DropdownMenuLabel>
-              <div className="px-2 py-1.5 text-xs text-muted-foreground space-y-1">
-                <div className="flex items-center justify-between"><span>Undo</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Z</span></div>
-                <div className="flex items-center justify-between"><span>Redo</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + Z</span></div>
-                <div className="flex items-center justify-between"><span>Zoom In</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + +</span></div>
-                <div className="flex items-center justify-between"><span>Zoom Out</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + -</span></div>
-                <div className="flex items-center justify-between"><span>Reset Zoom</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + 0</span></div>
-                <div className="flex items-center justify-between"><span>Export</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + E</span></div>
-                <div className="flex items-center justify-between"><span>Pan</span><span className="font-mono">Shift + Drag or Middle Click</span></div>
-                <div className="flex items-center justify-between"><span>Toggle Left Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + L</span></div>
-                <div className="flex items-center justify-between"><span>Toggle Right Panel</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + I</span></div>
-                <div className="flex items-center justify-between"><span>Bring Forward</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + ]</span></div>
-                <div className="flex items-center justify-between"><span>Send Backward</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + [</span></div>
-                <div className="flex items-center justify-between"><span>Bring to Front</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + ]</span></div>
-                <div className="flex items-center justify-between"><span>Send to Back</span><span className="font-mono">{typeof navigator !== 'undefined' && navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} + Shift + [</span></div>
-                <div className="flex items-center justify-between"><span>Delete Layer</span><span className="font-mono">Delete</span></div>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Panels</DropdownMenuLabel>
-              <div className="px-2 py-1.5 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span>Left panel width</span>
-                  <span className="font-mono text-muted-foreground">{leftWidth ?? '—'} px</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Right panel width</span>
-                  <span className="font-mono text-muted-foreground">{rightWidth ?? '—'} px</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>States panel height</span>
-                  <span className="font-mono text-muted-foreground">{statesHeight ?? '—'} px</span>
-                </div>
-                <div className="pt-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setLeftWidth?.(320);
-                      setRightWidth?.(400);
-                      setStatesHeight?.(350);
-                    }}
-                  >
-                    Reset to defaults
-                  </Button>
-                </div>
-              </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer" onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new Event('caplay:start-onboarding' as any));
-                }
-                setSettingsOpen(false);
-              }}>
-                Show onboarding
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                Version: {latestVersion ?? '...'}
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 p-0" 
+            aria-label="Settings" 
+            data-tour-id="settings-button"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Gear className="h-4 w-4" />
+          </Button>
         </div>
         <div>
           <Button variant="secondary" disabled={!doc} onClick={() => { setExportView('select'); setExportOpen(true); }}>Export</Button>
@@ -834,6 +731,19 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Settings panel */}
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        latestVersion={latestVersion}
+        leftWidth={leftWidth}
+        rightWidth={rightWidth}
+        statesHeight={statesHeight}
+        setLeftWidth={setLeftWidth}
+        setRightWidth={setRightWidth}
+        setStatesHeight={setStatesHeight}
+      />
     </div>
   );
 }
