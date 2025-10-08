@@ -569,14 +569,18 @@ function parseCALayer(el: Element): AnyLayer {
             vals.push({ x, y });
           }
         } else if (kp === 'position.x') {
-          const nums = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'NSNumber'));
-          for (const n of nums) {
+          const numEls = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'NSNumber'));
+          const intEls = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'integer'));
+          const merged = [...numEls, ...intEls];
+          for (const n of merged) {
             const v = Number(n.getAttribute('value') || '');
             vals.push(Math.round(Number.isFinite(v) ? v : 0));
           }
         } else if (kp === 'position.y') {
-          const nums = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'NSNumber'));
-          for (const n of nums) {
+          const numEls = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'NSNumber'));
+          const intEls = Array.from(valuesNode.getElementsByTagNameNS(CAML_NS, 'integer'));
+          const merged = [...numEls, ...intEls];
+          for (const n of merged) {
             const v = Number(n.getAttribute('value') || '');
             vals.push(Math.round(Number.isFinite(v) ? v : 0));
           }
@@ -787,8 +791,13 @@ export function serializeCAML(
         if (ov.keyPath === 'transform.rotation.z') {
           outVal = (ov.value as number) * Math.PI / 180;
         }
-        const isInt = Number.isInteger(outVal);
-        vEl.setAttribute("type", isInt ? "integer" : "real");
+        if (ov.keyPath === 'position.x' || ov.keyPath === 'position.y') {
+          outVal = Math.round(outVal);
+          vEl.setAttribute('type', 'integer');
+        } else {
+          const isInt = Number.isInteger(outVal);
+          vEl.setAttribute('type', isInt ? 'integer' : 'real');
+        }
         vEl.setAttribute('value', String(outVal));
       } else {
         vEl.setAttribute('type', 'string');
@@ -1184,17 +1193,17 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, 
       for (const v of anim.values as Array<any>) {
         const n = Number(v);
         const cx = Math.round(Number.isFinite(n) ? n : 0);
-        const numEl = doc.createElementNS(CAML_NS, 'NSNumber');
-        numEl.setAttribute('value', String(cx));
-        valuesEl.appendChild(numEl);
+        const intEl = doc.createElementNS(CAML_NS, 'integer');
+        intEl.setAttribute('value', String(cx));
+        valuesEl.appendChild(intEl);
       }
     } else if (keyPath === 'position.y') {
       for (const v of anim.values as Array<any>) {
         const n = Number(v);
         const cy = Math.round(Number.isFinite(n) ? n : 0);
-        const numEl = doc.createElementNS(CAML_NS, 'NSNumber');
-        numEl.setAttribute('value', String(cy));
-        valuesEl.appendChild(numEl);
+        const intEl = doc.createElementNS(CAML_NS, 'integer');
+        intEl.setAttribute('value', String(cy));
+        valuesEl.appendChild(intEl);
       }
     } else if (keyPath === 'transform.rotation.x' || keyPath === 'transform.rotation.y' || keyPath === 'transform.rotation.z') {
       for (const v of anim.values as Array<any>) {
