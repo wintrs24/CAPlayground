@@ -147,6 +147,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
   const exportCA = async (): Promise<boolean> => {
     try {
       if (!doc) return false;
+      try { await flushPersist(); } catch {}
       const proj = await getProject(doc.meta.id);
       const nameSafe = ((proj?.name || doc.meta.name) || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
       const folder = `${(proj?.name || doc.meta.name) || 'Project'}.ca`;
@@ -219,6 +220,7 @@ export function MenuBar({ projectId, showLeft = true, showRight = true, toggleLe
     try {
       setExportingTendies(true);
       if (!doc) return;
+      try { await flushPersist(); } catch {}
       const proj = await getProject(doc.meta.id);
       const nameSafe = ((proj?.name || doc.meta.name) || 'Project').replace(/[^a-z0-9\-_]+/gi, '-');
       const isGyro = doc.meta.gyroEnabled ?? false;

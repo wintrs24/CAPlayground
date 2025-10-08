@@ -1080,9 +1080,31 @@ export function EditorProvider({
       pushHistory(prev);
       const key = prev.activeCA;
       const cur = prev.docs[key];
+      const collectIds = (node: AnyLayer, out: Set<string>) => {
+        out.add(node.id);
+        if ((node as any).type === 'group' && Array.isArray((node as any).children)) {
+          for (const c of (node as GroupLayer).children) collectIds(c, out);
+        }
+      };
+      const removedIds = new Set<string>();
+      const target = findById(cur.layers, id);
+      if (target) collectIds(target, removedIds);
+
       const nextLayers = deleteInTree(cur.layers, id);
+
+      const nextAssets = { ...(cur.assets || {}) } as NonNullable<CADoc['assets']>;
+      for (const rid of removedIds) {
+        if (nextAssets[rid]) delete nextAssets[rid];
+      }
+
+      const nextStateOverrides: NonNullable<CADoc['stateOverrides']> = {};
+      const curSO = cur.stateOverrides || {};
+      for (const [stateName, list] of Object.entries(curSO)) {
+        nextStateOverrides[stateName] = (list || []).filter((ov) => !removedIds.has(ov.targetId));
+      }
+
       const nextSelected = cur.selectedId === id || (cur.selectedId ? !containsId(nextLayers, cur.selectedId) : false) ? null : cur.selectedId;
-      const nextCur = { ...cur, layers: nextLayers, selectedId: nextSelected };
+      const nextCur = { ...cur, layers: nextLayers, selectedId: nextSelected, assets: nextAssets, stateOverrides: nextStateOverrides };
       return { ...prev, docs: { ...prev.docs, [key]: nextCur } } as ProjectDocument;
     });
   }, [pushHistory]);

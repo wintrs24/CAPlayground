@@ -736,6 +736,7 @@ export function serializeCAML(
   stateNames.forEach((stateName) => {
     let ovs = (stateOverridesInput || {})[stateName] || [];
     for (let override of ovs) {
+      if (!layerIndex[override.targetId]) continue;
       let defaultVal: any;
       switch (override.keyPath) {
         case "position.x":
@@ -775,7 +776,7 @@ export function serializeCAML(
     }
   });
 
-    const ovs = (stateOverridesInput || {})[stateName] || [];
+    const ovs = ((stateOverridesInput || {})[stateName] || []).filter((ov) => !!layerIndex[ov.targetId]);
     for (const ov of ovs) {
       const el = doc.createElementNS(CAML_NS, 'LKStateSetValue');
       el.setAttribute('targetId', ov.targetId);
