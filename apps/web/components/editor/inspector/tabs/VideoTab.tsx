@@ -2,6 +2,7 @@
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { InspectorTabProps } from "../types";
 
 export function VideoTab({
@@ -19,6 +20,24 @@ export function VideoTab({
           <div>FPS: {(selected as any).fps || 30}</div>
           <div>Duration: {((selected as any).duration || 0).toFixed(2)}s</div>
         </div>
+      </div>
+      <div className="space-y-1 col-span-2">
+        <Label htmlFor="video-calculation-mode">Calculation Mode</Label>
+        <Select
+          value={(selected as any).calculationMode || 'linear'}
+          onValueChange={(v) => updateLayer(selected.id, { calculationMode: (v as 'linear' | 'discrete') } as any)}
+        >
+          <SelectTrigger id="video-calculation-mode" className="w-full">
+            <SelectValue placeholder="Select mode" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="linear">Linear</SelectItem>
+            <SelectItem value="discrete">Discrete</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Linear blends frame values smoothly. Discrete jumps from one frame to the next with no interpolation.
+        </p>
       </div>
       <div className="space-y-1 col-span-2">
         <div className="flex items-center justify-between">

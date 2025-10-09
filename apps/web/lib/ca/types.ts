@@ -82,6 +82,7 @@ export type VideoLayer = LayerBase & {
   autoReverses?: boolean;
   framePrefix?: string;
   frameExtension?: string;
+  calculationMode?: 'linear' | 'discrete';
 };
 
 export type GradientColor = {

@@ -278,6 +278,10 @@ function parseCAVideoLayer(el: Element): VideoLayer {
       const durAttr = animNode.getAttribute('duration');
       if (durAttr) duration = Number(durAttr);
     }
+    const cm = (animNode.getAttribute('calculationMode') || '').toLowerCase();
+    if (cm === 'linear' || cm === 'discrete') {
+      (base as any).calculationMode = cm as 'linear' | 'discrete';
+    }
   }
 
   const contents = directChildByTagNS(el, 'contents');
@@ -1173,7 +1177,8 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, 
       const animationsEl = doc.createElementNS(CAML_NS, 'animations');
       const a = doc.createElementNS(CAML_NS, 'animation');
       a.setAttribute('type', 'CAKeyframeAnimation');
-      a.setAttribute('calculationMode', 'linear');
+      const calcMode = (layer as any).calculationMode === 'discrete' ? 'discrete' : 'linear';
+      a.setAttribute('calculationMode', calcMode);
       a.setAttribute('keyPath', 'contents');
       a.setAttribute('beginTime', '1e-100');
       a.setAttribute('duration', String(duration));
