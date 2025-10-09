@@ -805,16 +805,16 @@ export function EditorProvider({
       if (!selId || selId === '__root__') {
         nextLayers = [...cur.layers, layer];
       } else {
-        const insertInto = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
-          if (l.id === selId && (l as any).type === 'group') {
-            return { ...l, children: [...(l as any).children, layer] } as AnyLayer;
-          }
-          if ((l as any).type === 'group') {
-            return { ...l, children: insertInto((l as any).children) } as AnyLayer;
-          }
-          return l;
-        });
-        nextLayers = insertInto(cur.layers);
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
       }
       return {
         ...prev,
