@@ -879,7 +879,7 @@ export function EditorProvider({
     const nameSansExt = rawName.replace(/\.[a-z0-9]+$/i, '');
     const safeName = sanitizeFilename(nameSansExt) || 'Video_Layer';
     const framePrefix = `${safeName}_`;
-    const frameExtension = '.jpg';
+    let frameExtension = isGif ? '.png' : '.jpg';
     const frameAssets: Array<{ dataURL: string; filename: string }> = [];
 
     if (isGif) {
@@ -916,7 +916,7 @@ export function EditorProvider({
           const img: any = (res as any).image;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           (ctx as any).drawImage(img, 0, 0, canvas.width, canvas.height);
-          const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+          const dataURL = canvas.toDataURL('image/png');
           const filename = `${framePrefix}${i}${frameExtension}`;
           frameAssets.push({ dataURL, filename });
           try { img.close?.(); } catch {}
