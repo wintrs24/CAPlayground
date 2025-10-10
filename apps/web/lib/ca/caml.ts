@@ -228,6 +228,7 @@ function parseCAVideoLayer(el: Element): VideoLayer {
   const position = parseNumberList(attr(el, 'position'));
   const anchorPt = parseNumberList(attr(el, 'anchorPoint'));
   const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const masksToBoundsAttr = attr(el, 'masksToBounds');
   const rotationZ = attr(el, 'transform.rotation.z');
   const rotationX = attr(el, 'transform.rotation.x');
   const rotationY = attr(el, 'transform.rotation.y');
@@ -244,6 +245,7 @@ function parseCAVideoLayer(el: Element): VideoLayer {
     rotationY: rotationY ? ((Number(rotationY) * 180) / Math.PI) : undefined,
     anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
     geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+    masksToBounds: typeof masksToBoundsAttr !== 'undefined' ? ((masksToBoundsAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
   };
 
   const frameCountAttr = attr(el, 'caplayFrameCount') || attr(el, 'caplay.frameCount');
@@ -330,6 +332,7 @@ function parseCATextLayer(el: Element): AnyLayer {
   const position = parseNumberList(attr(el, 'position'));
   const anchorPt = parseNumberList(attr(el, 'anchorPoint'));
   const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const masksToBoundsAttr = attr(el, 'masksToBounds');
   const rotationZ = attr(el, 'transform.rotation.z');
   const rotationX = attr(el, 'transform.rotation.x');
   const rotationY = attr(el, 'transform.rotation.y');
@@ -358,6 +361,7 @@ function parseCATextLayer(el: Element): AnyLayer {
     rotationY: rotationY ? ((Number(rotationY) * 180) / Math.PI) : undefined,
     anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
     geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+    masksToBounds: typeof masksToBoundsAttr !== 'undefined' ? ((masksToBoundsAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
   } as const;
 
   const sublayersEl = directChildByTagNS(el, 'sublayers');
@@ -408,6 +412,7 @@ function parseCAGradientLayer(el: Element): AnyLayer {
   const position = parseNumberList(attr(el, 'position'));
   const anchorPt = parseNumberList(attr(el, 'anchorPoint'));
   const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const masksToBoundsAttr = attr(el, 'masksToBounds');
   const rotationZ = attr(el, 'transform.rotation.z');
   const rotationX = attr(el, 'transform.rotation.x');
   const rotationY = attr(el, 'transform.rotation.y');
@@ -456,6 +461,7 @@ function parseCAGradientLayer(el: Element): AnyLayer {
     rotationY: rotationY ? ((Number(rotationY) * 180) / Math.PI) : undefined,
     anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
     geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+    masksToBounds: typeof masksToBoundsAttr !== 'undefined' ? ((masksToBoundsAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
   } as const;
 
   const sublayersEl = directChildByTagNS(el, 'sublayers');
@@ -508,6 +514,7 @@ function parseCALayer(el: Element): AnyLayer {
   const position = parseNumberList(attr(el, 'position')); // x y
   const anchorPt = parseNumberList(attr(el, 'anchorPoint')); // ax ay in 0..1
   const geometryFlippedAttr = attr(el, 'geometryFlipped');
+  const masksToBoundsAttr = attr(el, 'masksToBounds');
   const rotZAttr = attr(el, 'transform.rotation.z');
   const rotXAttr = attr(el, 'transform.rotation.x');
   const rotYAttr = attr(el, 'transform.rotation.y');
@@ -597,6 +604,7 @@ function parseCALayer(el: Element): AnyLayer {
     rotationY: (rotYAttr ? ((Number(rotYAttr) * 180) / Math.PI) : undefined) ?? tRotY,
     anchorPoint: (anchorPt.length === 2 && (anchorPt[0] !== 0.5 || anchorPt[1] !== 0.5)) ? { x: anchorPt[0], y: anchorPt[1] } : undefined,
     geometryFlipped: typeof geometryFlippedAttr !== 'undefined' ? ((geometryFlippedAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
+    masksToBounds: typeof masksToBoundsAttr !== 'undefined' ? ((masksToBoundsAttr === '1' ? 1 : 0) as 0 | 1) : undefined,
   } as const;
 
   // Parse per-layer keyframe animations
@@ -1032,6 +1040,8 @@ function serializeLayer(doc: XMLDocument, layer: AnyLayer, project?: CAProject, 
   }
   const gf = (layer as any).geometryFlipped;
   if (gf === 0 || gf === 1) setAttr(el, 'geometryFlipped', String(gf));
+  const mtb = (layer as any).masksToBounds;
+  if (mtb === 0 || mtb === 1) setAttr(el, 'masksToBounds', String(mtb));
   setAttr(el, 'opacity', layer.opacity ?? undefined);
   const rotZ = (layer as any).rotation;
   const rotX = (layer as any).rotationX;

@@ -3,6 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import type { InspectorTabProps } from "../types";
 
 import type { TabId } from "../types";
@@ -106,6 +107,19 @@ export function CompositingTab({
           />
         </div>
       )}
+
+      <div className="space-y-1 col-span-2">
+        <Label>Clip contents</Label>
+        <div className="flex items-center gap-2 h-8">
+          <Switch
+            checked={(((selected as any).masksToBounds ?? 0) === 1)}
+            onCheckedChange={(checked) =>
+              updateLayer(selected.id, { masksToBounds: (checked ? 1 : 0) as any } as any)
+            }
+          />
+          <span className="text-xs text-muted-foreground">Masks this layer's sublayers to its bounds.</span>
+        </div>
+      </div>
     </div>
   );
 }

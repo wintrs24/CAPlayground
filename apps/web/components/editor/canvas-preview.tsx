@@ -1169,7 +1169,7 @@ export function CanvasPreview() {
     const parentDisplay = (g as any)._displayType as string | undefined;
     return (
       <LayerContextMenu key={g.id} layer={g} siblings={siblings}>
-        <div style={{ ...common, ...bgStyleFor(g) }}
+        <div style={{ ...common, ...bgStyleFor(g), ...((((g as any).masksToBounds ?? 0) === 1) ? { overflow: 'hidden' as const } : {}) }}
              onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}
              onTouchStart={(e) => {
                if (e.touches.length === 1) {

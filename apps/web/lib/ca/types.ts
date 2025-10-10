@@ -30,6 +30,8 @@ export type LayerBase = {
   anchorPoint?: { x: number; y: number };
   // Flip Geometry for this layer and its sublayers (0 = bottom-left origin, 1 = top-left origin)
   geometryFlipped?: 0 | 1;
+  // Clip contents for sublayers to this layer's bounds (0 = off, 1 = on)
+  masksToBounds?: 0 | 1;
   animations?: {
     enabled?: boolean;
     keyPath?: 'position' | 'position.x' | 'position.y' | 'transform.rotation.x' | 'transform.rotation.y' | 'transform.rotation.z';
