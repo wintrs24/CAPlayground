@@ -4,7 +4,9 @@ export function sanitizeFilename(name: string): string {
   const parts = n.split('.');
   const ext = parts.length > 1 ? parts.pop() as string : '';
   const base = parts.join('.') || 'image';
-  const safeBase = base.replace(/[^a-z0-9\-_.]+/gi, '_');
+  let safeBase = base.replace(/[^a-z0-9\-_.]+/gi, '_');
+  safeBase = safeBase.replace(/^-+/, '').replace(/-+$/, '');
+  if (!safeBase) safeBase = 'image';
   const safeExt = (ext || '').replace(/[^a-z0-9]+/gi, '').toLowerCase();
   return safeExt ? `${safeBase}.${safeExt}` : safeBase;
 }
