@@ -805,16 +805,16 @@ export function EditorProvider({
       if (!selId || selId === '__root__') {
         nextLayers = [...cur.layers, layer];
       } else {
-        const insertInto = (arr: AnyLayer[]): AnyLayer[] => arr.map((l) => {
-          if (l.id === selId && (l as any).type === 'group') {
-            return { ...l, children: [...(l as any).children, layer] } as AnyLayer;
-          }
-          if ((l as any).type === 'group') {
-            return { ...l, children: insertInto((l as any).children) } as AnyLayer;
-          }
-          return l;
-        });
-        nextLayers = insertInto(cur.layers);
+        const target = findById(cur.layers, selId);
+        if (target && (target as any).type === 'group') {
+          nextLayers = insertIntoGroupInTree(cur.layers, selId, layer).layers;
+        } else if (target) {
+          const wrapped = wrapAsGroup(cur.layers, selId);
+          const groupId = wrapped.newGroupId || selId;
+          nextLayers = insertIntoGroupInTree(wrapped.layers, groupId, layer).layers;
+        } else {
+          nextLayers = [...cur.layers, layer];
+        }
       }
       return {
         ...prev,
@@ -879,7 +879,7 @@ export function EditorProvider({
     const nameSansExt = rawName.replace(/\.[a-z0-9]+$/i, '');
     const safeName = sanitizeFilename(nameSansExt) || 'Video_Layer';
     const framePrefix = `${safeName}_`;
-    const frameExtension = '.jpg';
+    let frameExtension = isGif ? '.png' : '.jpg';
     const frameAssets: Array<{ dataURL: string; filename: string }> = [];
 
     if (isGif) {
@@ -916,7 +916,7 @@ export function EditorProvider({
           const img: any = (res as any).image;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           (ctx as any).drawImage(img, 0, 0, canvas.width, canvas.height);
-          const dataURL = canvas.toDataURL('image/jpeg', 0.7);
+          const dataURL = canvas.toDataURL('image/png');
           const filename = `${framePrefix}${i}${frameExtension}`;
           frameAssets.push({ dataURL, filename });
           try { img.close?.(); } catch {}

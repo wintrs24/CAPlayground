@@ -90,7 +90,14 @@ export function SettingsPanel({
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/50 z-[1000] transition-opacity duration-200" onClick={onClose} />
+      <div
+        aria-hidden
+        className={cn(
+          "fixed inset-0 z-[1000] bg-black/50 transition-opacity duration-300 ease-in-out",
+          entering && !isClosing ? "opacity-100" : "opacity-0"
+        )}
+        onClick={onClose}
+      />
       <div
         className={cn(
           "fixed top-0 right-0 h-full z-[1001] bg-background border-l shadow-2xl",

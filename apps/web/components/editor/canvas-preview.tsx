@@ -971,11 +971,13 @@ export function CanvasPreview() {
     containerH: number = (doc?.meta.height ?? 0),
     useYUp: boolean = getRootFlip() === 0,
     siblings: AnyLayer[] = renderedLayers,
-    assets?: Record<string, { dataURL?: string }>
+    assets?: Record<string, { dataURL?: string }>,
+    disableHitTesting: boolean = false
   ): ReactNode => {
     const { left, top } = computeCssLT(l, containerH, useYUp);
     const a = getAnchor(l);
     const transformOriginY = useYUp ? (1 - a.y) * 100 : a.y * 100;
+    const isWrappedContent = (l as any).__wrappedContent === true || disableHitTesting === true;
     const borderStyle: React.CSSProperties = (typeof (l as any).borderWidth === 'number' && (l as any).borderWidth > 0)
       ? { border: `${(l as any).borderWidth}px solid ${(l as any).borderColor || '#000000'}` }
       : {};
@@ -991,6 +993,7 @@ export function CanvasPreview() {
       display: l.visible === false ? "none" : undefined,
       opacity: typeof (l as any).opacity === 'number' ? Math.max(0, Math.min(1, (l as any).opacity)) : undefined,
       cursor: "move",
+      pointerEvents: isWrappedContent ? 'none' : undefined,
       ...(borderStyle || {}),
       ...(typeof (l as any).cornerRadius === 'number' ? { borderRadius: (l as any).cornerRadius } : {}),
     };
@@ -1003,13 +1006,13 @@ export function CanvasPreview() {
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
           <div
             style={{ ...common, ...bgStyleFor(l), color: l.color, fontSize: l.fontSize, textAlign: cssAlign as any, whiteSpace }}
-            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
-            onTouchStart={(e) => {
+            onMouseDown={isWrappedContent ? undefined : (e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={isWrappedContent ? undefined : ((e) => {
               if (e.touches.length === 1) {
                 e.preventDefault();
                 startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
               }
-            }}
+            })}
           >
             {l.text}
           </div>
@@ -1033,13 +1036,13 @@ export function CanvasPreview() {
               maxHeight: "none",
             }}
             draggable={false}
-            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
-            onTouchStart={(e) => {
+            onMouseDown={isWrappedContent ? undefined : (e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={isWrappedContent ? undefined : ((e) => {
               if (e.touches.length === 1) {
                 e.preventDefault();
                 startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
               }
-            }}
+            })}
           />
         </LayerContextMenu>
       );
@@ -1064,13 +1067,13 @@ export function CanvasPreview() {
               maxHeight: "none",
             }}
             draggable={false}
-            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
-            onTouchStart={(e) => {
+            onMouseDown={isWrappedContent ? undefined : (e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={isWrappedContent ? undefined : ((e) => {
               if (e.touches.length === 1) {
                 e.preventDefault();
                 startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
               }
-            }}
+            })}
           />
         </LayerContextMenu>
       );
@@ -1124,13 +1127,13 @@ export function CanvasPreview() {
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
           <div
             style={{ ...common, background }}
-            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
-            onTouchStart={(e) => {
+            onMouseDown={isWrappedContent ? undefined : (e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={isWrappedContent ? undefined : ((e) => {
               if (e.touches.length === 1) {
                 e.preventDefault();
                 startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
               }
-            }}
+            })}
           />
         </LayerContextMenu>
       );
@@ -1147,13 +1150,13 @@ export function CanvasPreview() {
         <LayerContextMenu key={l.id} layer={l} siblings={siblings}>
           <div
             style={style}
-            onMouseDown={(e) => startDrag(l, e, containerH, useYUp)}
-            onTouchStart={(e) => {
+            onMouseDown={isWrappedContent ? undefined : (e) => startDrag(l, e, containerH, useYUp)}
+            onTouchStart={isWrappedContent ? undefined : ((e) => {
               if (e.touches.length === 1) {
                 e.preventDefault();
                 startDrag(l, touchToMouseLike(e.touches[0]), containerH, useYUp);
               }
-            }}
+            })}
           />
         </LayerContextMenu>
       );
@@ -1163,9 +1166,10 @@ export function CanvasPreview() {
     const nextUseYUp = (typeof (g as any).geometryFlipped === 'number')
       ? (((g as any).geometryFlipped as 0 | 1) === 0)
       : useYUp;
+    const parentDisplay = (g as any)._displayType as string | undefined;
     return (
       <LayerContextMenu key={g.id} layer={g} siblings={siblings}>
-        <div style={{ ...common, ...bgStyleFor(g) }}
+        <div style={{ ...common, ...bgStyleFor(g), ...((((g as any).masksToBounds ?? 0) === 1) ? { overflow: 'hidden' as const } : {}) }}
              onMouseDown={(e) => startDrag(g, e, containerH, useYUp)}
              onTouchStart={(e) => {
                if (e.touches.length === 1) {
@@ -1174,7 +1178,95 @@ export function CanvasPreview() {
                }
              }}
         >
-          {g.children.map((c) => renderLayer(c, g.size.h, nextUseYUp, g.children))}
+          {parentDisplay === 'text' && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                color: (g as any).color,
+                fontSize: (g as any).fontSize,
+                textAlign: (((g as any).align === 'justified') ? 'justify' : ((g as any).align || 'left')) as any,
+                whiteSpace: (((g as any).wrapped ?? 1) === 1 ? 'normal' : 'nowrap') as any,
+                pointerEvents: 'none',
+              }}
+            >
+              {(g as any).text}
+            </div>
+          )}
+          {parentDisplay === 'image' && (() => {
+            const assetsMap = assets || (current?.assets || {});
+            const imgAsset = assetsMap[g.id];
+            const previewSrc = imgAsset?.dataURL || (g as any).src || '';
+            return (
+              <img
+                src={previewSrc}
+                alt={(g as any).name}
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'fill',
+                  maxWidth: 'none',
+                  maxHeight: 'none',
+                  pointerEvents: 'none',
+                }}
+                draggable={false}
+              />
+            );
+          })()}
+          {parentDisplay === 'gradient' && (() => {
+            const grad: any = g;
+            const gradType = grad.gradientType || 'axial';
+            const startX = (grad.startPoint?.x ?? 0) * 100;
+            const startY = (grad.startPoint?.y ?? 0) * 100;
+            const endX = (grad.endPoint?.x ?? 1) * 100;
+            const endY = (grad.endPoint?.y ?? 1) * 100;
+            const colors = (grad.colors || []).map((c: any) => {
+              const opacity = c.opacity ?? 1;
+              const hex = c.color || '#000000';
+              const r = parseInt(hex.slice(1, 3), 16);
+              const gC = parseInt(hex.slice(3, 5), 16);
+              const b = parseInt(hex.slice(5, 7), 16);
+              return `rgba(${r}, ${gC}, ${b}, ${opacity})`;
+            }).join(', ');
+            let background = '';
+            const isSamePoint = Math.abs(startX - endX) < 0.01 && Math.abs(startY - endY) < 0.01;
+            if (isSamePoint) {
+              const firstColor = (grad.colors || [])[0];
+              if (firstColor) {
+                const opacity = firstColor.opacity ?? 1;
+                const hex = firstColor.color || '#000000';
+                const r = parseInt(hex.slice(1, 3), 16);
+                const gC = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                background = `rgba(${r}, ${gC}, ${b}, ${opacity})`;
+              }
+            } else if (gradType === 'axial') {
+              const dx = endX - startX;
+              const dy = -(endY - startY);
+              const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+              background = `linear-gradient(${angle}deg, ${colors})`;
+            } else if (gradType === 'radial') {
+              background = `radial-gradient(circle at ${startX}% ${100 - startY}%, ${colors})`;
+            } else if (gradType === 'conic') {
+              const dx = endX - startX;
+              const dy = -(endY - startY);
+              const angle = Math.atan2(dy, dx) + Math.PI / 2;
+              background = `conic-gradient(from ${angle}rad at ${startX}% ${100 - startY}%, ${colors})`;
+            }
+            return (
+              <div
+                style={{ position: 'absolute', inset: 0, background, pointerEvents: 'none' }}
+              />
+            );
+          })()}
+          {g.children.map((c) => {
+            const childType = (c as any).type as string | undefined;
+            const disable = !!parentDisplay && !!childType && parentDisplay === childType;
+            return renderLayer(c, g.size.h, nextUseYUp, g.children, assets, disable);
+          })}
         </div>
       </LayerContextMenu>
     );
