@@ -24,7 +24,9 @@ type CADoc = {
   assets?: Record<string, { filename: string; dataURL: string }>;
   states: string[];
   stateOverrides?: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>;
-  activeState?: 'Base State' | 'Locked' | 'Unlock' | 'Sleep';
+  activeState?: 'Base State' | 'Locked' | 'Unlock' | 'Sleep' | 'Locked Light' | 'Unlock Light' | 'Sleep Light' | 'Locked Dark' | 'Unlock Dark' | 'Sleep Dark';
+  appearanceSplit?: boolean;
+  appearanceMode?: 'light' | 'dark';
   wallpaperParallaxGroups?: GyroParallaxDictionary[];
   camlHeaderComments?: string;
 };
@@ -67,7 +69,7 @@ export type EditorContextValue = {
   persist: () => void;
   undo: () => void;
   redo: () => void;
-  setActiveState: (state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => void;
+  setActiveState: (state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep' | 'Locked Light' | 'Unlock Light' | 'Sleep Light' | 'Locked Dark' | 'Unlock Dark' | 'Sleep Dark') => void;
   updateStateOverride: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
   updateStateOverrideTransient: (targetId: string, keyPath: 'position.x' | 'position.y' | 'opacity', value: number) => void;
   isAnimationPlaying: boolean;
@@ -276,12 +278,14 @@ export function EditorProvider({
             states: states.length ? states : [...fixedStates],
             activeState: 'Base State',
             stateOverrides,
+            appearanceSplit: false,
+            appearanceMode: 'light',
             wallpaperParallaxGroups,
             camlHeaderComments,
           };
         };
 
-        const emptyDoc: CADoc = { layers: [], selectedId: null, assets: {}, states: [...fixedStates], activeState: 'Base State', stateOverrides: {} };
+        const emptyDoc: CADoc = { layers: [], selectedId: null, assets: {}, states: [...fixedStates], activeState: 'Base State', stateOverrides: {}, appearanceSplit: false, appearanceMode: 'light' };
         
         let floatingDoc: CADoc, backgroundDoc: CADoc, wallpaperDoc: CADoc;
         if (isGyro) {
@@ -299,11 +303,71 @@ export function EditorProvider({
           activeCA: isGyro ? 'wallpaper' : 'floating',
           docs: { background: backgroundDoc, floating: floatingDoc, wallpaper: wallpaperDoc },
         };
-        skipPersistRef.current = true;
-        setDoc(initial);
+        try {
+          const applyAppearancePrefs = (docIn: ProjectDocument): ProjectDocument => {
+            const keys: Array<'background' | 'floating' | 'wallpaper'> = ['background','floating','wallpaper'];
+            const out: ProjectDocument = JSON.parse(JSON.stringify(docIn));
+            for (const k of keys) {
+              const cur = out.docs[k];
+              if (!cur) continue;
+              let split: boolean = false;
+              let mode: 'light' | 'dark' = cur.appearanceMode || 'light';
+              try {
+                const s = localStorage.getItem(`caplay_states_appearance_split_${projectId}_${k}`);
+                split = s === '1';
+                const m = localStorage.getItem(`caplay_states_appearance_mode_${projectId}_${k}`);
+                if (m === 'dark' || m === 'light') mode = m;
+              } catch {}
+              cur.appearanceSplit = split;
+              cur.appearanceMode = mode;
+              const baseStates = ["Locked","Unlock","Sleep"] as const;
+              if (split) {
+                const lightStates = ["Locked Light","Unlock Light","Sleep Light"] as const;
+                const darkStates = ["Locked Dark","Unlock Dark","Sleep Dark"] as const;
+                cur.states = [...lightStates, ...darkStates] as any;
+                const nextSO: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
+                const curSO = cur.stateOverrides || {};
+                for (let i = 0; i < baseStates.length; i++) {
+                  const b = baseStates[i];
+                  const l = lightStates[i] as string;
+                  const d = darkStates[i] as string;
+                  const list = (curSO[b] || []).slice();
+                  nextSO[l] = curSO[l] || list;
+                  nextSO[d] = curSO[d] || list;
+                }
+                cur.stateOverrides = nextSO;
+                if (cur.activeState && cur.activeState !== 'Base State' && baseStates.includes(cur.activeState as any)) {
+                  const suffix = mode === 'dark' ? 'Dark' : 'Light';
+                  cur.activeState = `${cur.activeState} ${suffix}` as any;
+                }
+              } else {
+                cur.states = [...baseStates] as any;
+                const nextSO: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
+                const curSO = cur.stateOverrides || {};
+                const pick = mode === 'dark' ? 'Dark' : 'Light';
+                for (let i = 0; i < baseStates.length; i++) {
+                  const b = baseStates[i];
+                  const v = `${b} ${pick}`;
+                  nextSO[b] = (curSO as any)[v] || curSO[b] || [];
+                }
+                cur.stateOverrides = nextSO;
+                if (cur.activeState && /\s(Light|Dark)$/.test(String(cur.activeState))) {
+                  cur.activeState = String(cur.activeState).replace(/\s(Light|Dark)$/,'') as any;
+                }
+              }
+            }
+            return out;
+          };
+          const applied = applyAppearancePrefs(initial);
+          skipPersistRef.current = true;
+          setDoc(applied);
+        } catch {
+          skipPersistRef.current = true;
+          setDoc(initial);
+        }
       } catch {
         skipPersistRef.current = true;
-        const emptyDoc: CADoc = { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {} };
+        const emptyDoc: CADoc = { layers: [], selectedId: null, assets: {}, states: ["Locked", "Unlock", "Sleep"], activeState: 'Base State', stateOverrides: {}, appearanceSplit: false, appearanceMode: 'light' };
         setDoc({
           meta: {
             id: initialMeta.id,
@@ -428,6 +492,26 @@ export function EditorProvider({
           ? rootBase as GroupLayer
           : { ...rootBase, backgroundColor: snapshot.meta.background } as GroupLayer;
 
+        const mapVariantToBaseOverrides = (docPart: CADoc): Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> => {
+          const baseStates = ["Locked", "Unlock", "Sleep"] as const;
+          const out: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
+          let mode: 'Light' | 'Dark';
+          const as = String(docPart.activeState || '');
+          if (/\sDark$/.test(as)) mode = 'Dark';
+          else if (/\sLight$/.test(as)) mode = 'Light';
+          else if (docPart.appearanceMode === 'dark') mode = 'Dark';
+          else mode = 'Light';
+          const src = (docPart.stateOverrides || {}) as Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>>;
+          for (const base of baseStates) {
+            const prefer = `${base} ${mode}`;
+            out[base] = src[prefer] || src[base] || [];
+          }
+          return out;
+        };
+
+        const outputStates = ((caDoc as any).states) as any;
+        const outputOverrides = ((caDoc as any).stateOverrides) as any;
+
         let caml = serializeCAML(
           root,
           {
@@ -438,8 +522,8 @@ export function EditorProvider({
             background: snapshot.meta.background,
             geometryFlipped: (snapshot.meta as any).geometryFlipped ?? 0,
           } as any,
-          (caDoc as any).states,
-          (caDoc as any).stateOverrides,
+          outputStates,
+          outputOverrides,
           undefined,
           caDoc.wallpaperParallaxGroups,
         );
@@ -1315,12 +1399,20 @@ export function EditorProvider({
     });
   }, []);
 
-  const setActiveState = useCallback((state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep') => {
+  const setActiveState = useCallback((state: 'Base State' | 'Locked' | 'Unlock' | 'Sleep' | 'Locked Light' | 'Unlock Light' | 'Sleep Light' | 'Locked Dark' | 'Unlock Dark' | 'Sleep Dark') => {
     setDoc((prev) => {
       if (!prev) return prev;
       const key = prev.activeCA;
       const cur = prev.docs[key];
-      const next = { ...cur, activeState: state };
+      let nextState = state as any;
+      if (state && state !== 'Base State' && cur.appearanceSplit) {
+        const isVariant = /\s(Light|Dark)$/.test(String(state));
+        if (!isVariant) {
+          const suffix = (cur.appearanceMode === 'dark') ? 'Dark' : 'Light';
+          nextState = `${state} ${suffix}` as any;
+        }
+      }
+      const next = { ...cur, activeState: nextState };
       return { ...prev, docs: { ...prev.docs, [key]: next } } as ProjectDocument;
     });
   }, []);

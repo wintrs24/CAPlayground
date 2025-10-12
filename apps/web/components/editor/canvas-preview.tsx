@@ -325,7 +325,11 @@ export function CanvasPreview() {
       return copy;
     });
     const rootCopy = cloneTree(layers);
-    const list = overrides[state] || [];
+    let list = overrides[state] || [];
+    if ((!list || list.length === 0) && /\s(Light|Dark)$/.test(String(state))) {
+      const base = String(state).replace(/\s(Light|Dark)$/,'');
+      list = overrides[base] || [];
+    }
     for (const o of list) {
       const target = map[o.targetId?.trim()] || map[o.targetId];
       if (!target) continue;
@@ -569,8 +573,15 @@ export function CanvasPreview() {
       gens[0].elements.push({ targetId, keyPath, animation: { duration } });
     };
     const ovs = current?.stateOverrides || {};
-    const toList = ovs[nextState || ''] || [];
-    const fromList = ovs[prevState || ''] || [];
+    const pickList = (st?: string): Array<{ targetId: string; keyPath: string; value: any }> => {
+      if (!st) return [];
+      const base = /\s(Light|Dark)$/.test(String(st)) ? String(st).replace(/\s(Light|Dark)$/,'') : String(st);
+      const direct = ovs[st] || [];
+      if (direct && direct.length) return direct as any;
+      return (ovs[base] || []) as any;
+    };
+    const toList = pickList(nextState);
+    const fromList = pickList(prevState);
     const keys = [
       'position.x','position.y','bounds.size.width','bounds.size.height','transform.rotation.z','opacity'
     ];
