@@ -887,8 +887,17 @@ export function serializeCAML(
         case "transform.rotation.z":
           defaultVal = layerIndex[override.targetId].rotation;
           break;
+        case "transform.rotation.x":
+          defaultVal = (layerIndex as any)[override.targetId]?.rotationX;
+          break;
+        case "transform.rotation.y":
+          defaultVal = (layerIndex as any)[override.targetId]?.rotationY;
+          break;
         case "opacity":
           defaultVal = layerIndex[override.targetId].opacity;
+          break;
+        case "cornerRadius":
+          defaultVal = (layerIndex as any)[override.targetId]?.cornerRadius;
           break;
       }
       stateNames.forEach((checkState) => {
@@ -959,7 +968,7 @@ export function serializeCAML(
     for (const elSpec of (t.elements || [])) {
       const el = doc.createElementNS(CAML_NS, 'LKStateTransitionElement');
       el.setAttribute('targetId', elSpec.targetId);
-      el.setAttribute('keyPath', elSpec.keyPath);
+      el.setAttribute('key', elSpec.keyPath);
       if (elSpec.animation) {
         const a = doc.createElementNS(CAML_NS, 'animation');
         if (elSpec.animation.type) a.setAttribute('type', String(elSpec.animation.type));
@@ -970,6 +979,7 @@ export function serializeCAML(
         if (typeof elSpec.animation.duration === 'number') a.setAttribute('duration', String(elSpec.animation.duration));
         if (elSpec.animation.fillMode) a.setAttribute('fillMode', String(elSpec.animation.fillMode));
         if (elSpec.animation.keyPath) a.setAttribute('keyPath', String(elSpec.animation.keyPath));
+        if (typeof (elSpec.animation as any).mica_autorecalculatesDuration !== 'undefined') a.setAttribute('mica_autorecalculatesDuration', String((elSpec.animation as any).mica_autorecalculatesDuration));
         el.appendChild(a);
       }
       elements.appendChild(el);

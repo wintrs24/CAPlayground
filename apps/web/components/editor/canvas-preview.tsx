@@ -349,10 +349,20 @@ export function CanvasPreview() {
         (target as any).rotationX = v as number;
       } else if (kp === 'transform.rotation.y' && typeof v === 'number') {
         (target as any).rotationY = v as number;
-      } else if ((kp === 'opacity' || kp === 'cornerRadius' || kp === 'borderWidth' || kp === 'fontSize') && typeof v === 'number') {
-        (target as any)[kp] = v as any;
-      } else if ((kp === 'backgroundColor' || kp === 'borderColor' || kp === 'color') && typeof v === 'string') {
-        (target as any)[kp] = v as any;
+      } else if (kp === 'opacity' && typeof v === 'number') {
+        (target as any).opacity = v as any;
+      } else if (kp === 'cornerradius' && typeof v === 'number') {
+        (target as any).cornerRadius = v as any;
+      } else if (kp === 'borderwidth' && typeof v === 'number') {
+        (target as any).borderWidth = v as any;
+      } else if (kp === 'fontsize' && typeof v === 'number') {
+        (target as any).fontSize = v as any;
+      } else if (kp === 'backgroundcolor' && typeof v === 'string') {
+        (target as any).backgroundColor = v as any;
+      } else if (kp === 'bordercolor' && typeof v === 'string') {
+        (target as any).borderColor = v as any;
+      } else if (kp === 'color' && typeof v === 'string') {
+        (target as any).color = v as any;
       }
     }
     return rootCopy;
@@ -404,7 +414,10 @@ export function CanvasPreview() {
     if (keyPath === 'bounds.size.width') return (l as any).size?.w;
     if (keyPath === 'bounds.size.height') return (l as any).size?.h;
     if (keyPath === 'transform.rotation.z') return (l as any).rotation ?? 0;
+    if (keyPath === 'transform.rotation.x') return (l as any).rotationX ?? 0;
+    if (keyPath === 'transform.rotation.y') return (l as any).rotationY ?? 0;
     if (keyPath === 'opacity') return (l as any).opacity ?? 1;
+    if (keyPath === 'cornerRadius') return (l as any).cornerRadius ?? 0;
     return undefined;
   };
   const setProp = (l: AnyLayer, keyPath: string, v: number) => {
@@ -416,6 +429,7 @@ export function CanvasPreview() {
     else if (keyPath === 'transform.rotation.x') (l as any).rotationX = v as any;
     else if (keyPath === 'transform.rotation.y') (l as any).rotationY = v as any;
     else if (keyPath === 'opacity') (l as any).opacity = v as any;
+    else if (keyPath === 'cornerRadius') (l as any).cornerRadius = v as any;
   };
 
   const [timeSec, setTimeSec] = useState(0);
@@ -583,7 +597,7 @@ export function CanvasPreview() {
     const toList = pickList(nextState);
     const fromList = pickList(prevState);
     const keys = [
-      'position.x','position.y','bounds.size.width','bounds.size.height','transform.rotation.z','opacity'
+      'position.x','position.y','bounds.size.width','bounds.size.height','transform.rotation.z','transform.rotation.x','transform.rotation.y','opacity','cornerRadius'
     ];
     const byKey = (arr: any[]) => {
       const m = new Map<string, Map<string, number>>();
@@ -633,7 +647,7 @@ export function CanvasPreview() {
     for (const tr of transitions) {
       for (const el of tr.elements) {
         const key = el.keyPath;
-        if (!['position.x', 'position.y', 'bounds.size.width', 'bounds.size.height', 'transform.rotation.z', 'opacity'].includes(key)) continue;
+        if (!['position.x', 'position.y', 'bounds.size.width', 'bounds.size.height', 'transform.rotation.z', 'transform.rotation.x', 'transform.rotation.y', 'opacity', 'cornerRadius'].includes(key)) continue;
         const dur = Math.max(0.1, el.animation?.duration || 0.5);
         addTrack(el.targetId, key, dur);
       }

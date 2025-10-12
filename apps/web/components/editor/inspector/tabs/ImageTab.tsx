@@ -4,17 +4,21 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
 import type { InspectorTabProps } from "../types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ImageTabProps extends Omit<InspectorTabProps, 'getBuf' | 'setBuf' | 'clearBuf' | 'round2' | 'fmt2' | 'fmt0' | 'updateLayerTransient' | 'selectedBase'> {
   replaceImageForLayer: (id: string, file: File) => Promise<void>;
+  activeState?: string;
 }
 
 export function ImageTab({
   selected,
   updateLayer,
   replaceImageForLayer,
+  activeState,
 }: ImageTabProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const inState = !!activeState && activeState !== 'Base State';
 
   if (selected.type !== 'image') return null;
 
@@ -23,13 +27,21 @@ export function ImageTab({
       <div className="space-y-1 col-span-2">
         <Label>Image</Label>
         <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
           <Button
             type="button"
             variant="secondary"
+            disabled={inState}
             onClick={() => fileInputRef.current?.click()}
           >
             Replace Image…
           </Button>
+              </div>
+            </TooltipTrigger>
+            {inState && <TooltipContent sideOffset={6}>Not supported for state transitions</TooltipContent>}
+          </Tooltip>
           <Button
             type="button"
             variant="outline"
