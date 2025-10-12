@@ -179,11 +179,16 @@ export function StatesPanel() {
                 <Settings className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-2">
+            <DropdownMenuContent align="end" className="w-64 p-2">
               <DropdownMenuLabel className="text-xs">State Settings</DropdownMenuLabel>
-              <div className="flex items-center justify-between py-1.5 px-1">
-                <span className="text-xs text-muted-foreground">Light/Dark per state</span>
-                <Switch checked={split} onCheckedChange={onToggleSplit} />
+              <div className="space-y-1">
+                <div className="flex items-center justify-between py-1.5 px-1">
+                  <span className="text-xs text-muted-foreground">Light/Dark per state</span>
+                  <Switch checked={split} onCheckedChange={onToggleSplit} />
+                </div>
+                <p className="text-[10px] text-muted-foreground px-1 pb-1">
+                  Light/Dark per state will make wallpaper not usable on iOS 16
+                </p>
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
