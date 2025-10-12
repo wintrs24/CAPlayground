@@ -47,6 +47,7 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
   const [importingWallpaper, setImportingWallpaper] = useState<string | null>(null)
   const [downloadStats, setDownloadStats] = useState<Record<string, number>>({})
   const [sortBy, setSortBy] = useState<'default' | 'downloads'>('downloads')
+  const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
     const initial = (searchParams?.get("q") || "").trim()
@@ -97,6 +98,11 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
     loadUser()
     return () => { mounted = false }
   }, [supabase])
+
+  useEffect(() => {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    setIsIOS(ios)
+  }, [])
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -319,16 +325,29 @@ export function WallpapersGrid({ data }: { data: WallpapersResponse }) {
                     <Edit className="h-4 w-4 mr-2" />
                     {importingWallpaper === item.name ? 'Opening...' : 'Open in Editor'}
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => {
-                      trackDownload(item.id, item.name)
-                      window.open(fileUrl, '_blank')
-                    }}
-                  >
-                    Download .tendies
-                  </Button>
+                  {isIOS ? (
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => {
+                        trackDownload(item.id, item.name)
+                        window.location.href = `pocketposter://download?url=${fileUrl}`
+                      }}
+                    >
+                      Open in Pocket Poster
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => {
+                        trackDownload(item.id, item.name)
+                        window.open(fileUrl, '_blank')
+                      }}
+                    >
+                      Download .tendies
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
