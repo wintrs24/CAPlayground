@@ -366,9 +366,8 @@ function parseCATextLayer(el: Element): AnyLayer {
 
   const sublayersEl = directChildByTagNS(el, 'sublayers');
   if (sublayersEl) {
-    const sublayerNodes = directChildrenByTagNS(sublayersEl, 'CALayer')
-      .concat(directChildrenByTagNS(sublayersEl, 'CATextLayer'))
-      .concat(directChildrenByTagNS(sublayersEl, 'CAGradientLayer'));
+    const sublayerNodes = (Array.from(sublayersEl.children) as Element[])
+      .filter((c) => ((c as any).namespaceURI === CAML_NS) && (c.localName === 'CALayer' || c.localName === 'CATextLayer' || c.localName === 'CAGradientLayer'));
     if (sublayerNodes.length > 0) {
       const children: AnyLayer[] = [];
       for (const n of sublayerNodes) {
@@ -466,9 +465,8 @@ function parseCAGradientLayer(el: Element): AnyLayer {
 
   const sublayersEl = directChildByTagNS(el, 'sublayers');
   if (sublayersEl) {
-    const sublayerNodes = directChildrenByTagNS(sublayersEl, 'CALayer')
-      .concat(directChildrenByTagNS(sublayersEl, 'CATextLayer'))
-      .concat(directChildrenByTagNS(sublayersEl, 'CAGradientLayer'));
+    const sublayerNodes = (Array.from(sublayersEl.children) as Element[])
+      .filter((c) => ((c as any).namespaceURI === CAML_NS) && (c.localName === 'CALayer' || c.localName === 'CATextLayer' || c.localName === 'CAGradientLayer'));
     if (sublayerNodes.length > 0) {
       const children: AnyLayer[] = [];
       for (const n of sublayerNodes) {
@@ -681,8 +679,10 @@ function parseCALayer(el: Element): AnyLayer {
   } catch {}
 
   const sublayersEl = directChildByTagNS(el, 'sublayers');
-  const sublayerNodesRaw = sublayersEl ? directChildrenByTagNS(sublayersEl, 'CALayer').concat(directChildrenByTagNS(sublayersEl, 'CATextLayer')).concat(directChildrenByTagNS(sublayersEl, 'CAGradientLayer')) : [];
-  const sublayerNodes = sublayerNodesRaw;
+  const sublayerNodes = sublayersEl
+    ? (Array.from(sublayersEl.children) as Element[])
+        .filter((c) => ((c as any).namespaceURI === CAML_NS) && (c.localName === 'CALayer' || c.localName === 'CATextLayer' || c.localName === 'CAGradientLayer'))
+    : [];
 
   if (caplayKind === 'image' || caplayKind === 'text' || caplayKind === 'gradient') {
     const children: AnyLayer[] = [];
