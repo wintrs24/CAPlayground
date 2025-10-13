@@ -5,11 +5,13 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { InspectorTabProps } from "../types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import type { TabId } from "../types";
 
 interface CompositingTabProps extends InspectorTabProps {
   setActiveTab: (tab: TabId) => void;
+  activeState?: string;
 }
 
 export function CompositingTab({
@@ -21,7 +23,9 @@ export function CompositingTab({
   clearBuf,
   fmt0,
   setActiveTab,
+  activeState,
 }: CompositingTabProps) {
+  const inState = !!activeState && activeState !== 'Base State';
   return (
     <div className="grid grid-cols-2 gap-x-1.5 gap-y-3">
       <div className="space-y-1 col-span-2">
@@ -111,12 +115,22 @@ export function CompositingTab({
       <div className="space-y-1 col-span-2">
         <Label>Clip contents</Label>
         <div className="flex items-center gap-2 h-8">
-          <Switch
-            checked={(((selected as any).masksToBounds ?? 0) === 1)}
-            onCheckedChange={(checked) =>
-              updateLayer(selected.id, { masksToBounds: (checked ? 1 : 0) as any } as any)
-            }
-          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Switch
+                  checked={(((selected as any).masksToBounds ?? 0) === 1)}
+                  disabled={inState}
+                  onCheckedChange={(checked) =>
+                    updateLayer(selected.id, { masksToBounds: (checked ? 1 : 0) as any } as any)
+                  }
+                />
+              </div>
+            </TooltipTrigger>
+            {inState && (
+              <TooltipContent sideOffset={6}>Not supported for state transitions</TooltipContent>
+            )}
+          </Tooltip>
           <span className="text-xs text-muted-foreground">Masks this layer's sublayers to its bounds.</span>
         </div>
       </div>

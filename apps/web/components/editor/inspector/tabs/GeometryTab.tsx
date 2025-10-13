@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Slider } from "@/components/ui/slider";
 import { Fragment, useState } from "react";
 import type { InspectorTabProps } from "../types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface GeometryTabProps extends InspectorTabProps {
   disablePosX: boolean;
@@ -15,6 +16,7 @@ interface GeometryTabProps extends InspectorTabProps {
   disableRotX: boolean;
   disableRotY: boolean;
   disableRotZ: boolean;
+  activeState?: string;
 }
 
 export function GeometryTab({
@@ -32,7 +34,9 @@ export function GeometryTab({
   disableRotX,
   disableRotY,
   disableRotZ,
+  activeState,
 }: GeometryTabProps) {
+  const inState = !!activeState && activeState !== 'Base State';
   const selAx = (selected as any).anchorPoint?.x ?? 0.5;
   const selAy = (selected as any).anchorPoint?.y ?? 0.5;
   
@@ -214,6 +218,9 @@ export function GeometryTab({
         </div>
         <div className="space-y-1 col-span-2">
           <Label>Anchor Point</Label>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className={inState ? 'opacity-50 pointer-events-none' : ''}>
           {!useCustomAnchor ? (
             <div className="grid grid-cols-3 gap-1">
               {([1,0.5,0] as number[]).map((ay, rowIdx) => (
@@ -222,6 +229,7 @@ export function GeometryTab({
                     const isActive = Math.abs(selAx - ax) < 1e-6 && Math.abs(selAy - ay) < 1e-6;
                     return (
                       <Button key={`ap-${rowIdx}-${colIdx}`} type="button" variant={isActive ? 'default' : 'outline'} size="sm"
+                        disabled={inState}
                         onClick={()=> updateLayer(selected.id, { anchorPoint: { x: ax, y: ay } as any })}>
                         {ax},{ay}
                       </Button>
@@ -241,6 +249,7 @@ export function GeometryTab({
                   min={0}
                   max={100}
                   step={1}
+                  disabled={inState}
                   value={[Math.round(selAx * 100)]}
                   onValueChange={([val]) => {
                     const newX = val / 100;
@@ -261,6 +270,7 @@ export function GeometryTab({
                   min={0}
                   max={100}
                   step={1}
+                  disabled={inState}
                   value={[Math.round(selAy * 100)]}
                   onValueChange={([val]) => {
                     const newY = val / 100;
@@ -278,6 +288,7 @@ export function GeometryTab({
             <Switch
               id="custom-anchor"
               checked={useCustomAnchor}
+              disabled={inState}
               onCheckedChange={(checked) => {
                 setUseCustomAnchor(checked);
                 if (!checked) {
@@ -295,12 +306,24 @@ export function GeometryTab({
               Use custom anchor point
             </Label>
           </div>
+              </div>
+            </TooltipTrigger>
+            {inState && <TooltipContent sideOffset={6}>Not supported for state transitions</TooltipContent>}
+          </Tooltip>
         </div>
         <div className="space-y-1 col-span-2">
           <Label>Flip Geometry</Label>
           <div className="flex items-center gap-2 h-8">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
             <Switch checked={(((selected as any).geometryFlipped ?? 0) === 1)}
+              disabled={inState}
               onCheckedChange={(checked)=> updateLayer(selected.id, { geometryFlipped: (checked ? 1 : 0) as any })} />
+                </div>
+              </TooltipTrigger>
+              {inState && <TooltipContent sideOffset={6}>Not supported for state transitions</TooltipContent>}
+            </Tooltip>
             <span className="text-xs text-muted-foreground">Affects this layer's sublayers' coordinate system.</span>
           </div>
         </div>

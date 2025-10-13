@@ -335,19 +335,20 @@ export function Inspector() {
               disableRotX={disableRotX}
               disableRotY={disableRotY}
               disableRotZ={disableRotZ}
+              activeState={current?.activeState}
             />
           )}
 
           {activeTab === 'compositing' && (
-            <CompositingTab {...tabProps} setActiveTab={setActiveTab} />
+            <CompositingTab {...tabProps} setActiveTab={setActiveTab} activeState={current?.activeState} />
           )}
 
           {activeTab === 'content' && (
-            <ContentTab {...tabProps} setActiveTab={setActiveTab} />
+            <ContentTab {...tabProps} setActiveTab={setActiveTab} activeState={current?.activeState} />
           )}
 
           {activeTab === 'text' && selected.type === "text" && (
-            <TextTab {...tabProps} />
+            <TextTab {...tabProps} activeState={current?.activeState} />
           )}
 
           {activeTab === 'gradient' && selected.type === "gradient" && (
@@ -359,6 +360,7 @@ export function Inspector() {
               selected={selected}
               updateLayer={updateLayer}
               replaceImageForLayer={replaceImageForLayer}
+              activeState={current?.activeState}
             />
           )}
 

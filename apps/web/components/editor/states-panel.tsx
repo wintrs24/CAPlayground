@@ -3,12 +3,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Eye } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ArrowRight, Eye, Settings } from "lucide-react";
 import { useEditor } from "./editor-context";
 import { useState, useMemo } from "react";
 
 export function StatesPanel() {
-  const { doc, setActiveState } = useEditor();
+  const { doc, setDoc, setActiveState } = useEditor();
   const key = doc?.activeCA ?? 'floating';
   const current = doc?.docs?.[key];
   const states = current?.states ?? [];
@@ -54,18 +56,68 @@ export function StatesPanel() {
     return findInLayers(current?.layers || []) || 'Unknown Layer';
   };
 
+  const split = current?.appearanceSplit ?? false;
+
+  const onToggleSplit = (checked: boolean) => {
+    if (!doc) return;
+    setDoc((prev) => {
+      if (!prev) return prev;
+      const key = prev.activeCA;
+      const cur = prev.docs[key];
+      const baseStates = ["Locked","Unlock","Sleep"] as const;
+      const lightStates = ["Locked Light","Unlock Light","Sleep Light"] as const;
+      const darkStates = ["Locked Dark","Unlock Dark","Sleep Dark"] as const;
+      const nextStates = checked ? ([...lightStates, ...darkStates] as string[]) : ([...baseStates] as string[]);
+      const curSO = cur.stateOverrides || {};
+      let nextSO: Record<string, Array<{ targetId: string; keyPath: string; value: string | number }>> = {};
+      if (checked) {
+        for (let i = 0; i < baseStates.length; i++) {
+          const b = baseStates[i];
+          const l = (lightStates[i] as string);
+          const d = (darkStates[i] as string);
+          const list = (curSO[b] || []).slice();
+          nextSO[l] = curSO[l] || list;
+          nextSO[d] = curSO[d] || list;
+        }
+      } else {
+        const pick = (cur.appearanceMode === 'dark') ? 'Dark' : 'Light';
+        for (let i = 0; i < baseStates.length; i++) {
+          const b = baseStates[i];
+          const v = `${b} ${pick}`;
+          nextSO[b] = (curSO as any)[v] || curSO[b] || [];
+        }
+      }
+      let nextActive = cur.activeState || 'Base State';
+      if (checked && nextActive && nextActive !== 'Base State' && baseStates.includes(nextActive as any)) {
+        const suffix = (cur.appearanceMode === 'dark') ? 'Dark' : 'Light';
+        nextActive = `${nextActive} ${suffix}` as any;
+      }
+      if (!checked && nextActive && /\s(Light|Dark)$/.test(nextActive)) {
+        nextActive = nextActive.replace(/\s(Light|Dark)$/,'') as any;
+      }
+      try {
+        localStorage.setItem(`caplay_states_appearance_split_${prev.meta.id}_${key}`, checked ? '1' : '0');
+      } catch {}
+      const next = { ...cur, appearanceSplit: checked, states: nextStates, stateOverrides: nextSO, activeState: nextActive } as any;
+      return { ...prev, docs: { ...prev.docs, [key]: next } } as any;
+    });
+  };
+
+  
+
   return (
     <Card className="p-0 gap-0 h-full flex flex-col" data-tour-id="states-panel">
       <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
         <div className="font-medium">States</div>
-        <Dialog open={viewAllOpen} onOpenChange={setViewAllOpen}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 px-2">
-              <Eye className="h-3.5 w-3.5 mr-1" />
-              View All
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="flex items-center gap-2">
+          <Dialog open={viewAllOpen} onOpenChange={setViewAllOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2">
+                <Eye className="h-3.5 w-3.5 mr-1" />
+                View All
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle>State Transitions Overview</DialogTitle>
             </DialogHeader>
@@ -119,8 +171,28 @@ export function StatesPanel() {
                 </div>
               )}
             </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 p-2">
+              <DropdownMenuLabel className="text-xs">State Settings</DropdownMenuLabel>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between py-1.5 px-1">
+                  <span className="text-xs text-muted-foreground">Light/Dark per state</span>
+                  <Switch checked={split} onCheckedChange={onToggleSplit} />
+                </div>
+                <p className="text-[10px] text-muted-foreground px-1 pb-1">
+                  Light/Dark per state will make wallpaper not usable on iOS 16
+                </p>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="flex-1 overflow-hidden p-3">
