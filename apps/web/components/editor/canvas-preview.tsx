@@ -1345,6 +1345,17 @@ export function CanvasPreview() {
         parentAbsTop: number;
         parentH: number;
         parentYUp: boolean;
+        rot: number;
+        cos: number;
+        sin: number;
+        hX: number;
+        hY: number;
+        sX: number;
+        sY: number;
+        fixUX: number;
+        fixUY: number;
+        fixX: number;
+        fixY: number;
       }
     | null
   >(null);
@@ -1393,6 +1404,46 @@ export function CanvasPreview() {
     const startLT = computeCssLT(l, canvasH, yUp);
     const a = getAnchor(l);
     const parentCtx = getParentAbsContextFor(l.id);
+    const rotDeg = (l.rotation ?? 0) as number;
+    const theta = -((rotDeg || 0) * Math.PI / 180);
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    const handleToFactors = (h: typeof handle) => {
+      const ax = a.x;
+      const ay = a.y;
+      if (h === "e") return { hx: 1, hy: ay };
+      if (h === "w") return { hx: 0, hy: ay };
+      if (h === "n") return { hx: ax, hy: 0 };
+      if (h === "s") return { hx: ax, hy: 1 };
+      if (h === "ne") return { hx: 1, hy: 0 };
+      if (h === "nw") return { hx: 0, hy: 0 };
+      if (h === "se") return { hx: 1, hy: 1 };
+      return { hx: 0, hy: 1 };
+    };
+    const { hx, hy } = handleToFactors(handle);
+    const sx = hx - a.x;
+    const sy = hy - a.y;
+    const oppositeFor = (h: typeof handle) => {
+      switch (h) {
+        case 'e': return { ux: 0, uy: a.y };
+        case 'w': return { ux: 1, uy: a.y };
+        case 'n': return { ux: a.x, uy: 1 };
+        case 's': return { ux: a.x, uy: 0 };
+        case 'ne': return { ux: 0, uy: 1 };
+        case 'nw': return { ux: 1, uy: 1 };
+        case 'se': return { ux: 0, uy: 0 };
+        case 'sw': return { ux: 1, uy: 0 };
+      }
+    };
+    const opp = oppositeFor(handle);
+    const anchorAbsX0 = (parentCtx.left + startLT.left) + a.x * l.size.w;
+    const anchorAbsY0 = (parentCtx.top + startLT.top) + (parentCtx.useYUp ? (1 - a.y) * l.size.h : a.y * l.size.h);
+    const dx0 = (opp.ux - a.x) * l.size.w;
+    const dy0 = (opp.uy - a.y) * l.size.h;
+    const worldDX0 = c * dx0 - s * dy0;
+    const worldDY0 = s * dx0 + c * dy0;
+    const fixX = anchorAbsX0 + worldDX0;
+    const fixY = anchorAbsY0 + worldDY0;
     resizeDragRef.current = {
       id: l.id,
       handle,
@@ -1418,34 +1469,47 @@ export function CanvasPreview() {
       parentAbsTop: parentCtx.top,
       parentH: parentCtx.containerH,
       parentYUp: parentCtx.useYUp,
+      rot: rotDeg,
+      cos: c,
+      sin: s,
+      hX: hx,
+      hY: hy,
+      sX: sx,
+      sY: sy,
+      fixUX: opp.ux,
+      fixUY: opp.uy,
+      fixX,
+      fixY,
     };
     const onMove = (ev: MouseEvent) => {
       const d = resizeDragRef.current;
       if (!d) return;
-      const startWorld = clientToWorld(d.startClientX, d.startClientY);
-      const currentWorld = clientToWorld(ev.clientX, ev.clientY);
-      const dx = currentWorld.x - startWorld.x;
-      const dy = currentWorld.y - startWorld.y;
+      const mouseWorld = clientToWorld(ev.clientX, ev.clientY);
+      const dvx = mouseWorld.x - d.fixX;
+      const dvy = mouseWorld.y - d.fixY;
+      const lx = dvx * d.cos + dvy * d.sin;
+      const ly = -dvx * d.sin + dvy * d.cos;
+      const dxH = d.hX - d.fixUX;
+      const dyH = d.hY - d.fixUY;
       let w = d.startW;
       let h = d.startH;
-      switch (d.handle) {
-        case "e": w = Math.max(1, d.startW + dx); break;
-        case "w": w = Math.max(1, d.startW - dx); break;
-        case "s": h = Math.max(1, d.startH + dy); break;
-        case "n": h = Math.max(1, d.startH - dy); break;
-        case "se": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH + dy); break;
-        case "ne": w = Math.max(1, d.startW + dx); h = Math.max(1, d.startH - dy); break;
-        case "sw": w = Math.max(1, d.startW - dx); h = Math.max(1, d.startH + dy); break;
-        case "nw": w = Math.max(1, d.startW - dx); h = Math.max(1, d.startH - dy); break;
+      const eps = 1e-6;
+      if (d.handle === "e" || d.handle === "w") {
+        if (Math.abs(dxH) > eps) w = Math.max(1, lx / dxH);
+      } else if (d.handle === "n" || d.handle === "s") {
+        if (Math.abs(dyH) > eps) h = Math.max(1, ly / dyH);
+      } else {
+        if (Math.abs(dxH) > eps) w = Math.max(1, lx / dxH);
+        if (Math.abs(dyH) > eps) h = Math.max(1, ly / dyH);
       }
       
-      if (snapResizeEnabled) {
+      const normRot = ((d.rot % 360) + 360) % 360;
+      if (snapResizeEnabled && (normRot < 0.0001 || Math.abs(normRot - 180) < 0.0001)) {
         const canvasW = docRef.current?.meta.width ?? 0;
         const canvasH = docRef.current?.meta.height ?? 0;
         const th = SNAP_THRESHOLD;
         const affectsW = ["e", "w", "ne", "se", "sw", "nw"].includes(d.handle);
         const affectsH = ["n", "s", "ne", "se", "sw", "nw"].includes(d.handle);
-        
         let testLeft = d.startLeft;
         let testTop = d.startTop;
         switch (d.handle) {
@@ -1465,10 +1529,9 @@ export function CanvasPreview() {
         const testLeftAbs = testLeft + d.parentAbsLeft;
         const testTopAbs = testTop + d.parentAbsTop;
         const testRightAbs = testLeftAbs + w;
-        const testBottomAbs = testTopAbs + h;  
+        const testBottomAbs = testTopAbs + h;
         const xTargets: number[] = [];
         const yTargets: number[] = [];
-        
         if (snapEdgesEnabled) {
           xTargets.push(0, canvasW);
           yTargets.push(0, canvasH);
@@ -1492,79 +1555,60 @@ export function CanvasPreview() {
             pushY(bottom);
           }
         }
-        
         if (affectsW) {
           const snapLeft = ["w", "nw", "sw"].includes(d.handle);
           const snapRight = ["e", "ne", "se"].includes(d.handle);
-          
           if (snapLeft) {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of xTargets) {
               const dist = Math.abs(testLeftAbs - target);
-              if (dist <= th && dist < bestDist) {
-                bestDist = dist;
-                bestTarget = target;
-              }
+              if (dist <= th && dist < bestDist) { bestDist = dist; bestTarget = target; }
             }
             if (bestTarget !== null) {
               const startRightAbs = d.startAbsLeft + d.startW;
               w = startRightAbs - bestTarget;
             }
           }
-          
           if (snapRight) {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of xTargets) {
               const dist = Math.abs(testRightAbs - target);
-              if (dist <= th && dist < bestDist) {
-                bestDist = dist;
-                bestTarget = target;
-              }
+              if (dist <= th && dist < bestDist) { bestDist = dist; bestTarget = target; }
             }
             if (bestTarget !== null) {
               w = bestTarget - testLeftAbs;
             }
           }
         }
-        
         if (affectsH) {
           const snapTop = ["n", "ne", "nw"].includes(d.handle);
           const snapBottom = ["s", "se", "sw"].includes(d.handle);
-          
           if (snapTop) {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of yTargets) {
               const dist = Math.abs(testTopAbs - target);
-              if (dist <= th && dist < bestDist) {
-                bestDist = dist;
-                bestTarget = target;
-              }
+              if (dist <= th && dist < bestDist) { bestDist = dist; bestTarget = target; }
             }
             if (bestTarget !== null) {
               const startBottomAbs = d.startAbsTop + d.startH;
               h = startBottomAbs - bestTarget;
             }
           }
-          
           if (snapBottom) {
             let bestDist = th + 1;
             let bestTarget: number | null = null;
             for (const target of yTargets) {
               const dist = Math.abs(testBottomAbs - target);
-              if (dist <= th && dist < bestDist) {
-                bestDist = dist;
-                bestTarget = target;
-              }
+              if (dist <= th && dist < bestDist) { bestDist = dist; bestTarget = target; }
             }
             if (bestTarget !== null) {
               h = bestTarget - testTopAbs;
             }
           }
         }
-        
         w = Math.max(1, w);
         h = Math.max(1, h);
       }
@@ -1583,40 +1627,14 @@ export function CanvasPreview() {
           else w = Math.max(1, h * aspect);
         }
       }
-      let left = d.startLeft;
-      let top = d.startTop;
-      switch (d.handle) {
-        case "e":
-          left = d.startLeft;
-          break;
-        case "w":
-          left = d.startLeft + d.startW - w;
-          break;
-        case "s":
-          top = d.startTop;
-          break;
-        case "n":
-          top = d.startTop + d.startH - h;
-          break;
-        case "ne":
-          left = d.startLeft;
-          top = d.startTop + d.startH - h;
-          break;
-        case "se":
-          left = d.startLeft;
-          top = d.startTop;
-          break;
-        case "sw":
-          left = d.startLeft + d.startW - w;
-          top = d.startTop;
-          break;
-        case "nw":
-          left = d.startLeft + d.startW - w;
-          top = d.startTop + d.startH - h;
-          break;
-      }
-      const localLeft = left;
-      const localTop = top;
+      const dxn = (d.fixUX - d.aX) * w;
+      const dyn = (d.fixUY - d.aY) * h;
+      const worldDXn = d.cos * dxn - d.sin * dyn;
+      const worldDYn = d.sin * dxn + d.cos * dyn;
+      const anchorX = d.fixX - worldDXn;
+      const anchorY = d.fixY - worldDYn;
+      const localLeft = (anchorX - d.aX * w) - d.parentAbsLeft;
+      const localTop = (anchorY - (d.parentYUp ? (1 - d.aY) * h : d.aY * h)) - d.parentAbsTop;
       const x = localLeft + d.aX * w;
       const y = d.parentYUp
         ? ((d.parentH - localTop) - (1 - d.aY) * h)
@@ -1659,7 +1677,7 @@ export function CanvasPreview() {
     const lt = { left: abs.left, top: abs.top };
     const a = getAnchor(l);
     const centerX = lt.left + a.x * l.size.w;
-    const centerY = lt.top + a.y * l.size.h;
+    const centerY = lt.top + (yUp ? (1 - a.y) * l.size.h : a.y * l.size.h);
     const world = clientToWorld(e.clientX, e.clientY);
     const angle0 = Math.atan2(world.y - centerY, world.x - centerX) * 180 / Math.PI;
     rotationDragRef.current = { id: l.id, centerX, centerY, startAngle: angle0 + (l.rotation ?? 0), canvasH, yUp, lastRot: l.rotation ?? 0 };
@@ -1719,6 +1737,19 @@ export function CanvasPreview() {
   const transformOriginY = abs.useYUp ? (1 - a.y) * 100 : a.y * 100;
   const inv = 1 / Math.max(0.0001, scale);
   const px = (n: number) => Math.max(0, n * inv);
+  const rot = (l.rotation ?? 0) as number;
+  const r180 = ((rot % 180) + 180) % 180;
+  const edgeCursor = (axis: 'x' | 'y'): React.CSSProperties["cursor"] => {
+    const vertical = r180 >= 45 && r180 < 135;
+    if (axis === 'x') return vertical ? 'ns-resize' : 'ew-resize';
+    return vertical ? 'ew-resize' : 'ns-resize';
+  };
+  const cornerCursor = (corner: 'nw' | 'ne' | 'se' | 'sw'): React.CSSProperties["cursor"] => {
+    const flip = r180 >= 45 && r180 < 135;
+    const base = (corner === 'nw' || corner === 'se') ? 'nwse-resize' : 'nesw-resize';
+    if (!flip) return base;
+    return base === 'nwse-resize' ? 'nesw-resize' : 'nwse-resize';
+  };
   const boxStyle: React.CSSProperties = {
     position: "absolute",
     left: abs.left,
@@ -1750,22 +1781,22 @@ export function CanvasPreview() {
     const wrapped = (((l as any).wrapped ?? 1) as number) === 1;
     if (wrapped) {
       handles = [
-        { key: "e", x: "100%", y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "e", e) },
-        { key: "w", x: 0, y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "w", e) },
+        { key: "e", x: "100%", y: "50%", cursor: edgeCursor('x'), h: (e: any) => beginResize(l, "e", e) },
+        { key: "w", x: 0, y: "50%", cursor: edgeCursor('x'), h: (e: any) => beginResize(l, "w", e) },
       ];
     } else {
       handles = [];
     }
   } else {
     handles = [
-      { key: "nw", x: 0, y: 0, cursor: "nwse-resize", h: (e: any) => beginResize(l, "nw", e) },
-      { key: "n", x: "50%", y: 0, cursor: "ns-resize", h: (e: any) => beginResize(l, "n", e) },
-      { key: "ne", x: "100%", y: 0, cursor: "nesw-resize", h: (e: any) => beginResize(l, "ne", e) },
-      { key: "e", x: "100%", y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "e", e) },
-      { key: "se", x: "100%", y: "100%", cursor: "nwse-resize", h: (e: any) => beginResize(l, "se", e) },
-      { key: "s", x: "50%", y: "100%", cursor: "ns-resize", h: (e: any) => beginResize(l, "s", e) },
-      { key: "sw", x: 0, y: "100%", cursor: "nesw-resize", h: (e: any) => beginResize(l, "sw", e) },
-      { key: "w", x: 0, y: "50%", cursor: "ew-resize", h: (e: any) => beginResize(l, "w", e) },
+      { key: "nw", x: 0, y: 0, cursor: cornerCursor('nw'), h: (e: any) => beginResize(l, "nw", e) },
+      { key: "n", x: "50%", y: 0, cursor: edgeCursor('y'), h: (e: any) => beginResize(l, "n", e) },
+      { key: "ne", x: "100%", y: 0, cursor: cornerCursor('ne'), h: (e: any) => beginResize(l, "ne", e) },
+      { key: "e", x: "100%", y: "50%", cursor: edgeCursor('x'), h: (e: any) => beginResize(l, "e", e) },
+      { key: "se", x: "100%", y: "100%", cursor: cornerCursor('se'), h: (e: any) => beginResize(l, "se", e) },
+      { key: "s", x: "50%", y: "100%", cursor: edgeCursor('y'), h: (e: any) => beginResize(l, "s", e) },
+      { key: "sw", x: 0, y: "100%", cursor: cornerCursor('sw'), h: (e: any) => beginResize(l, "sw", e) },
+      { key: "w", x: 0, y: "50%", cursor: edgeCursor('x'), h: (e: any) => beginResize(l, "w", e) },
     ];
   }
   const rotationHandleStyle: React.CSSProperties = {
