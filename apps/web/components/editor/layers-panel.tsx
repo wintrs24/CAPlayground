@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Plus, MoreVertical, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, MoreVertical, ChevronRight, ChevronDown, Copy, Trash2, Check } from "lucide-react";
 import { useEditor } from "./editor-context";
 import { useEffect, useRef, useState } from "react";
 import type { AnyLayer, GroupLayer } from "@/lib/ca/types";
@@ -319,10 +319,10 @@ export function LayersPanel() {
           <div className="text-xs text-muted-foreground">
             {multiSelectedIds.length} selected
           </div>
-          <div className="flex gap-2 flex-col">
+          <div className="flex gap-2 items-center w-full">
             <Button
               variant="outline"
-              size="sm"
+              size="icon"
               disabled={multiSelectedIds.length === 0}
               onClick={(e) => {
                 e.stopPropagation();
@@ -330,13 +330,14 @@ export function LayersPanel() {
                   try { duplicateLayer(id); } catch {}
                 }
               }}
-              className="w-full"
+              className="h-8 w-8"
+              title="Duplicate layers"
             >
-              Duplicate layers
+              <Copy className="h-4 w-4" />
             </Button>
             <Button
-              variant="destructive"
-              size="sm"
+              variant="outline"
+              size="icon"
               disabled={multiSelectedIds.length === 0}
               onClick={(e) => {
                 e.stopPropagation();
@@ -345,15 +346,17 @@ export function LayersPanel() {
                 }
                 setMultiSelectedIds([]);
               }}
-              className="w-full"
+              className="h-8 w-8"
+              title="Delete layers"
             >
-              Delete layers
+              <Trash2 className="h-4 w-4" />
             </Button>
             <Button
               size="sm"
               onClick={() => { setIsSelectMode(false); setMultiSelectedIds([]); }}
-              className="w-full"
+              className="flex-1 gap-1.5"
             >
+              <Check className="h-4 w-4" />
               Done
             </Button>
           </div>
